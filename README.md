@@ -1,2 +1,2 @@
 # maneatsbible.github.io
-Man Eats Bible LIVE
+The static website for Man Eats Bible LIVE.

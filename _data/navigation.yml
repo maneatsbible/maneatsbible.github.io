@@ -2,11 +2,13 @@
 
 - title: Posts
   url: /posts/
-- title: Categories
-  url: /categories/
-- title: Tags
-  url: /tags/
-- title: Recipes
-  url: /recipes/
+- title: Book
+  url: /book/
+- title: Letters
+  url: /letters/
+- title: Videos
+  url: /videos/
+- title: About
+  url: /about/
 - title: Search
   url: /search/

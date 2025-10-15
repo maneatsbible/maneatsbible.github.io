@@ -10,6 +10,12 @@ A Plain Reading of the Bible, written here LIVE. This will amount to a full Bibl
 
 # Preface
 
+In a dream, I saw in my vision by night a dining table set before me, and a manservant entering the room with a white cloth draped over one arm.
+
+"Good morning, Christopher," he said. "God has prepared a feast for you to eat in seven meals over three days. God made each meal in the beginning, but men freely choose not to partake, preferring their own meals instead, prepared by devils to suit their diverse tastes. So God cursed them by sealing His seven meals from them, until the day someone could open them and eat by simply reading the Bible plainly."
+
+The sections and chapters in this book comprise seven meals with seven seals, to be opened and eaten by the reader.
+
 # Introduction to Plain Reading
 
 Plain reading is to humble yourself in God's sight, putting aside all argumentation, vain imagination and philosophies of men, honestly seeking the coherence of the truth by sound exegesis, knowing context and intent by studying all of scripture.

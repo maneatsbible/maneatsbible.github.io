@@ -12,7 +12,7 @@ A Plain Reading of the Bible, written here LIVE. This will amount to a full Bibl
 
 In a dream, I saw in my vision by night a dining table set before me, and a manservant entering the room with a white cloth draped over one arm.
 
-"Good morning, Christopher," he said. "God has prepared a feast for you to eat in seven meals over three days. God made each meal in the beginning, but men freely choose not to partake, preferring their own meals instead, prepared by devils to suit their diverse tastes. So God cursed them by sealing His seven meals from them, until the day someone could open them and eat by simply reading the Bible plainly."
+"Good morning, Christopher," he said. "God has prepared a feast for you to eat in seven meals over three days. God made each meal in the beginning, but men freely choose not to partake, preferring their own meals instead, prepared by devils to suit their diverse tastes. So God cursed them by sealing His seven meals from them, until the day God's people could open them and eat by simply reading the Bible plainly."
 
 The sections and chapters in this book comprise seven meals with seven seals, to be opened and eaten by the reader. Which vain philosophies have kept the meals in this plain reading sealed from you? Whatever they may be, you'll need to drop them now if you want to proceed.
 

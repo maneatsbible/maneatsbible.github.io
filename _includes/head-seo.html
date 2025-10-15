@@ -1,3 +1,8 @@
 {% seo %}
 
-<meta name="twitter:image" content="/images/man-eats-bible-live-logo.png" />
+{% if page.image == nil %}
+  {% assign post.image = site.logo %}
+  <!-- Default card image for twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="{{ site.url }}{{ site.logo }}" />
+{% endif %}

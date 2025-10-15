@@ -38,6 +38,8 @@ disqus:
   shortname: # Disqus shortname, e.g. "my_disqus_shortname"
 twitter:
   username: maneatsbible # site's Twitter username
+  card: summary_large_image # Or 'summary'
+  image: "/images/man-eats-bible-live-logo.png" # Path to your default image
 
 # Liquid
 liquid:

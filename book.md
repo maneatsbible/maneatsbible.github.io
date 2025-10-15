@@ -6,4 +6,4 @@ title: How to Eat the Bible
 
 # Preface
 
-This will be a book about the plain reading of the Bible, Lord willing.
+This will be a book about plainly reading the Bible, and it will eventually amount to a full Bible commentary, Lord willing.

@@ -113,3 +113,6 @@ collections:
   letters:
     output: true
     permalink: /:collection/:path/
+  videos:
+    output: true
+    permalink: /:collection/:path/

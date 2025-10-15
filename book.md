@@ -1,10 +1,9 @@
 ---
 title: How to Eat the Bible
-toc: true
 ---
 
 {% include toc %}
 
 # Preface
 
-This is a book....
+This will be a book about the plain reading of the Bible, Lord willing.

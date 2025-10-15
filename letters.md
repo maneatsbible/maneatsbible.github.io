@@ -6,4 +6,4 @@ collection: letters
 entries_layout: grid
 ---
 
-These are open letters to Christian ministers and apologists.
+Letters to Christian ministers and apologists will go here, Lord willing.

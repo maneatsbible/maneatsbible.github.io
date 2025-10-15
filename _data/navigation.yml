@@ -3,12 +3,12 @@
 - title: Home
   url: /
 - title: Book
-  url: /book/
+  url: /book
 - title: Letters
   url: /letters/
 - title: Podcast
   url: /podcast/
 - title: About
-  url: /about/
+  url: /about
 - title: Search
   url: /search/

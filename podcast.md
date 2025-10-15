@@ -1,8 +1,8 @@
 ---
-title: Videos
+title: Podcast
 layout: collection
-permalink: /videos/
-collection: videos
+permalink: /podcast/
+collection: podcast
 entries_layout: grid
 ---
 

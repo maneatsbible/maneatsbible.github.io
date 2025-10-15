@@ -37,7 +37,7 @@ google_analytics: # Google Analytics id, e.g. "UA-NNNNNNNN-N"
 disqus:
   shortname: # Disqus shortname, e.g. "my_disqus_shortname"
 twitter:
-  username: mmistakes # site's Twitter username
+  username: maneatsbible # site's Twitter username
 
 # Liquid
 liquid:
@@ -77,26 +77,12 @@ plugins:
   - jekyll-feed
   - jekyll-paginate
 
-# Collections
-collections:
-  recipes:
-    output: true
-    permalink: /:collection/:path/
-
 # Front Matter Defaults
 defaults:
   # Post defaults
   - scope:
       path: "_posts"
       type: posts
-    values:
-      layout: post
-      comments: true
-      share: true
-  # Recipe defaults
-  - scope:
-      path: "_recipes"
-      type: recipes
     values:
       layout: post
       comments: true
@@ -121,3 +107,9 @@ footer_links:
   - title: Feed
     url: atom.xml
     icon: fas fa-rss-square
+
+# Collections
+collections:
+  letters:
+    output: true
+    permalink: /:collection/:path/

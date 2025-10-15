@@ -1,5 +1,6 @@
 ---
 title: The Word of God
+date: 2025-10-14 12:00:00 -0700
 ---
 
 Much confusion has arisen over the blurred distinction between the word of God and the Bible, which conveys the word of God. The confusion mainly began with Luther, and all of it perpetuates because people don't even understand the plain meaning of the word of God.

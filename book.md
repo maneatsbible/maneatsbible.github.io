@@ -34,7 +34,7 @@ A Plain Reading of the Bible, written here LIVE. This will amount to a full Bibl
 
 # Appendix A: The Good Questions of God and Jesus
 
-An exhaustive list of all the questions asked by God and Jesus, directly and through their messengers, along with analysis.
+An exhaustive list of all the questions asked by God and Jesus, directly and through their messengers, along with commentary. Their good questions teach us how to ask good questions.
 
 # Appendix B: Plainly Reading the Proof-Texts
 

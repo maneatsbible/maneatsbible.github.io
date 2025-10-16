@@ -30,13 +30,15 @@ layout: default
           {% include social-share.html %}
         {% endif %}
 
-        <script src="https://utteranc.es/client.js"
-          repo="maneatsbible/maneatsbible.github.io"
-          issue-term="pathname"
-          theme="github-light"
-          crossorigin="anonymous"
-          async>
-        </script>
+	{% if page.comments %}
+          <script src="https://utteranc.es/client.js"
+            repo="maneatsbible/maneatsbible.github.io"
+            issue-term="pathname"
+            theme="github-light"
+            crossorigin="anonymous"
+            async>
+          </script>
+        {% endif %}
 
         {% include page-pagination.html %}
       </div>

@@ -4,7 +4,7 @@ layout: post
 share: true
 ---
 
-*A plain reading of the Bible, written here LIVE. This will amount to a full Bible commentary, Lord willing.*
+*A plain reading of the Bible, written here LIVE. This will eventually amount to a full Bible commentary, Lord willing.*
 
 {% include toc %}
 

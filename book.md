@@ -52,7 +52,7 @@ God is the Gardener, and we're His trees. Seriously.
 
 ## Chapter 6: The Tower and the Tabernacle
 
-This is about technology.
+This is about technology. It's about men who build skyscrapers, and starships.
 
 # Section 3: Prophecy
 

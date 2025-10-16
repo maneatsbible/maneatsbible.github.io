@@ -2,6 +2,7 @@
 title: How to Eat the Bible
 layout: post
 share: true
+comments: true
 ---
 
 *A plain reading of the Bible, written here LIVE. This will eventually amount to a full Bible commentary, Lord willing.*

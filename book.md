@@ -62,7 +62,7 @@ Let me tell you about Solomon's Masons...
 
 # Appendix A: The Good Questions of God and Jesus
 
-An exhaustive list of all the questions asked by God and Jesus, directly and through their messengers, along with commentary. Their good questions teach us how to ask good questions in pursuit of the truth, which is needed for judging righteously as commanded by God.
+An exhaustive list of all the questions asked by God and Jesus, directly and through their messengers, along with commentary. Their good questions teach us how to ask good questions in pursuit of the truth, which is needed for judging righteously as commanded by God. Asking good questions is a spiritual weapon that hypocrites cannot wield, as it will turn back and cut them too.
 
 # Appendix B: Plainly Reading the Proof-Texts
 

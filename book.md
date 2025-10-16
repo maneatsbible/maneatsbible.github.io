@@ -40,7 +40,7 @@ This is about conscience, your God-given knowledge of right and wrong. It's also
 
 # Section 2: This Proving Ground
 
-We're all Job. God is testing all of us, to see who is worthy to dwell in His kingdom forever, and who is worthy for the fire that consumes, destroying even their souls in hell.
+We're all Job. God is testing all of us, to see who is worthy to dwell in His kingdom forever, and who is worthy of the fire that consumes, destroying even their souls in hell.
 
 ## Chapter 4: Heaven, Earth and Sea
 

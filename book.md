@@ -52,7 +52,7 @@ God is the Gardener, and we're trees. Seriously. I'll show you.
 
 ## Chapter 6: The Tower and the Tabernacle
 
-This is about technology. It's about men who build skyscrapers, and starships.
+This is about technology and the beast system. It's about men who build skyscrapers, and starships.
 
 # Section 3: Prophecy
 
@@ -60,7 +60,7 @@ I will prophesy here, Lord willing, by preaching the word of God that comes by w
 
 ## Chapter 7: The Vast Conspiracy
 
-Let me tell you about Solomon's Masons...
+Let me tell you about Solomon and his Masons, and the temple they intend to build...
 
 # Appendix A: The Good Questions of God and Jesus
 

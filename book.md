@@ -56,6 +56,8 @@ This is about technology. It's about men who build skyscrapers, and starships.
 
 # Section 3: Prophecy
 
+I will prophecy here, Lord willing, by preaching the word of God that comes by way of reading plainly.
+
 ## Chapter 7: The Vast Conspiracy
 
 Let me tell you about Solomon's Masons...

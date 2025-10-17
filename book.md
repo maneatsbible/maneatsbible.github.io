@@ -53,7 +53,7 @@ God is the Gardener, and we're trees. Seriously. I'll show you.
 
 ## Chapter 6: The Tower and the Tabernacle
 
-This is about technology and the beast system. It's about men who build skyscrapers, and starships. They build idols, which are worthless. "They worship the work of their own hands, that which their own fingers have made" (Psa 2:8b).
+This is about technology and the beast system. It's about men who build skyscrapers, and starships. They build idols, which are worthless. "They worship the work of their own hands, that which their own fingers have made" (Isa 2:8b).
 
 # Section 3: Prophecy
 

@@ -1,5 +1,5 @@
 ---
-title: How to Eat the Bible
+title: Let's Eat the Bible Together
 layout: post
 share: true
 comments: true

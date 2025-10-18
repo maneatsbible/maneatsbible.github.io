@@ -5,7 +5,7 @@ permalink: /memoirs/
 collection: memoirs
 entries_layout: grid
 image: 
-  thumbnail: /images/memoirs-1200x630.png
+  thumbnail: /images/memoirs.png
 ---
 
 *I've spent time living as a homeless man, walking and talking to people about Jesus Christ. These are some of my memoirs.*

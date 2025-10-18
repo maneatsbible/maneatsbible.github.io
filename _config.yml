@@ -95,7 +95,7 @@ defaults:
       comments: true
       share: true
       image: 
-        thumbnail: /images/memoirs-1200x630.png
+        thumbnail: /images/memoirs.png
       hide_date: true
 
 # Site Author

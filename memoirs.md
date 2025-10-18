@@ -4,6 +4,7 @@ layout: collection
 permalink: /memoirs/
 collection: memoirs
 entries_layout: grid
+sort_by: position
 image: 
   thumbnail: /images/memoirs.jpg
 ---

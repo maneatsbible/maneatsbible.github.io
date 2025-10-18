@@ -1,5 +1,6 @@
 ---
 title: Rich Is Not Rich
+position: 2
 ---
 
 Today I met Rich, a homeless man who is definitely not rich.

@@ -5,7 +5,6 @@ permalink: /memoirs/
 collection: memoirs
 entries_layout: grid
 image: 
-  path: /images/memoirs.jpg
   thumbnail: /images/memoirs.jpg
 ---
 

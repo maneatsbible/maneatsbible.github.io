@@ -70,11 +70,11 @@ Starr jumped up, lit a cigarette, exhaled.
 
 "Tell me."
 
-"Josh **** Brolin."
+"Josh \*** Brolin."
 
 He drew from his cigarette, holding up the wait finger. Then he exhaled and said,
 
-"Josh **** Brolin. He's my absolute hero of all time, bro. Ever since The Goonies."
+"Josh \*** Brolin. He's my absolute hero of all time, bro. Ever since The Goonies."
 
 Here are some things you should know:
 

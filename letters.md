@@ -6,4 +6,4 @@ collection: letters
 entries_layout: grid
 ---
 
-Letters to Christian ministers and apologists will go here, Lord willing.
+*Letters to Christian ministers and apologists will go here, Lord willing.*

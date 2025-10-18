@@ -113,6 +113,9 @@ collections:
   letters:
     output: true
     permalink: /:collection/:path/
-  videos:
+  podcast:
+    output: true
+    permalink: /:collection/:path/
+  memoirs:
     output: true
     permalink: /:collection/:path/

@@ -94,6 +94,8 @@ defaults:
       layout: post
       comments: true
       share: true
+      image: 
+        thumbnail: /images/memoirs.jpg
 
 # Site Author
 author:

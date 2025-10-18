@@ -4,4 +4,7 @@
   {% assign post.image = site.logo %}
   <!-- Default card image for twitter -->
   <meta name="twitter:image" content="{{ site.url }}{{ site.logo }}" />
+{% else if page.image.thumbnail %}
+  <!-- Thumbnail card image for twitter -->
+  <meta name="twitter:image" content="{{ site.url }}{{ page.image.thumbnail }}" />
 {% endif %}

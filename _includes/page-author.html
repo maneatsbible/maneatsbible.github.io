@@ -34,6 +34,8 @@
       </ul>
     {%- endif -%}
     {% if site.read_time %}{% include read-time.html %}{% endif %}
-    {% if page.date %}{% include page-date.html %}{% endif %}
+    {% unless page.hide_date %}
+      {% if page.date %}{% include page-date.html %}{% endif %}
+    {% endunless %}
   </div>
 </div>

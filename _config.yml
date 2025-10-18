@@ -96,6 +96,7 @@ defaults:
       share: true
       image: 
         thumbnail: /images/memoirs.jpg
+      hide_date: true
 
 # Site Author
 author:

@@ -1,6 +1,6 @@
 ---
 title: Mississippi Delivered a Message
-position: 9
+date: 2025-10-17
 ---
 
 I preach to save souls, but I experienced an Ezekiel 3 moment a couple years ago that made that burden secondary (Eze 3:16-21).

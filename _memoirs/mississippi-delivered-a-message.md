@@ -4,7 +4,9 @@ image:
   thumbnail: /images/memoirs.jpg
 ---
 
-I preach to save souls, but I experienced an Ezekiel 3 moment a couple years ago that made that burden secondary (Eze 3:16-21). After I'd informed a homeless shelter that I wouldn't be preaching in the courtyard anymore because of all the haters, a man I took to be a hard case approached.
+I preach to save souls, but I experienced an Ezekiel 3 moment a couple years ago that made that burden secondary (Eze 3:16-21).
+
+After I'd informed a homeless shelter that I wouldn't be preaching in the courtyard anymore because of all the haters, a man I took to be a hard case approached.
 
 He called me Preacher and I called him Mississippi. He chain-smoked and spoke with a drawl, and whenever asked how he's doing, always responded the same way: I'm doing great!
 

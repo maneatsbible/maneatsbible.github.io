@@ -7,5 +7,3 @@ entries_layout: grid
 ---
 
 *Title says it all...*
-
-![image](/images/memoirs.jpg)

@@ -41,7 +41,7 @@ It gets worse. The history of the Old Mission is a history of slave-driving.
 
 It wasn't African slaves, or Mexican slaves, although Mexicans are now the slave-class in Santa Barbara. I grew up hearing rich people talk about their gardeners as their Mexicans. They'd loan them out to friends who needed stuff done. "I'll send over my Mexican to do that."
 
-No, it was the Chumash Indians who got enslaved by Rome. The Chumash built everything for them, including the Mission. They put in the waterways, ran a massive cattle operation and generally worked as the slave backbone of a proto-city.
+No, it was the Chumash Indians who got enslaved by Rome. The Chumash built everything for them in early Santa Barbara, including the Mission. They put in the waterways, ran a massive cattle operation and generally worked as the slave backbone of a proto-city.
 
 Do you see the Chumash hands in the Spanish-Greco-Roman mash-up architecture?
 

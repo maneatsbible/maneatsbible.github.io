@@ -1,6 +1,5 @@
 ---
 title: Fallen Starr
-date: 2025-08-10
 ---
 
 I'll tell you about fallen Starr.

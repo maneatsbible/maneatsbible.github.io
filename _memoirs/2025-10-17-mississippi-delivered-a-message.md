@@ -1,6 +1,5 @@
 ---
 title: Mississippi Delivered a Message
-date: 2025-10-17
 ---
 
 I preach to save souls, but I experienced an Ezekiel 3 moment a couple years ago that made that burden secondary (Eze 3:16-21).
@@ -31,7 +30,9 @@ And then Mississippi walked away.
 
 I got the message (Eze 3:16-21).
 
- preached that evening in front of the courtyard at the usual time, 10 minute message at 5 o'clock, and daily over the next few weeks.
+---
+
+I preached that evening in front of the courtyard at the usual time, 10 minute message at 5 o'clock, and daily over the next few weeks.
 
 One day Mississippi approached.
 
@@ -44,5 +45,7 @@ I already knew his name is Brian.
 "My name's Christopher," I told him.
 
 Brian still calls me Preacher, so I still call him Mississippi.
+
+---
 
 The cheeseburgers at the Wellness Center are excellent for the price, which is $0. I never saw Mississippi there.

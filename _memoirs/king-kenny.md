@@ -93,7 +93,7 @@ I wasn't up for it.
 
 ---
 
-"I said you wouldn't go," said Mississippi, who said Kenny wouldn't go, and Kenny didn't go.
+"I said you wouldn't go," said Mississippi, who said Kenny wouldn't go, because Kenny didn't go.
 
 Kenny said he’d had a heart attack along the way, and sure enough, he had a broken ER bracelet dated from the day prior. That could have been from an asthma attack, for all anyone knew, but dude brought receipts nonetheless.
 

@@ -37,7 +37,7 @@ He shrugs. "It's a free country."
 
 ---
 
-I like walking the tracks to get across town, and when you're doing that, you want to keep to your own business. The people camped by the tracks tend to like their privacy, and despise inspections.
+I like walking the tracks to get across town, and when you're doing that, you want to keep to your own business. The people camped by the tracks tend to like their privacy, and despise inspections, because they're criminals.
 
 If you look, expect, "What're you lookin' at."
 

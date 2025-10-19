@@ -187,7 +187,7 @@ One Sunday night, I'm falling asleep at the shelter when a man comes in late. It
 
 I'm not an "I told you so" kind of guy, so I don't say anything.
 
-Grace was the life of Bobby's breakfast party, then she and Bobby were hanging out. I want no further details.
+Grace was the life of Bobby's breakfast party that day, then she and Bobby were hanging out. I want no further details.
 
 Then Bobby calls me over and says,
 

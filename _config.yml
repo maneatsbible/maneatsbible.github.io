@@ -20,7 +20,7 @@ title: "Man Eats Bible LIVE"
 description: "You are what you eat."
 baseurl: # the subpath of your site, e.g. "/blog"
 url: "https://maneatsbible.live"
-logo: "/images/man-eats-bible-live-logo.png" # path of site logo, e.g. "/assets/images/logo.png"
+logo: "/images/logo.png" # path of site logo, e.g. "/assets/images/logo.png"
 date_format: "%B %-d, %Y"
 read_time: true
 words_per_minute: 200
@@ -87,6 +87,26 @@ defaults:
       layout: post
       comments: true
       share: true
+  - scope:
+      path: "_letters"
+      type: letters
+    values:
+      layout: post
+      comments: true
+      share: true
+      image: 
+        thumbnail: /images/letters.png
+      hide_date: true
+  - scope:
+      path: "_podcast"
+      type: podcast
+    values:
+      layout: post
+      comments: true
+      share: true
+      image: 
+        thumbnail: /images/logo.png
+      hide_date: true
   - scope:
       path: "_memoirs"
       type: memoirs

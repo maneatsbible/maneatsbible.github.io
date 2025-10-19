@@ -1,5 +1,6 @@
 ---
 title: Rich Is Not Rich
+date: 2025-08-11
 ---
 
 Today I met Rich, a homeless man who is definitely not rich.

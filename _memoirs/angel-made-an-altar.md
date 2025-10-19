@@ -1,5 +1,6 @@
 ---
 title: Angel Made an Altar
+date: 2025-08-12
 ---
 
 There's a homeless man who calls himself Angel, and he claims to be an actual for-reals angel from heaven. He also claims that I'm with Satan and I'm trying to deny an entire city of homeless people their due blessings.

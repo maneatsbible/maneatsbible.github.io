@@ -1,5 +1,6 @@
 ---
 title: False Israel
+date: 2025-08-13
 ---
 
 The thing about false Israel was, he had demons. And for the longest time, I didn't know what to call him, and I'm still not sure, because Israel was a liar, a thief and a murderer.

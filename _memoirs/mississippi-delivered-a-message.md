@@ -49,4 +49,4 @@ Brian still calls me Preacher, so I still call him Mississippi.
 
 ---
 
-The cheeseburgers at the Wellness Center are excellent for the price, which is $0. I never saw Mississippi there.
+The cheeseburgers at the Wellness Center are excellent for the price, which is $0.00. I never saw Mississippi there.

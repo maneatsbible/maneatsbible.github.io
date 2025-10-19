@@ -85,7 +85,7 @@ I'm serious. From booze to pain killers and meth, the problem is partying.
 
 The KJV calls it banqueting. It sounds quaint, but I'm still serious.
 
-Whether happy or sad, alone or with others, when you're taking in substances to comfort yourself, you're partying. You're throwing yourself a cute little comfort party, to celebrate whatever, or just whatever.
+Whether happy or sad, alone or with others, when you're taking in substances to get wasted, you're partying. You're throwing yourself a cute little comfort party, to celebrate whatever, or just whatever.
 
 I don't remember when exactly, but I was a child, and I marveled that people threw parties for no reason. Ragers, even.
 

@@ -219,6 +219,7 @@ Then he hands me off to the Sheriff's department. They let me keep my sweater be
 After getting held for the night, they let me out with a court date in 30 days.
 
 ![image](/images/trespassing-citation.jpg)
+*That address is the rescue mission. Dox me, fool.*
 
 Fresh out of jail (haha), I walk across town to Police HQ and claim my cowboy hat. They bring me the hat in an evidence bag all sealed up and dated like it’s going to trial. What a thoughtful cop.
 

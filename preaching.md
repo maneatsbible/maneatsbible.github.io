@@ -11,4 +11,6 @@ excerpt: "I'm gonna preach through the Bible cover-to-cover LIVE, Lord willing."
 
 *{{ page.excerpt }}*
 
+Upcoming and recorded sessions to go here.
+
 ![image](/images/the-big-preach.png)

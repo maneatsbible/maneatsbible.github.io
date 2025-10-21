@@ -6,11 +6,9 @@ collection: preaching
 entries_layout: grid
 image: 
   thumbnail: /images/the-big-preach.png
-excerpt: "I'm gonna preach through the entire Bible LIVE, Lord willing."
+excerpt: "I'm preaching through the entire Bible LIVE."
 ---
 
 *{{ page.excerpt }}*
 
-Upcoming and recorded sermons to go here.
-
-![image](/images/the-big-preach.png)
+Find upcoming and recorded sermons here.

@@ -106,6 +106,7 @@ defaults:
       share: true
       image: 
         thumbnail: /images/the-big-preach.png
+      hide_date: true
   - scope:
       path: "_tcbt"
       type: tcbt

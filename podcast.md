@@ -11,4 +11,4 @@ excerpt: "Podcast episodes, including True Crime Bible Time, will go here, Lord 
 
 *{{ page.excerpt }}*
 
-![image](/images/TCBT.jpg)
+![image](/images/tcbt.jpg)

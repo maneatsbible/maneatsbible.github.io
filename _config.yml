@@ -98,14 +98,24 @@ defaults:
         thumbnail: /images/letters.png
       hide_date: true
   - scope:
-      path: "_podcast"
-      type: podcast
+      path: "_preaching"
+      type: preaching
     values:
       layout: post
       comments: true
       share: true
       image: 
-        thumbnail: /images/logo.png
+        thumbnail: /images/the-big-preach.png
+      hide_date: true
+  - scope:
+      path: "_tcbt"
+      type: tcbt
+    values:
+      layout: post
+      comments: true
+      share: true
+      image: 
+        thumbnail: /images/tcbt.jpg
       hide_date: true
   - scope:
       path: "_memoirs"
@@ -143,7 +153,10 @@ collections:
   letters:
     output: true
     permalink: /:collection/:path/
-  podcast:
+  preaching:
+    output: true
+    permalink: /:collection/:path/
+  tcbt:
     output: true
     permalink: /:collection/:path/
   memoirs:

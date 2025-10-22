@@ -15,7 +15,7 @@ I [read the Bible plainly]({{ site.url }}/book#introduction-to-plain-reading) wi
 On this website, I'm hosting:
 
 * [Live preaching]({{ site.url }}/preaching)
+* [A catechism of the biblical Christian faith]({{ site.url }}/catechism)
 * [My memoirs as a homeless preacher]({{ site.url }}/memoirs)
-* [A catechism of the Bible]({{ site.url }}/catechism)
-* [A new true crime podcast]({{ site.url }}/tcbt)
-* [Letters to the churches]({{ site.url }}/letters)
+* [A new (and biblical) true crime podcast]({{ site.url }}/tcbt)
+* [Open letters to the churches]({{ site.url }}/letters)

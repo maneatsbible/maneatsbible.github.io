@@ -3,9 +3,10 @@ title: Let's Eat the Bible Together
 layout: post
 share: true
 comments: true
+excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add your comments below."
 ---
 
-*A catechism of the biblical Christian faith, written here LIVE. Add your comments below.*
+*{{ page.excerpt }}*
 
 {% include toc %}
 

@@ -35,11 +35,79 @@ comments: true
 
 # Introduction to Plain Reading
 
-*A*: Plain reading is to humble yourself in God's sight, putting aside all argumentation, vain imagination and philosophies of men, honestly seeking the coherence of the truth by sound exegesis, knowing context and intent by studying all of scripture.
+*A*: Plain reading is to humble yourself in God's sight, putting aside all argumentation, vain imagination and the philosophies of men, honestly seeking the coherence of the truth by sound exegesis, knowing context and intent by studying all of scripture.
+
+*Q* What does it mean to humble yourself in God's sight?
+
+*A*: 
+
+*Q*: What is argumentation?
+
+*A*: 
+
+*Q*: Why put aside all argumentation?
+
+*A*: 
+
+*Q*: What is vain imagination?
+
+*A*: 
+
+*Q*: Why put aside vain imagination?
+
+*A*: 
+
+*Q*: What are the philosophies of men?
+
+*A*: 
+
+*Q*: Why put aside the philosophies of men?
+
+*A*: 
+
+*Q*: What does it mean to honestly seek?
+
+*A*: 
+
+*Q*: What is coherence?
+
+*A*: 
+
+*Q*: What is coherence?
+
+*A*: 
+
+*Q*: What is the truth?
+
+*A*: 
+
+*Q*: What is exegesis?
+
+*A*: 
+
+*Q*: What is sound exegesis?
+
+*A*: 
+
+*Q*: What is context?
+
+*A*: 
+
+*Q*: What is intent?
+
+*A*: 
+
+*Q*: What is scripture?
+
+*A*: 
+
+*Q*: What is it to study all of scripture?
+
+*A*: 
 
 # Section 1: Obey God
 
-... or perish. Grace ain't your ticket to disobedience.
+Obey God or perish. Grace ain't your ticket to disobedience.
 
 ## Chapter 1: Fear God
 

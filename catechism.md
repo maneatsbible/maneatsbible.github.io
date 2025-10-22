@@ -5,7 +5,7 @@ share: true
 comments: true
 ---
 
-*A catechism of the biblical Christian faith, written here LIVE.*
+*A catechism of the biblical Christian faith, written here LIVE. Add your comments below.*
 
 {% include toc %}
 

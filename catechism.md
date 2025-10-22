@@ -12,13 +12,13 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 # Preface
 
-<a name="q-qdkbom54wq" href="{{ url }}/catechism#q-qdkbom54wq">*Question*</a>: What is a catechism?
+{% include question.html random="qdkbom54wq" long=true %} What is a catechism?
 
-<a name="a-4bhen73p17" href="{{ url }}/catechism#a-4bhen73p17">*Answer*</a>: A catechism is a summary of religious principles taught in the form of questions and answers.
+{% include answer.html random="4bhen73p17" long=true %} A catechism is a summary of religious principles taught in the form of questions and answers.
 
-<a name="q-kmx83jvsa3" href="{{ url }}/catechism#q-kmx83jvsa3">*Q*</a>: So it's a FAQ?
+{% include question.html random="kmx83jvsa3" %} So it's a FAQ?
 
-<a name="a-3ge11qetdd" href="{{ url }}/catechism#a-3ge11qetdd">*A*</a>: The word *catechism* is fancier, but Yes.
+{% include answer.html random="kmx83jvsa3" %} The word *catechism* is fancier, but Yes.
 
 *Q*: What is faith?
 
@@ -126,7 +126,7 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 *A*: 
 
-<a name="q-nkpgw6s2aw" href="{{ url }}/catechism#q-nkpgw6s2aw">*Q*</a>: What is the truth?
+{% include question.html random="nkpgw6s2aw" %} What is the truth?
 
 *A*: 
 

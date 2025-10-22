@@ -15,6 +15,10 @@ comments: true
 
 *Answer*: A catechism is a summary of religious principles taught in the form of questions and answers.
 
+*Q*: So it's a FAQ?
+
+*A*: The word *catechism* is fancier, but Yes.
+
 *Q*: What is faith?
 
 *A*: Faith is trust in the promises made by a loved one, as in a marriage.
@@ -25,13 +29,13 @@ comments: true
 
 *Q*: What is the biblical Christian faith?
 
-*A*: The faith received after reading the Bible plainly.
+*A*: The faith understood after reading the Bible plainly.
 
-*A*: What does it mean to read the Bible plainly?
+*Q*: What does it mean to read the Bible plainly?
 
 # Introduction to Plain Reading
 
-Plain reading is to humble yourself in God's sight, putting aside all argumentation, vain imagination and philosophies of men, honestly seeking the coherence of the truth by sound exegesis, knowing context and intent by studying all of scripture.
+*A*: Plain reading is to humble yourself in God's sight, putting aside all argumentation, vain imagination and philosophies of men, honestly seeking the coherence of the truth by sound exegesis, knowing context and intent by studying all of scripture.
 
 # Section 1: Obey God
 

@@ -178,5 +178,4 @@ An exhaustive list of all the questions asked by God and Jesus, directly and thr
 
 # Appendix B: Plainly Reading the Proof-Texts
 
-Here's where we'll clear up the misreadings of false doctrines.
-
+Here's where we'll clear up the vain readings used to support false doctrines, reading those texts [plainly]({{ url }}/catechism#introduction-to-plain-reading) instead.

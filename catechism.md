@@ -39,7 +39,7 @@ comments: true
 
 *Q* What does it mean to humble yourself in God's sight?
 
-*A*: 
+*A*: See [Get Over Yourself]({{ url }}/catechism#chapter-2-get-over-yourself).
 
 *Q*: What is argumentation?
 

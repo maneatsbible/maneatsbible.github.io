@@ -170,7 +170,7 @@ I will prophesy here, Lord willing, by preaching the word of God that comes by w
 
 ## Chapter 7: The Vast Conspiracy
 
-Let me tell you about Solomon and his Masons, and the temple they intend to build...
+Let's learn about Solomon and his Masons, and the temple they intend to build...
 
 # Appendix A: The Good Questions of God and Jesus
 

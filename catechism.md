@@ -37,7 +37,7 @@ comments: true
 
 *A*: Plain reading is to humble yourself in God's sight, putting aside all argumentation, vain imagination and the philosophies of men, honestly seeking the coherence of the truth by sound exegesis, knowing context and intent by studying all of scripture.
 
-*Q* What does it mean to humble yourself in God's sight?
+*Q*: What does it mean to humble yourself in God's sight?
 
 *A*: See [Get Over Yourself]({{ url }}/catechism#chapter-2-get-over-yourself).
 

@@ -22,11 +22,59 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 *Q*: What is faith?
 
-*A*: Faith is trust in the promises made by a loved one, as in a marriage.
+*A*: Faith is trust in the promises made by a loved one in union, making promises in return, as in a marriage.
+
+*Q*: What is trust?
+
+*A*: 
+
+*Q*: What is a promise?
+
+*A*: A promise is a covenant.
+
+*Q*: What is a covenant?
+
+*A*: 
+
+*Q*: What is love?
+
+*A*: 
+
+*Q*: What is a loved one?
+
+*A*:
+
+*Q*: What is marriage?
+
+*A*:
 
 *Q*: What is the Christian faith?
 
-*A*: The Christian faith is the hope of everlasting life promised by God in Jesus Christ.
+*A*: The Christian faith is the hope of everlasting life promised by God through belief in Jesus Christ.
+
+*Q*: What is hope?
+
+*A*: 
+
+*Q*: What is life?
+
+*A*: 
+
+*Q*: What does everlasting life mean?
+
+*A*: 
+
+*Q*: What is belief?
+
+*A*: 
+
+*Q*: Who is Jesus Christ?
+
+*A*: Sadly, Christians decide that for themselves.
+
+*Q*: What is the biblical Christian faith?
+
+*A*: The Christian faith understood by reading the Bible plainly, which we intend to do presently.
 
 *Q*: What is the Bible?
 
@@ -35,10 +83,6 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 *Q*: Why the KJV?
 
 *A*: That's my preferred English translation. We'll read in Hebrew and Greek too.
-
-*Q*: What is the biblical Christian faith?
-
-*A*: The faith understood after reading the Bible plainly.
 
 *Q*: What does it mean to read the Bible plainly?
 

@@ -12,13 +12,13 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 # Preface
 
-*Question*: What is a catechism?
+<a name="q-qdkbom54wq" href="{{ url }}/catechism#q-qdkbom54wq">*Question*</a>: What is a catechism?
 
-*Answer*: A catechism is a summary of religious principles taught in the form of questions and answers.
+<a name="a-4bhen73p17" href="{{ url }}/catechism#a-4bhen73p17">*Answer*</a>: A catechism is a summary of religious principles taught in the form of questions and answers.
 
-*Q*: So it's a FAQ?
+<a name="q-kmx83jvsa3" href="{{ url }}/catechism#q-kmx83jvsa3">*Q*</a>: So it's a FAQ?
 
-*A*: The word *catechism* is fancier, but Yes.
+<a name="a-3ge11qetdd" href="{{ url }}/catechism#a-3ge11qetdd">*A*</a>: The word *catechism* is fancier, but Yes.
 
 *Q*: What is faith?
 
@@ -70,7 +70,7 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 *Q*: Who is Jesus Christ?
 
-*A*: Sadly, Christians decide that for themselves.
+*A*: Sadly, Christians decide that for themselves. See [*Q*: What is the truth?]({{ url }}/catechism#q-nkpgw6s2aw).
 
 *Q*: What is the biblical Christian faith?
 
@@ -126,7 +126,7 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 *A*: 
 
-*Q*: What is the truth?
+<a name="q-nkpgw6s2aw" href="{{ url }}/catechism#q-nkpgw6s2aw">*Q*</a>: What is the truth?
 
 *A*: 
 

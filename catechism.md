@@ -74,10 +74,6 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 *A*: 
 
-*Q*: What is coherence?
-
-*A*: 
-
 *Q*: What is the truth?
 
 *A*: 

@@ -4,7 +4,7 @@ layout: post
 comments: false
 ---
 
-Christopher is a preacher of holiness and judgment in Christ Jesus, and I proclaim the truth without philosophical argumentation. Here it is:
+I'm a preacher of holiness and judgment in Christ Jesus, and I proclaim the truth without philosophical argumentation. Here it is:
 
 God is love and His Son is life. Choose love. Choose life.
 

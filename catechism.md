@@ -126,6 +126,10 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 *A*: 
 
+*Q*: What does it mean to think like a Hebrew?
+
+*A*: See [Heaven, Earth and Sea]({{ url }}/catechism#chapter-4-heaven-earth-and-sea).
+
 *Q*: What does it mean to think like an obedient Hebrew?
 
 # Section 1: Obey God
@@ -142,7 +146,7 @@ Humble yourself in the sight of God, and He will lift you up.
 
 ## Chapter 3: The Doctrine of Original Knowledge
 
-This is about conscience, your God-given knowledge of right and wrong. It's also directly against the doctrine of disobedience called Original Sin.
+This is about conscience -- your God-given knowledge of right and wrong. It's also directly against the doctrine of disobedience called Original Sin.
 
 # Section 2: This Proving Ground
 

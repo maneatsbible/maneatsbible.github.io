@@ -22,7 +22,7 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 *Q*: What is faith?
 
-*A*: Faith is trust in the promises made by a loved one in union, making promises in return, as in a marriage.
+*A*: Faith is trust in the promises made by a loved one in union, while making promises in return, as in a marriage.
 
 *Q*: What is trust?
 

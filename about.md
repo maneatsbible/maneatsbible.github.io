@@ -16,6 +16,6 @@ On this website, I'm hosting:
 
 * [Live preaching]({{ site.url }}/preaching)
 * [My memoirs as a homeless preacher]({{ site.url }}/memoirs)
-* [A full Bible commentary]({{ site.url }}/book)
+* [A catechism of the Bible]({{ site.url }}/catechism)
 * [A new true crime podcast]({{ site.url }}/tcbt)
 * [Letters to the churches]({{ site.url }}/letters)

@@ -5,20 +5,30 @@ share: true
 comments: true
 ---
 
-*A plain reading of the Bible, written here LIVE. This will eventually amount to a full Bible commentary, Lord willing.*
+*A catechism of the biblical Christian faith, written here LIVE.*
 
 {% include toc %}
-<!--
+
 # Preface
 
-In a dream, I saw in my vision by night a dining table set before me, and a manservant entering the room with a white cloth draped over one arm.
+*Question*: What is a catechism?
 
-"Good morning, Christopher," he said. "God has prepared a feast for you to eat in seven meals over three days. God made each meal in the beginning, but men freely choose not to partake, preferring their own menus instead, prepared by devils to suit their diverse tastes. So God cursed them by sealing His seven meals from them, until the day God's people could open them and eat by simply reading the Bible plainly."
+*Answer*: A catechism is a summary of religious principles taught in the form of questions and answers.
 
-The sections and chapters in this book comprise seven meals with seven seals, to be opened and eaten by the reader. Which vain philosophies have kept the meals in this plain reading sealed from you? Whatever they may be, you'll need to loose yourself from them now if you want to proceed.
+*Q*: What is faith?
 
-Won't you please join me at the table, and eat the Bible with me? It's sometimes sweet, and sometimes bitter, but always good nourishment for your body and soul.
--->
+*A*: Faith is trust in the promises made by a loved one, as in a marriage.
+
+*Q*: What is the Christian faith?
+
+*A*: The Christian faith is the hope of everlasting life promised by God in Jesus Christ.
+
+*Q*: What is the biblical Christian faith?
+
+*A*: The faith received after reading the Bible plainly.
+
+*A*: What does it mean to read the Bible plainly?
+
 # Introduction to Plain Reading
 
 Plain reading is to humble yourself in God's sight, putting aside all argumentation, vain imagination and philosophies of men, honestly seeking the coherence of the truth by sound exegesis, knowing context and intent by studying all of scripture.

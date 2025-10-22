@@ -28,6 +28,14 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 *A*: The Christian faith is the hope of everlasting life promised by God in Jesus Christ.
 
+*Q*: What is the Bible?
+
+*A*: The KJV, baby.
+
+*Q*: Why the KJV?
+
+*A*: That's my preferred English translation. We'll read in Hebrew and Greek too.
+
 *Q*: What is the biblical Christian faith?
 
 *A*: The faith understood after reading the Bible plainly.
@@ -102,9 +110,27 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 *A*: 
 
+*Q*: Shall we begin with Genesis 1? That's the first book in my Bible.
+
+*A*: No.
+
+*Q*: Why not begin reading the Bible in Genesis 1? I heard there were answers in Genesis...
+
+*A*: Genesis was written by Moses for the Hebrews, and you don't think like a Hebrew, and even less like an obedient Hebrew.
+
+*Q*: Who are the Hebrews?
+
+*A*: 
+
+*Q*: Who is Moses?
+
+*A*: 
+
+*Q*: What does it mean to think like an obedient Hebrew?
+
 # Section 1: Obey God
 
-Obey God or perish. Grace ain't your ticket to disobedience.
+*A*: Obey God or perish. Grace ain't your ticket to disobedience.
 
 ## Chapter 1: Fear God
 

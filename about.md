@@ -10,7 +10,7 @@ God is love and His Son is life. Choose love. Choose life.
 
 If you're still choosing to serve your flesh -- if you're still sinning -- then you're still with Satan. You need to stop all that and go with Jesus instead. No excuses.
 
-I [read the Bible plainly]({{ site.url }}/book#introduction-to-plain-reading) without compromise. I'm a Christian extremist. I take the gospel of Jesus Christ to the extreme, because everything else is a lie.
+I [read the Bible plainly]({{ site.url }}/catechism#introduction-to-plain-reading) without compromise. I'm a Christian extremist. I take the gospel of Jesus Christ to the extreme, because everything else is a lie.
 
 On this website, I'm hosting:
 

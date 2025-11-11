@@ -3,7 +3,7 @@ title: 2\. This Proving Ground - Genesis 1:20 - TBD
 date: 2025-11-06
 ---
 
-This session is scheduled to air at 3pm PST on Nov 15 2025.
+This session is scheduled to air at 3pm PST on Jan 1 2026.
 
 The subject: [This Proving Ground]({{ site.url }}/catechism#section-2-this-proving-ground).
 

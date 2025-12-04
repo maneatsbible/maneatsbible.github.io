@@ -38,6 +38,8 @@ disqus:
   shortname: # Disqus shortname, e.g. "my_disqus_shortname"
 twitter:
   username: maneatsbible # site's Twitter username
+facebook:
+  username: maneatsbible
 
 # Liquid
 liquid:
@@ -135,12 +137,30 @@ author:
   email:
   twitter: maneatsbible
   links:
+    - title: Email
+      url: mailto:maneatsbible@gmail.com
+      icon: fa fa-envelope-square
+    - title: Facebook
+      url: https://facebook.com/maneatsbible
+      icon: fab fa-facebook-square
+    - title: YouTube
+      url: https://youtube.com/@maneatsbible
+      icon: fab fa-youtube-square
     - title: Twitter
       url: https://twitter.com/maneatsbible
       icon: fab fa-twitter-square
 
 # Footer Links
 footer_links:
+  - title: Email
+    url: mailto:maneatsbible@gmail.com
+    icon: fa fa-envelope-square
+  - title: Facebook
+    url: https://facebook.com/maneatsbible
+    icon: fab fa-facebook-square
+  - title: YouTube
+    url: https://youtube.com/@maneatsbible
+    icon: fab fa-youtube-square
   - title: Twitter
     url: https://twitter.com/maneatsbible
     icon: fab fa-twitter-square

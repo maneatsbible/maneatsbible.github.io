@@ -25,7 +25,7 @@ My walks alone with Noah James were mostly focused on not lusting after women, w
 
 Thing is, the city of Santa Barbara is crawling with whores (and witches), and if you're not a total incel, you can easily get yourself in trouble with them.
 
-My expectation was that I'd soon be counseling him on a slip-up, but he never had anything to report. He confessed later that he just wasn't telling me about his hookups. He got with onewoman in a public restroom at the harbor (yuck).
+My expectation was that I'd soon be counseling him on a slip-up, but he never had anything to report. He confessed later that he just wasn't telling me about his hookups. He got with one woman in a public restroom at the harbor (yuck).
 
 His even bigger trouble was with the gays. I was walking through the dining hall when gay Aldo pulled me aside. He spoke like a Mexican lady with an accent.
 

@@ -87,7 +87,7 @@ Those were the names spoken by that man, and not made up by me. I do understand 
 
 ---
 
-In the season when Angel was trying to disrupt my preaching, and things were different with Israel.
+Later, in the season when Angel was trying to disrupt my preaching, things were different with Israel.
 
 As Angel was accusing me of denying blessings for people, again, Israel stepped in and countered that I'm a true Bible preacher, and that Angel needed to shut it. Of course, they threatened to beat each other up. Neither threw fists, but Angel shut it that day.
 

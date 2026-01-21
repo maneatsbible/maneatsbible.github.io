@@ -41,7 +41,7 @@ Then Israel shows up, and he’s hungry too.
 
 When Israel catches sight of the bread, he goes after it like a hungry lion, and my friend takes off like hungover gazelle, while I yell, "Drop the bread! Don't get beat down for it!"
 
-He dies run for a while, but he’s too exhausted to escape. Finally, he throws the bread to the lion, who eats.
+My friend does run for a while, but he’s too exhausted to escape. Finally, he throws the bread to the lion, who eats.
 
 After his meal, Israel comes over to us. He has other business to conduct with my friend.
 

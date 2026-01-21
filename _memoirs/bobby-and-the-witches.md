@@ -179,7 +179,7 @@ Later that day, I see brother Alfonso carrying Grace’s bags across town. That 
 
 Bobby makes the most delicious chorizo breakfast burritos, and he cooks up a whole mess of them for friends on Sundays.
 
-When I mentioned that this was a kind thing for him to do, he was in a season of hating on preacher at the time. He got serious and said, "Who told you?"
+When I mentioned that this was a kind thing for him to do, he was in a season of hating on preacher. He got serious and said, "Who told you?"
 
 One Sunday night, I'm falling asleep at the shelter when a man comes in late. It's Bobby, and he's moaning like someone just stabbed him through the heart.
 

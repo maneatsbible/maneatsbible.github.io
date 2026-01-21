@@ -204,7 +204,7 @@ That’s the correct answer. Aaron and I have history together. He's an avowed S
 
 Aaron is an obese man with bad skin. He's seething with anger inside and spends a great deal of effort chilling on the outside. That's Stoicism.
 
-"I'm calling the cops," Aaron says with monk-like calmness, giving the impression that he’a almost falling asleep.
+"I'm calling the cops," Aaron says with monk-like calmness, giving the impression that he’s almost falling asleep.
 
 Then he calls the cops. Some people advise me to bail, because of course they bail when Aaron calls the cops on them. It made no sense to them that I'd stay.
 

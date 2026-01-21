@@ -47,9 +47,8 @@ We stared into each others' eyes. He was dead serious. His bloodshot eyes were a
 
 I preach on a few themes to the homeless:
 
-The blessings and power in your weakness before God.
-Get over yourself and walk with Jesus.
-One Step Recovery
+The blessings and power in your weakness before God. Get over yourself and walk with Jesus. One Step Recovery.
+
 When men talk to me about holiness, I know they've been hearing me. I praised God in my heart when Starr told me, in words that first appeared to be bonkers, how he successfully practiced holiness for an extended (for him) period of time.
 
 "What went wrong, though?" I asked.

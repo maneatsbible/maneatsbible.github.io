@@ -6,7 +6,7 @@ comments: false
 
 Read this [open letter to the churches]({{ site.url }}/letters/1-babylonians).
 
-Read some of my [actiom-packed street preaching memoirs]({{ site.url }}/memoirs) too.
+Read some of my [action-packed street preaching memoirs]({{ site.url }}/memoirs) too.
 
 I'm a plain preacher of holiness and judgment in Christ Jesus.
 

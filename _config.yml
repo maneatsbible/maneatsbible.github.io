@@ -96,6 +96,8 @@ defaults:
       layout: post
       comments: true
       share: true
+      image:
+        thumbnail: /images/letters.png
       hide_date: true
   - scope:
       path: "_preaching"

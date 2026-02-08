@@ -4,9 +4,11 @@ layout: post
 comments: false
 ---
 
-I'm a shock preacher of holiness and judgment in Christ Jesus.
+[Read this letter]({{ site.url }}/letters/1-babylonians).
 
-Here it is:
+[Read these memoirs]({{ site.url }}/memoirs) too.
+
+I'm a plain preacher of holiness and judgment in Christ Jesus.
 
 God is love and His Son is life. Choose love. Choose life.
 

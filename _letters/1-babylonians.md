@@ -1,6 +1,6 @@
 ---
-title: "Letter to the Churches in Babylon"
-date: 02-08-2026
+title: Letter to the Churches in Babylon
+date: 2026-02-08
 ---
 
 Christopher, a plain Bible preacher of Jesus Christ and a homeless brother crying out in the wilderness, delivering a biblical message from God to the churches that are in Babylon.

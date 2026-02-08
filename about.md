@@ -4,9 +4,9 @@ layout: post
 comments: false
 ---
 
-[Read this letter]({{ site.url }}/letters/1-babylonians).
+Read this [open letter to the churches]({{ site.url }}/letters/1-babylonians).
 
-[Read these memoirs]({{ site.url }}/memoirs) too.
+Read some of my [memoirs]({{ site.url }}/memoirs) as a homeless preacher too.
 
 I'm a plain preacher of holiness and judgment in Christ Jesus.
 

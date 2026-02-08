@@ -1,5 +1,5 @@
 ---
-title: Letter to the Churches in Babylon
+title: First Letter to the Churches in Babylon
 date: 2026-02-07
 ---
 

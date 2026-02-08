@@ -96,8 +96,6 @@ defaults:
       layout: post
       comments: true
       share: true
-      image: 
-        thumbnail: /images/logo.png
       hide_date: true
   - scope:
       path: "_preaching"

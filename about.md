@@ -8,10 +8,12 @@ Read this [open letter to the churches]({{ site.url }}/letters/1-babylonians).
 
 Read some of my [action-packed street preaching memoirs]({{ site.url }}/memoirs) too.
 
-I'm a plain preacher of holiness and judgment in Christ Jesus.
+I'm a fire-throwing preacher of holiness and judgment in Jesus Christ.
 
-God is love and His Son is life. Choose love. Choose life.
+I proclaim the truth without the leaven of apologetics, [reading the Bible plainly]({{ site.url }}/plain-reading).
 
-If you're still choosing to serve your flesh -- if you're still sinning -- then you're still with Satan. You need to stop all that and go with Jesus instead. No excuses.
+God is love and His Son is life.
 
-I proclaim the truth without philosophical argumentation. I [read the Bible plainly]({{ site.url }}/plain-reading) without compromise. I'm a Jesus extremist. I take the gospel of Jesus Christ extremely seriously, because everything else is death.
+Choose love. Choose life.
+
+Fear God. Follow Jesus.

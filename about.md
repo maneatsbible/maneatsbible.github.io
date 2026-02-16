@@ -16,4 +16,4 @@ God is love and His Son is life.
 
 Choose love. Choose life.
 
-Fear God. Follow Jesus.
+Fear God. Follow Jesus for real.

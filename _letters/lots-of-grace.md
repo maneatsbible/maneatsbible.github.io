@@ -1,7 +1,6 @@
 ---
 title: Lots of Grace
 date: 2026-02-16
-published: false
 ---
 
 The burden of the word of the LORD to the churches, which came to Christopher, a brother in Jesus Christ and a plain Bible preacher of Him.

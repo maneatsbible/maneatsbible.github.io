@@ -9,6 +9,6 @@ The churches possess an abundance of parking lots which they hardly use, keeping
 
 In the judgment to come, many pastors will say, Lord, when did we see you homeless, and did not allow you refuge in our church parking lots? Then shall Jesus reply to them, saying, Verily, I say unto you, Inasmuch as you did it not to one of the least of these, you did it not to me.
 
-Elders of the churches, please hear this message and open your church parking lots for the safe harbor of our most vulnerable sheep. God is no respecter of persons, and He calls on us also to judge righteously, without respect of persons. God also calls on the church to give to the needy without the expectation of a return on investment. The transactional giving of the world, falsely called charity, is opposed to the sacrificial love of God, which is true charity.
+Elders of the churches, please hear this message and open your church parking lots for the safe harbor of our most vulnerable sheep. God is no respecter of persons, and He calls on us also to judge righteously, without respect of persons. God also calls on the churches to give to the needy without the expectation of a return on investment. The transactional giving of the world, falsely called charity, is opposed to the sacrificial love of God, which is true charity.
 
-<!-- Parking and camping, behavioral concerns, sherpherds watching -->
+The vision for Lots of Grace depends on the grace and instruction given in Jesus Christ. To wit, shepherds of Christ will watch over the flock at all hours, ensuring safety and proper conduct. Shepherds will deliver daily reports to the elders of the churches on every aspect of operations.

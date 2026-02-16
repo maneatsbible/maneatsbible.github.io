@@ -16,7 +16,7 @@ Then shall Jesus reply to them, saying, Verily, I say unto you, Inasmuch as you 
 
 <!--  ROI, transactions vs sacrficial giving -->
 
-Elders of the churches, please hear this message and open your parking lots for the safety of our most vulnerable sheep.
+Elders of the churches, please hear this message and open your church parking lots for the safety of our most vulnerable sheep.
 
 <!-- Parking and camping -->
 

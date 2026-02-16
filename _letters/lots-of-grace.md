@@ -11,12 +11,9 @@ In the judgment to come, many pastors will say, Lord, when did we see you homele
 
 Then shall Jesus reply to them, saying, Verily, I say unto you, Inasmuch as you did it not to one of the least of these, you did it not to me.
 
+Elders of the churches, please hear this message and open your church parking lots for the safety of our most vulnerable sheep. God is no respecter of persons, and He calls on us also to judge righteously, without respect of persons.
 
-<!-- Respect of persons -->
-
-<!--  ROI, transactions vs sacrficial giving -->
-
-Elders of the churches, please hear this message and open your church parking lots for the safety of our most vulnerable sheep.
+God also calls on the church to give to the needy without the expectation of a return on investment. The transactional giving of the world, falsely called charity, is opposed to the sacrificial love of God, which is true charity.
 
 <!-- Parking and camping -->
 

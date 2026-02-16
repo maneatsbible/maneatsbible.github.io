@@ -50,7 +50,7 @@ excerpt: "A catechism of the Christian faith, written here LIVE. Add your commen
 
 *Q*: What is the Christian faith?
 
-*A*: The Christian faith is the hope of everlasting life promised by God through belief in Jesus Christ.
+*A*: The Christian faith is the hope of everlasting life promised by God through belief in Jesus Christ, understood by reading the Bible plainly, which we intend to do presently.
 
 *Q*: What is hope?
 
@@ -72,19 +72,9 @@ excerpt: "A catechism of the Christian faith, written here LIVE. Add your commen
 
 *A*: Sadly, Christians decide that for themselves. See [*Q*: What is the truth?]({{ url }}/catechism#q-nkpgw6s2aw).
 
-*Q*: What is the biblical Christian faith?
-
-*A*: The Christian faith understood by reading the Bible plainly, which we intend to do presently.
-
-*Q*: What is the Bible?
-
-*A*: The KJV, baby.
-
-*Q*: Why the KJV?
-
-*A*: That's my preferred English translation. We'll read in Hebrew and Greek too.
-
 *Q*: What does it mean to read the Bible plainly?
+
+*A*: 
 
 # Introduction to Plain Reading
 

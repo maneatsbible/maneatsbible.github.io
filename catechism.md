@@ -14,11 +14,11 @@ excerpt: "A catechism of the Christian faith, written here LIVE. Add your commen
 
 {% include question.html id="qdkbom54wq" long=true %} What is a catechism?
 
-{% include answer.html id="4bhen73p17" long=true %} A catechism is a summary of religious principles taught in the form of questions and answers.
+{% include answer.html id="qdkbom54wq" long=true %} A catechism is a summary of religious principles taught in the form of questions and answers.
 
 {% include question.html id="kmx83jvsa3" %} So it's a FAQ?
 
-{% include answer.html id="pn6wdn0jus" %} The word *catechism* is fancier, but Yes, these are frequently asked questions that can be used for reference. But unlike a typical FAQ, this Q&A follows a reasoned thread of dialogue in search of the truth.
+{% include answer.html id="kmx83jvsa3" %} The word *catechism* is fancier, but Yes, these are frequently asked questions that can be used for reference. But unlike a typical FAQ, this Q&A follows a reasoned thread of dialogue in search of the truth.
 
 *Q*: What is faith?
 

@@ -3,7 +3,7 @@ title: Let's Eat the Bible Together
 layout: post
 share: true
 comments: true
-excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add your comments below."
+excerpt: "A catechism of the Christian faith, written here LIVE. Add your comments below."
 ---
 
 *{{ page.excerpt }}*
@@ -18,7 +18,7 @@ excerpt: "A catechism of the biblical Christian faith, written here LIVE. Add yo
 
 {% include question.html id="kmx83jvsa3" %} So it's a FAQ?
 
-{% include answer.html id="pn6wdn0jus" %} The word *catechism* is fancier, but Yes.
+{% include answer.html id="pn6wdn0jus" %} The word *catechism* is fancier, but Yes, these are frequently asked questions that can be used for reference. But unlike a typical FAQ, this Q&A follows a reasoned thread of dialogue in search of the truth.
 
 *Q*: What is faith?
 

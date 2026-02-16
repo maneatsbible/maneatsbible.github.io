@@ -50,8 +50,6 @@ excerpt: "A catechism of the Christian faith, written here LIVE. Add your commen
 
 *Q*: What does it mean to read the Bible plainly?
 
-*A*: 
-
 # Introduction to Plain Reading
 
 *A*: Plain reading is to humble yourself in God's sight, putting aside all argumentation, vain imagination and the philosophies of men, honestly seeking the coherence of the truth by sound exegesis, knowing context and intent by studying all of scripture.

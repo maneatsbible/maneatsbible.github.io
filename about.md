@@ -4,7 +4,7 @@ layout: post
 comments: false
 ---
 
-I'm a plain preacher of holiness and judgment in Jesus Christ, and the pastor of Fear God Church. I proclaim the truth without the leaven of apologetics, [reading the Bible plainly]({{ site.url }}/plain-reading).
+I'm a plain preacher of holiness and judgment in Jesus Christ, and the pastor of **Fear God Church**. I proclaim the truth without the leaven of apologetics, [reading the Bible plainly]({{ site.url }}/plain-reading).
 
 God is love and His Son is life.
 

@@ -12,6 +12,6 @@ Choose love. Choose life.
 
 Fear God. Follow Jesus for real.
 
-Read these [open letters to the churches]({{ site.url }}/letters/).
+Read these [open letters to the churches]({{ site.url }}/letters).
 
 Read these [action-packed street preaching memoirs]({{ site.url }}/memoirs).

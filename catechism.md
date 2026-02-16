@@ -24,30 +24,6 @@ excerpt: "A catechism of the Christian faith, written here LIVE. Add your commen
 
 *A*: Faith is trust in the promises made by a loved one in union, while making promises in return, as in a marriage.
 
-*Q*: What is trust?
-
-*A*: 
-
-*Q*: What is a promise?
-
-*A*: A promise is a covenant.
-
-*Q*: What is a covenant?
-
-*A*: 
-
-*Q*: What is love?
-
-*A*: 
-
-*Q*: What is a loved one?
-
-*A*:
-
-*Q*: What is marriage?
-
-*A*:
-
 *Q*: What is the Christian faith?
 
 *A*: The Christian faith is the hope of everlasting life promised by God through belief in Jesus Christ, understood by reading the Bible plainly, which we intend to do presently.

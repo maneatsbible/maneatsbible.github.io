@@ -18,7 +18,7 @@ excerpt: "A catechism of the Christian faith, written here LIVE. Add your commen
 
 {% include question.html id="kmx83jvsa3" %} So this is a FAQ?
 
-{% include answer.html id="kmx83jvsa3" %} The word *catechism* is fancier, but Yes, these are frequently asked questions that can be used for reference. But unlike a typical FAQ, this Q&A follows a reasoned thread of dialogue in search of the truth.
+{% include answer.html id="kmx83jvsa3" %} The word *catechism* is fancier, but Yes, these are frequently asked questions that can be used for reference. But unlike a typical FAQ, this Q&A follows a reasoned thread of dialogue to explicate the truth.
 
 *Q*: What is faith?
 

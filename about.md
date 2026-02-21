@@ -4,7 +4,7 @@ layout: post
 comments: false
 ---
 
-I'm a plain preacher of holiness and judgment in Jesus Christ, and pastor of **Fear God Church**, a congregation of sheep who know the voice of their Good Shepherd and follow Him.
+I'm a plain preacher of holiness and judgment in Jesus Christ, and pastor of **FEAR GOD Church**, a congregation of sheep who know the voice of their Good Shepherd and follow Him.
 
 I proclaim the truth without the leaven of apologetics, [reading the Bible plainly]({{ site.url }}/plain-reading).
 

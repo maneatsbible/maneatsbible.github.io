@@ -4,7 +4,7 @@ layout: post
 comments: false
 ---
 
-I'm a preacher of holiness and judgment in Jesus Christ, and the pastor of 24/7 Bible Church.
+I'm a preacher of holiness and judgment in Jesus Christ, and a pastor of His church.
 
 I proclaim the truth without the leaven of apologetics, [reading the Bible plainly]({{ site.url }}/plain-reading).
 

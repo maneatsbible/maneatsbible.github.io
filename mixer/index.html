@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Video Commentary Mixer</title>
+  <title>Video Commentary Mixer (Debug)</title>
   <style>
     body {
       margin: 0;
       background: black;
       overflow: hidden;
-      font-family: sans-serif;
+      font-family: monospace;
     }
 
     .video {
       position: absolute;
       display: none;
-      border: none;
+      border: 2px solid red;
     }
 
     #controls {
@@ -21,9 +21,33 @@
       top: 10px;
       left: 10px;
       z-index: 9999;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0,0,0,0.8);
       color: white;
       padding: 10px;
+    }
+
+    #debug {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 35%;
+      overflow-y: scroll;
+      background: rgba(0,0,0,0.9);
+      color: #00ff00;
+      font-size: 11px;
+      padding: 5px;
+      z-index: 9999;
+    }
+
+    #timeDisplay {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      color: yellow;
+      background: rgba(0,0,0,0.7);
+      padding: 5px;
+      z-index: 9999;
     }
   </style>
 </head>
@@ -32,27 +56,61 @@
 <div id="controls">
   <input id="controlId" placeholder="Control Video ID">
   <button onclick="start()">Start</button>
+  <button onclick="toggleAlerts()">Toggle Alerts</button>
 </div>
 
+<div id="timeDisplay">t=0</div>
 <div id="stage"></div>
+<div id="debug"></div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
 let players = {};
 let events = [];
-let startTime = 0;
 let controlPlayer = null;
 let eventIndex = 0;
+let alertMode = false;
 
-// --- SAMPLE CONTROL DATA (simulate YouTube description) ---
+// --- DEBUG LOGGING ---
+function log(msg) {
+  let d = document.getElementById("debug");
+  let line = document.createElement("div");
+  line.textContent = "[" + new Date().toLocaleTimeString() + "] " + msg;
+  d.appendChild(line);
+  d.scrollTop = d.scrollHeight;
+
+  console.log(msg);
+
+  if (alertMode) {
+    alert(msg);
+  }
+}
+
+function toggleAlerts() {
+  alertMode = !alertMode;
+  log("Alert mode: " + alertMode);
+}
+
+// --- SAFE EXECUTION WRAPPER ---
+function safe(fn, label) {
+  try {
+    fn();
+  } catch (e) {
+    log("❌ ERROR in " + label + ": " + e.message);
+  }
+}
+
+// --- SAMPLE CONTROL DATA ---
 function getControlDescription(id) {
+  log("Loading control description for: " + id);
+
   return `
 video vidA b9_CS8gTOR0
 video vidB cowOojdB47o
 
 00:00 show vidA 0 0 640 360
-00:02 play vidA
+00:01 play vidA
 
 00:05 show vidB 650 0 320 180
 00:06 play vidB
@@ -64,122 +122,168 @@ video vidB cowOojdB47o
 `;
 }
 
-// --- Parse timestamp ---
+// --- TIME PARSE ---
 function parseTime(t) {
   let parts = t.split(":").map(Number);
-  return parts[0]*60 + parts[1];
+  let seconds = parts[0]*60 + parts[1];
+  log("Parsed time " + t + " -> " + seconds);
+  return seconds;
 }
 
-// --- Parse control script ---
+// --- SCRIPT PARSE ---
 function parseScript(text) {
+  log("Parsing script...");
+
   let lines = text.trim().split("\n");
   let vids = {};
 
-  lines.forEach(line => {
+  lines.forEach((line, i) => {
     line = line.trim();
     if (!line) return;
+
+    log("Line " + i + ": " + line);
 
     let parts = line.split(" ");
 
     if (parts[0] === "video") {
       vids[parts[1]] = parts[2];
+      log("Registered video: " + parts[1] + " -> " + parts[2]);
     } else if (parts[0].includes(":")) {
-      events.push({
+      let evt = {
         time: parseTime(parts[0]),
         cmd: parts[1],
         args: parts.slice(2)
-      });
+      };
+      events.push(evt);
+      log("Event added: " + JSON.stringify(evt));
     }
   });
+
+  events.sort((a,b)=>a.time-b.time);
+
+  log("Total events: " + events.length);
 
   return vids;
 }
 
-// --- Create player ---
+// --- CREATE PLAYER ---
 function createPlayer(name, videoId) {
-  let iframe = document.createElement("div");
-  iframe.id = "player_" + name;
-  iframe.className = "video";
-  document.getElementById("stage").appendChild(iframe);
+  log("Creating player: " + name);
 
-  players[name] = new YT.Player(iframe.id, {
+  let div = document.createElement("div");
+  div.id = "player_" + name;
+  div.className = "video";
+  document.getElementById("stage").appendChild(div);
+
+  players[name] = new YT.Player(div.id, {
     videoId: videoId,
-    playerVars: { controls: 0, modestbranding: 1 }
+    events: {
+      onReady: () => log("Player ready: " + name),
+      onError: (e) => log("Player error " + name + ": " + e.data)
+    }
   });
 }
 
-// --- Execute commands ---
+// --- EXECUTE COMMAND ---
 function exec(e) {
+  log("Executing: " + JSON.stringify(e));
+
   let p = players[e.args[0]];
-
-  switch (e.cmd) {
-    case "play":
-      p.playVideo();
-      break;
-
-    case "pause":
-      p.pauseVideo();
-      break;
-
-    case "seek":
-      p.seekTo(parseFloat(e.args[1]), true);
-      break;
-
-    case "show":
-      let el = p.getIframe();
-      el.style.display = "block";
-      el.style.left = e.args[1] + "px";
-      el.style.top = e.args[2] + "px";
-      el.style.width = e.args[3] + "px";
-      el.style.height = e.args[4] + "px";
-      break;
-
-    case "hide":
-      p.getIframe().style.display = "none";
-      break;
+  if (!p) {
+    log("⚠️ Player not found: " + e.args[0]);
+    return;
   }
+
+  safe(() => {
+    switch (e.cmd) {
+      case "play":
+        p.playVideo();
+        break;
+
+      case "pause":
+        p.pauseVideo();
+        break;
+
+      case "seek":
+        p.seekTo(parseFloat(e.args[1]), true);
+        break;
+
+      case "show":
+        let el = p.getIframe();
+        el.style.display = "block";
+        el.style.left = e.args[1] + "px";
+        el.style.top = e.args[2] + "px";
+        el.style.width = e.args[3] + "px";
+        el.style.height = e.args[4] + "px";
+        break;
+
+      case "hide":
+        p.getIframe().style.display = "none";
+        break;
+
+      default:
+        log("Unknown command: " + e.cmd);
+    }
+  }, "exec");
 }
 
-// --- Timeline loop ---
+// --- TIMELINE LOOP ---
 function tick() {
   if (!controlPlayer) return;
 
-  let t = controlPlayer.getCurrentTime();
+  safe(() => {
+    let t = controlPlayer.getCurrentTime();
+    document.getElementById("timeDisplay").textContent = "t=" + t.toFixed(2);
 
-  while (eventIndex < events.length && events[eventIndex].time <= t) {
-    exec(events[eventIndex]);
-    eventIndex++;
-  }
+    while (eventIndex < events.length && events[eventIndex].time <= t) {
+      exec(events[eventIndex]);
+      eventIndex++;
+    }
+  }, "tick");
 
   requestAnimationFrame(tick);
 }
 
-// --- Start app ---
+// --- START ---
 function start() {
-  let id = document.getElementById("controlId").value.trim();
-  let text = getControlDescription(id);
+  safe(() => {
+    log("=== START ===");
 
-  let vids = parseScript(text);
+    events = [];
+    eventIndex = 0;
+    players = {};
 
-  for (let name in vids) {
-    createPlayer(name, vids[name]);
-  }
-
-  // control player (hidden)
-  let ctrlDiv = document.createElement("div");
-  ctrlDiv.id = "controlPlayer";
-  ctrlDiv.style.display = "none";
-  document.body.appendChild(ctrlDiv);
-
-  controlPlayer = new YT.Player("controlPlayer", {
-    videoId: id,
-    events: {
-      onReady: () => {
-        controlPlayer.playVideo();
-        requestAnimationFrame(tick);
-      }
+    let id = document.getElementById("controlId").value.trim();
+    if (!id) {
+      alert("Enter a control video ID");
+      return;
     }
-  });
+
+    let text = getControlDescription(id);
+    let vids = parseScript(text);
+
+    for (let name in vids) {
+      createPlayer(name, vids[name]);
+    }
+
+    let ctrlDiv = document.createElement("div");
+    ctrlDiv.id = "controlPlayer";
+    ctrlDiv.style.display = "none";
+    document.body.appendChild(ctrlDiv);
+
+    controlPlayer = new YT.Player("controlPlayer", {
+      videoId: id,
+      events: {
+        onReady: () => {
+          log("Control player ready");
+          controlPlayer.playVideo();
+          requestAnimationFrame(tick);
+        },
+        onError: (e) => log("Control player error: " + e.data)
+      }
+    });
+
+  }, "start");
 }
 </script>
 

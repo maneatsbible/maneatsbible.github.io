@@ -1,53 +1,50 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Video Commentary Mixer (Debug)</title>
+  <title>Video Mixer w/ Sync + Monitor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
-      margin: 0;
-      background: black;
-      overflow: hidden;
-      font-family: monospace;
-    }
+    body { margin:0; background:black; overflow:hidden; font-family:monospace; }
 
     .video {
-      position: absolute;
-      display: none;
-      border: 2px solid red;
+      position:absolute;
+      display:none;
+      border:2px solid red;
     }
 
     #controls {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      z-index: 9999;
-      background: rgba(0,0,0,0.8);
-      color: white;
-      padding: 10px;
+      position:fixed; top:10px; left:10px; z-index:9999;
+      background:rgba(0,0,0,0.8); color:white; padding:10px;
     }
 
     #debug {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 35%;
-      overflow-y: scroll;
-      background: rgba(0,0,0,0.9);
-      color: #00ff00;
-      font-size: 11px;
-      padding: 5px;
-      z-index: 9999;
+      position:fixed; bottom:0; left:0; width:100%; height:30%;
+      overflow-y:scroll; background:rgba(0,0,0,0.9);
+      color:#00ff00; font-size:11px; padding:5px;
+      z-index:9999;
     }
 
     #timeDisplay {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      color: yellow;
-      background: rgba(0,0,0,0.7);
-      padding: 5px;
-      z-index: 9999;
+      position:fixed; top:10px; right:10px;
+      color:yellow; background:rgba(0,0,0,0.7);
+      padding:5px; z-index:9999;
+    }
+
+    #syncMonitor {
+      position:fixed;
+      right:10px;
+      top:50px;
+      width:180px;
+      background:rgba(0,0,0,0.8);
+      color:white;
+      padding:5px;
+      z-index:9999;
+    }
+
+    .bar {
+      height:10px;
+      background:lime;
+      margin:2px 0;
     }
   </style>
 </head>
@@ -56,10 +53,11 @@
 <div id="controls">
   <input id="controlId" placeholder="Control Video ID">
   <button onclick="start()">Start</button>
-  <button onclick="toggleAlerts()">Toggle Alerts</button>
+  <button onclick="toggleAlerts()">Alerts</button>
 </div>
 
 <div id="timeDisplay">t=0</div>
+<div id="syncMonitor"></div>
 <div id="stage"></div>
 <div id="debug"></div>
 
@@ -68,222 +66,243 @@
 <script>
 let players = {};
 let events = [];
-let controlPlayer = null;
 let eventIndex = 0;
+
+let startTime = 0;
+let pausedAt = 0;
+let isPlaying = false;
+
+let syncMap = {};
+let ENABLE_SYNC = true;
+
+let SYNC_THRESHOLD = 0.4;
+let HARD_THRESHOLD = 1.2;
+
 let alertMode = false;
 
-// --- DEBUG LOGGING ---
-function log(msg) {
+// ---------- DEBUG ----------
+function log(msg){
   let d = document.getElementById("debug");
   let line = document.createElement("div");
-  line.textContent = "[" + new Date().toLocaleTimeString() + "] " + msg;
+  line.textContent = msg;
   d.appendChild(line);
   d.scrollTop = d.scrollHeight;
-
   console.log(msg);
-
-  if (alertMode) {
-    alert(msg);
-  }
+  if(alertMode) alert(msg);
 }
 
-function toggleAlerts() {
+function toggleAlerts(){
   alertMode = !alertMode;
-  log("Alert mode: " + alertMode);
 }
 
-// --- SAFE EXECUTION WRAPPER ---
-function safe(fn, label) {
-  try {
-    fn();
-  } catch (e) {
-    log("❌ ERROR in " + label + ": " + e.message);
-  }
+// ---------- TIME ----------
+function now(){
+  return (performance.now() - startTime)/1000;
 }
 
-// --- SAMPLE CONTROL DATA ---
-function getControlDescription(id) {
-  log("Loading control description for: " + id);
-
-  return `
+// ---------- SAMPLE SCRIPT ----------
+function getControlDescription(id){
+return `
 video vidA b9_CS8gTOR0
-video vidB cowOojdB47o
 
 00:00 show vidA 0 0 640 360
 00:01 play vidA
 
-00:05 show vidB 650 0 320 180
-00:06 play vidB
+00:03 show this 650 0 320 180
+00:04 play this
 
-00:10 seek vidB 45
+00:08 seek this 20
 
-00:15 hide vidA
-00:20 pause vidB
+00:12 hide vidA
 `;
 }
 
-// --- TIME PARSE ---
-function parseTime(t) {
-  let parts = t.split(":").map(Number);
-  let seconds = parts[0]*60 + parts[1];
-  log("Parsed time " + t + " -> " + seconds);
-  return seconds;
+// ---------- PARSE ----------
+function parseTime(t){
+  let p = t.split(":").map(Number);
+  return p[0]*60 + p[1];
 }
 
-// --- SCRIPT PARSE ---
-function parseScript(text) {
-  log("Parsing script...");
-
-  let lines = text.trim().split("\n");
+function parseScript(text){
   let vids = {};
+  events = [];
 
-  lines.forEach((line, i) => {
-    line = line.trim();
-    if (!line) return;
+  text.trim().split("\n").forEach(line=>{
+    line=line.trim();
+    if(!line) return;
 
-    log("Line " + i + ": " + line);
+    let parts=line.split(" ");
 
-    let parts = line.split(" ");
-
-    if (parts[0] === "video") {
+    if(parts[0]==="video"){
       vids[parts[1]] = parts[2];
-      log("Registered video: " + parts[1] + " -> " + parts[2]);
-    } else if (parts[0].includes(":")) {
-      let evt = {
-        time: parseTime(parts[0]),
-        cmd: parts[1],
-        args: parts.slice(2)
-      };
-      events.push(evt);
-      log("Event added: " + JSON.stringify(evt));
+    }
+    else if(parts[0].includes(":")){
+      events.push({
+        time:parseTime(parts[0]),
+        cmd:parts[1],
+        args:parts.slice(2)
+      });
     }
   });
 
   events.sort((a,b)=>a.time-b.time);
-
-  log("Total events: " + events.length);
-
   return vids;
 }
 
-// --- CREATE PLAYER ---
-function createPlayer(name, videoId) {
-  log("Creating player: " + name);
+// ---------- PLAYER ----------
+function createPlayer(name,id){
+  let div=document.createElement("div");
+  div.id="p_"+name;
+  div.className="video";
+  stage.appendChild(div);
 
-  let div = document.createElement("div");
-  div.id = "player_" + name;
-  div.className = "video";
-  document.getElementById("stage").appendChild(div);
-
-  players[name] = new YT.Player(div.id, {
-    videoId: videoId,
-    events: {
-      onReady: () => log("Player ready: " + name),
-      onError: (e) => log("Player error " + name + ": " + e.data)
+  players[name]=new YT.Player(div.id,{
+    videoId:id,
+    playerVars:{controls:0},
+    events:{
+      onReady:()=>log("ready "+name),
+      onError:e=>log("err "+name+" "+e.data)
     }
   });
 }
 
-// --- EXECUTE COMMAND ---
-function exec(e) {
-  log("Executing: " + JSON.stringify(e));
+// ---------- EXEC ----------
+function exec(e){
+  log(`@${e.time}s ${e.cmd} ${e.args.join(" ")}`);
 
-  let p = players[e.args[0]];
-  if (!p) {
-    log("⚠️ Player not found: " + e.args[0]);
-    return;
+  let name=e.args[0];
+  let p=players[name];
+  if(!p) return;
+
+  switch(e.cmd){
+
+    case "play":
+      syncMap[name]={
+        offset: now() - p.getCurrentTime()
+      };
+      p.playVideo();
+    break;
+
+    case "pause":
+      p.pauseVideo();
+    break;
+
+    case "seek":
+      p.seekTo(parseFloat(e.args[1]),true);
+    break;
+
+    case "show":
+      let el=p.getIframe();
+      el.style.display="block";
+      el.style.left=e.args[1]+"px";
+      el.style.top=e.args[2]+"px";
+      el.style.width=e.args[3]+"px";
+      el.style.height=e.args[4]+"px";
+    break;
+
+    case "hide":
+      p.getIframe().style.display="none";
+    break;
   }
-
-  safe(() => {
-    switch (e.cmd) {
-      case "play":
-        p.playVideo();
-        break;
-
-      case "pause":
-        p.pauseVideo();
-        break;
-
-      case "seek":
-        p.seekTo(parseFloat(e.args[1]), true);
-        break;
-
-      case "show":
-        let el = p.getIframe();
-        el.style.display = "block";
-        el.style.left = e.args[1] + "px";
-        el.style.top = e.args[2] + "px";
-        el.style.width = e.args[3] + "px";
-        el.style.height = e.args[4] + "px";
-        break;
-
-      case "hide":
-        p.getIframe().style.display = "none";
-        break;
-
-      default:
-        log("Unknown command: " + e.cmd);
-    }
-  }, "exec");
 }
 
-// --- TIMELINE LOOP ---
-function tick() {
-  if (!controlPlayer) return;
+// ---------- TIMELINE ----------
+function tick(){
+  if(!isPlaying) return;
 
-  safe(() => {
-    let t = controlPlayer.getCurrentTime();
-    document.getElementById("timeDisplay").textContent = "t=" + t.toFixed(2);
+  let t=now();
+  timeDisplay.textContent="t="+t.toFixed(2);
 
-    while (eventIndex < events.length && events[eventIndex].time <= t) {
-      exec(events[eventIndex]);
-      eventIndex++;
-    }
-  }, "tick");
+  while(eventIndex<events.length && events[eventIndex].time<=t){
+    exec(events[eventIndex]);
+    eventIndex++;
+  }
 
   requestAnimationFrame(tick);
 }
 
-// --- START ---
-function start() {
-  safe(() => {
-    log("=== START ===");
+// ---------- SYNC LOOP ----------
+function syncLoop(){
 
-    events = [];
-    eventIndex = 0;
-    players = {};
+  if(!ENABLE_SYNC){
+    setTimeout(syncLoop,300);
+    return;
+  }
 
-    let id = document.getElementById("controlId").value.trim();
-    if (!id) {
-      alert("Enter a control video ID");
-      return;
-    }
+  let t=now();
+  let monitorHTML="";
 
-    let text = getControlDescription(id);
-    let vids = parseScript(text);
+  for(let name in syncMap){
+    let p=players[name];
+    if(!p || !p.getCurrentTime) continue;
 
-    for (let name in vids) {
-      createPlayer(name, vids[name]);
-    }
+    try{
+      let actual=p.getCurrentTime();
+      let expected=t - syncMap[name].offset;
+      let drift=actual-expected;
 
-    let ctrlDiv = document.createElement("div");
-    ctrlDiv.id = "controlPlayer";
-    ctrlDiv.style.display = "none";
-    document.body.appendChild(ctrlDiv);
+      // --- SMOOTH CORRECTION ---
+      if(Math.abs(drift) > SYNC_THRESHOLD && Math.abs(drift) < HARD_THRESHOLD){
 
-    controlPlayer = new YT.Player("controlPlayer", {
-      videoId: id,
-      events: {
-        onReady: () => {
-          log("Control player ready");
-          controlPlayer.playVideo();
-          requestAnimationFrame(tick);
-        },
-        onError: (e) => log("Control player error: " + e.data)
+        let rate = 1 - drift * 0.5;
+        rate = Math.max(0.5, Math.min(1.5, rate));
+
+        p.setPlaybackRate(rate);
+
+      } else {
+        p.setPlaybackRate(1);
       }
-    });
 
-  }, "start");
+      // --- HARD SNAP ---
+      if(Math.abs(drift) >= HARD_THRESHOLD){
+        log("HARD SYNC "+name);
+        p.seekTo(expected,true);
+      }
+
+      // --- MONITOR BAR ---
+      let width = Math.min(100, Math.abs(drift)*50);
+      monitorHTML += `
+        <div>${name} ${drift.toFixed(2)}</div>
+        <div class="bar" style="width:${width}px"></div>
+      `;
+
+    }catch(e){
+      log("sync err "+e.message);
+    }
+  }
+
+  syncMonitor.innerHTML = monitorHTML;
+
+  setTimeout(syncLoop,200);
+}
+
+// ---------- START ----------
+function start(){
+
+  log("START");
+
+  players={};
+  syncMap={};
+  events=[];
+  eventIndex=0;
+
+  let id=controlId.value.trim();
+  if(!id) return alert("enter id");
+
+  let text=getControlDescription(id);
+  let vids=parseScript(text);
+
+  vids["this"]=id;
+
+  for(let k in vids){
+    createPlayer(k,vids[k]);
+  }
+
+  startTime=performance.now();
+  isPlaying=true;
+
+  requestAnimationFrame(tick);
+  syncLoop();
 }
 </script>
 

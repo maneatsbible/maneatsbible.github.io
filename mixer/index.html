@@ -1,53 +1,53 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Video Mixer w/ Sync + Monitor</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { margin:0; background:black; overflow:hidden; font-family:monospace; }
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Mixer Pro</title>
 
-    .video {
-      position:absolute;
-      display:none;
-      border:2px solid red;
-    }
+<style>
+body { margin:0; background:black; font-family:monospace; overflow:hidden; }
 
-    #controls {
-      position:fixed; top:10px; left:10px; z-index:9999;
-      background:rgba(0,0,0,0.8); color:white; padding:10px;
-    }
+.video {
+  position:absolute;
+  display:none;
+  border:2px solid red;
+}
 
-    #debug {
-      position:fixed; bottom:0; left:0; width:100%; height:30%;
-      overflow-y:scroll; background:rgba(0,0,0,0.9);
-      color:#00ff00; font-size:11px; padding:5px;
-      z-index:9999;
-    }
+#controls {
+  position:fixed; top:10px; left:10px;
+  background:rgba(0,0,0,0.8); color:white;
+  padding:10px; z-index:9999;
+}
 
-    #timeDisplay {
-      position:fixed; top:10px; right:10px;
-      color:yellow; background:rgba(0,0,0,0.7);
-      padding:5px; z-index:9999;
-    }
+#debug {
+  position:fixed; bottom:0; left:0; width:100%; height:30%;
+  overflow-y:scroll; background:rgba(0,0,0,0.9);
+  color:#00ff00; font-size:11px; padding:5px;
+}
 
-    #syncMonitor {
-      position:fixed;
-      right:10px;
-      top:50px;
-      width:180px;
-      background:rgba(0,0,0,0.8);
-      color:white;
-      padding:5px;
-      z-index:9999;
-    }
+#timeDisplay {
+  position:fixed; top:10px; right:10px;
+  color:yellow; background:rgba(0,0,0,0.7);
+  padding:5px;
+}
 
-    .bar {
-      height:10px;
-      background:lime;
-      margin:2px 0;
-    }
-  </style>
+#syncMonitor {
+  position:fixed;
+  right:10px;
+  top:50px;
+  width:180px;
+  background:rgba(0,0,0,0.8);
+  color:white;
+  padding:5px;
+}
+
+.bar {
+  height:10px;
+  margin:2px 0;
+}
+</style>
 </head>
+
 <body>
 
 <div id="controls">
@@ -69,35 +69,35 @@ let events = [];
 let eventIndex = 0;
 
 let startTime = 0;
-let pausedAt = 0;
 let isPlaying = false;
 
 let syncMap = {};
-let ENABLE_SYNC = true;
 
+let ENABLE_SYNC = true;
 let SYNC_THRESHOLD = 0.4;
 let HARD_THRESHOLD = 1.2;
+
+// 🔥 MASTER TRACK (set to "vidA", "this", or null)
+let MASTER = "vidA";
 
 let alertMode = false;
 
 // ---------- DEBUG ----------
 function log(msg){
-  let d = document.getElementById("debug");
-  let line = document.createElement("div");
-  line.textContent = msg;
+  let d=document.getElementById("debug");
+  let line=document.createElement("div");
+  line.textContent=msg;
   d.appendChild(line);
-  d.scrollTop = d.scrollHeight;
+  d.scrollTop=d.scrollHeight;
   console.log(msg);
   if(alertMode) alert(msg);
 }
 
-function toggleAlerts(){
-  alertMode = !alertMode;
-}
+function toggleAlerts(){ alertMode=!alertMode; }
 
 // ---------- TIME ----------
 function now(){
-  return (performance.now() - startTime)/1000;
+  return (performance.now()-startTime)/1000;
 }
 
 // ---------- SAMPLE SCRIPT ----------
@@ -119,13 +119,13 @@ video vidA b9_CS8gTOR0
 
 // ---------- PARSE ----------
 function parseTime(t){
-  let p = t.split(":").map(Number);
-  return p[0]*60 + p[1];
+  let p=t.split(":").map(Number);
+  return p[0]*60+p[1];
 }
 
 function parseScript(text){
-  let vids = {};
-  events = [];
+  let vids={};
+  events=[];
 
   text.trim().split("\n").forEach(line=>{
     line=line.trim();
@@ -134,7 +134,7 @@ function parseScript(text){
     let parts=line.split(" ");
 
     if(parts[0]==="video"){
-      vids[parts[1]] = parts[2];
+      vids[parts[1]]=parts[2];
     }
     else if(parts[0].includes(":")){
       events.push({
@@ -177,9 +177,7 @@ function exec(e){
   switch(e.cmd){
 
     case "play":
-      syncMap[name]={
-        offset: now() - p.getCurrentTime()
-      };
+      syncMap[name]={ offset: now() - p.getCurrentTime() };
       p.playVideo();
     break;
 
@@ -221,6 +219,14 @@ function tick(){
   requestAnimationFrame(tick);
 }
 
+// ---------- COLOR FUNCTION ----------
+function driftColor(d){
+  let a=Math.abs(d);
+  if(a < 0.3) return "lime";
+  if(a < 0.8) return "yellow";
+  return "red";
+}
+
 // ---------- SYNC LOOP ----------
 function syncLoop(){
 
@@ -232,23 +238,38 @@ function syncLoop(){
   let t=now();
   let monitorHTML="";
 
+  let masterTime=null;
+
+  if(MASTER && players[MASTER]){
+    try{
+      masterTime = players[MASTER].getCurrentTime();
+    }catch(e){}
+  }
+
   for(let name in syncMap){
+
     let p=players[name];
-    if(!p || !p.getCurrentTime) continue;
+    if(!p) continue;
 
     try{
+
       let actual=p.getCurrentTime();
-      let expected=t - syncMap[name].offset;
-      let drift=actual-expected;
 
-      // --- SMOOTH CORRECTION ---
+      let expected;
+
+      if(masterTime !== null && name !== MASTER){
+        expected = masterTime;
+      } else {
+        expected = t - syncMap[name].offset;
+      }
+
+      let drift = actual - expected;
+
+      // --- SMOOTH ---
       if(Math.abs(drift) > SYNC_THRESHOLD && Math.abs(drift) < HARD_THRESHOLD){
-
-        let rate = 1 - drift * 0.5;
+        let rate = 1 - drift*0.5;
         rate = Math.max(0.5, Math.min(1.5, rate));
-
         p.setPlaybackRate(rate);
-
       } else {
         p.setPlaybackRate(1);
       }
@@ -259,11 +280,13 @@ function syncLoop(){
         p.seekTo(expected,true);
       }
 
-      // --- MONITOR BAR ---
-      let width = Math.min(100, Math.abs(drift)*50);
+      // --- VISUAL BAR ---
+      let width=Math.min(100, Math.abs(drift)*50);
+      let color=driftColor(drift);
+
       monitorHTML += `
         <div>${name} ${drift.toFixed(2)}</div>
-        <div class="bar" style="width:${width}px"></div>
+        <div class="bar" style="width:${width}px;background:${color}"></div>
       `;
 
     }catch(e){
@@ -271,7 +294,7 @@ function syncLoop(){
     }
   }
 
-  syncMonitor.innerHTML = monitorHTML;
+  syncMonitor.innerHTML=monitorHTML;
 
   setTimeout(syncLoop,200);
 }
@@ -295,7 +318,7 @@ function start(){
   vids["this"]=id;
 
   for(let k in vids){
-    createPlayer(k,vids[k]);
+    createPlayer(k, vids[k]);
   }
 
   startTime=performance.now();

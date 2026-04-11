@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Video Commentary Mixer</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+
+    .video {
+      position: absolute;
+      display: none;
+      border: none;
+    }
+
+    #controls {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 9999;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="controls">
+  <input id="controlId" placeholder="Control Video ID">
+  <button onclick="start()">Start</button>
+</div>
+
+<div id="stage"></div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+
+<script>
+let players = {};
+let events = [];
+let startTime = 0;
+let controlPlayer = null;
+let eventIndex = 0;
+
+// --- SAMPLE CONTROL DATA (simulate YouTube description) ---
+function getControlDescription(id) {
+  return `
+video vidA dQw4w9WgXcQ
+video vidB 3JZ_D3ELwOQ
+
+00:00 show vidA 0 0 640 360
+00:02 play vidA
+
+00:05 show vidB 650 0 320 180
+00:06 play vidB
+
+00:10 seek vidB 45
+
+00:15 hide vidA
+00:20 pause vidB
+`;
+}
+
+// --- Parse timestamp ---
+function parseTime(t) {
+  let parts = t.split(":").map(Number);
+  return parts[0]*60 + parts[1];
+}
+
+// --- Parse control script ---
+function parseScript(text) {
+  let lines = text.trim().split("\n");
+  let vids = {};
+
+  lines.forEach(line => {
+    line = line.trim();
+    if (!line) return;
+
+    let parts = line.split(" ");
+
+    if (parts[0] === "video") {
+      vids[parts[1]] = parts[2];
+    } else if (parts[0].includes(":")) {
+      events.push({
+        time: parseTime(parts[0]),
+        cmd: parts[1],
+        args: parts.slice(2)
+      });
+    }
+  });
+
+  return vids;
+}
+
+// --- Create player ---
+function createPlayer(name, videoId) {
+  let iframe = document.createElement("div");
+  iframe.id = "player_" + name;
+  iframe.className = "video";
+  document.getElementById("stage").appendChild(iframe);
+
+  players[name] = new YT.Player(iframe.id, {
+    videoId: videoId,
+    playerVars: { controls: 0, modestbranding: 1 }
+  });
+}
+
+// --- Execute commands ---
+function exec(e) {
+  let p = players[e.args[0]];
+
+  switch (e.cmd) {
+    case "play":
+      p.playVideo();
+      break;
+
+    case "pause":
+      p.pauseVideo();
+      break;
+
+    case "seek":
+      p.seekTo(parseFloat(e.args[1]), true);
+      break;
+
+    case "show":
+      let el = p.getIframe();
+      el.style.display = "block";
+      el.style.left = e.args[1] + "px";
+      el.style.top = e.args[2] + "px";
+      el.style.width = e.args[3] + "px";
+      el.style.height = e.args[4] + "px";
+      break;
+
+    case "hide":
+      p.getIframe().style.display = "none";
+      break;
+  }
+}
+
+// --- Timeline loop ---
+function tick() {
+  if (!controlPlayer) return;
+
+  let t = controlPlayer.getCurrentTime();
+
+  while (eventIndex < events.length && events[eventIndex].time <= t) {
+    exec(events[eventIndex]);
+    eventIndex++;
+  }
+
+  requestAnimationFrame(tick);
+}
+
+// --- Start app ---
+function start() {
+  let id = document.getElementById("controlId").value.trim();
+  let text = getControlDescription(id);
+
+  let vids = parseScript(text);
+
+  for (let name in vids) {
+    createPlayer(name, vids[name]);
+  }
+
+  // control player (hidden)
+  let ctrlDiv = document.createElement("div");
+  ctrlDiv.id = "controlPlayer";
+  ctrlDiv.style.display = "none";
+  document.body.appendChild(ctrlDiv);
+
+  controlPlayer = new YT.Player("controlPlayer", {
+    videoId: id,
+    events: {
+      onReady: () => {
+        controlPlayer.playVideo();
+        requestAnimationFrame(tick);
+      }
+    }
+  });
+}
+</script>
+
+</body>
+</html>

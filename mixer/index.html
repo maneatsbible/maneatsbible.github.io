@@ -2,146 +2,108 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Video Mixer Pro</title>
+<title>Video Mixer</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
-body { margin:0; background:black; font-family:monospace; overflow:hidden; }
-
-.video {
-  position:absolute;
-  display:none;
-  border:2px solid red;
-}
-
-#controls {
-  position:fixed; top:10px; left:10px;
-  background:rgba(0,0,0,0.8); color:white;
-  padding:10px; z-index:9999;
-}
-
-#debug {
-  position:fixed; bottom:0; left:0; width:100%; height:30%;
-  overflow-y:scroll; background:rgba(0,0,0,0.9);
-  color:#00ff00; font-size:11px; padding:5px;
-}
-
-#timeDisplay {
-  position:fixed; top:10px; right:10px;
-  color:yellow; background:rgba(0,0,0,0.7);
-  padding:5px;
-}
-
-#syncMonitor {
-  position:fixed;
-  right:10px;
-  top:50px;
-  width:180px;
-  background:rgba(0,0,0,0.8);
-  color:white;
-  padding:5px;
-}
-
-.bar {
-  height:10px;
-  margin:2px 0;
-}
+body { background:#111; color:white; }
+.video { position:absolute; display:none; border:2px solid red; }
+#stage { position:relative; width:100%; height:60vh; background:black; }
+#debug { height:150px; overflow:auto; background:black; color:#0f0; font-size:12px; }
 </style>
 </head>
 
-<body>
+<body class="p-2">
 
-<div id="controls">
-  <input id="controlId" placeholder="Control Video ID">
-  <button onclick="start()">Start</button>
-  <button onclick="toggleAlerts()">Alerts</button>
+<div class="container-fluid">
+
+<div class="row mb-2">
+  <div class="col-8">
+    <input id="controlId" class="form-control" placeholder="Control Video ID">
+  </div>
+  <div class="col-4">
+    <button class="btn btn-success w-100" onclick="start()">Start</button>
+  </div>
 </div>
 
-<div id="timeDisplay">t=0</div>
-<div id="syncMonitor"></div>
+<div class="row mb-2">
+  <div class="col-6">
+    <input id="recordVid" class="form-control" placeholder="Video to comment on">
+  </div>
+  <div class="col-3">
+    <button class="btn btn-warning w-100" onclick="startRecording()">Record</button>
+  </div>
+  <div class="col-3">
+    <button class="btn btn-danger w-100" onclick="stopRecording()">Stop</button>
+  </div>
+</div>
+
 <div id="stage"></div>
-<div id="debug"></div>
+
+<div class="mt-2">
+  <b>Timeline:</b> <span id="time">0</span>
+</div>
+
+<div id="debug" class="mt-2"></div>
+
+<textarea id="output" class="form-control mt-2" rows="6" placeholder="Generated metadata"></textarea>
+
+</div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
-let players = {};
-let events = [];
-let eventIndex = 0;
+let players={}, events=[], eventIndex=0;
 
-let startTime = 0;
-let isPlaying = false;
+let startTime=0;
+let pausedOffset=0;
+let isRunning=false;
 
-let syncMap = {};
+let recording=false;
+let recordEvents=[];
 
-let ENABLE_SYNC = true;
-let SYNC_THRESHOLD = 0.4;
-let HARD_THRESHOLD = 1.2;
-
-// 🔥 MASTER TRACK (set to "vidA", "this", or null)
-let MASTER = "vidA";
-
-let alertMode = false;
-
-// ---------- DEBUG ----------
-function log(msg){
-  let d=document.getElementById("debug");
-  let line=document.createElement("div");
-  line.textContent=msg;
-  d.appendChild(line);
-  d.scrollTop=d.scrollHeight;
-  console.log(msg);
-  if(alertMode) alert(msg);
+function log(m){
+  debug.innerHTML += m+"<br>";
+  debug.scrollTop=debug.scrollHeight;
 }
 
-function toggleAlerts(){ alertMode=!alertMode; }
-
-// ---------- TIME ----------
 function now(){
-  return (performance.now()-startTime)/1000;
+  return (performance.now()-startTime)/1000 + pausedOffset;
 }
 
-// ---------- SAMPLE SCRIPT ----------
-function getControlDescription(id){
+// SAMPLE METADATA (PIP)
+function sampleMeta(){
 return `
 video vidA b9_CS8gTOR0
 
-00:00 show vidA 0 0 320 180
-00:01 play vidA
+00:00 show vidA 0 0 100% 100%
+00:00 play vidA
 
-00:03 show this 0 190 320 180
-00:04 play this
-
-00:08 seek this 20
-
-00:12 hide vidA
+00:02 show this 70% 70% 30% 30%
+00:02 play this
 `;
 }
 
-// ---------- PARSE ----------
+// PARSE
 function parseTime(t){
   let p=t.split(":").map(Number);
   return p[0]*60+p[1];
 }
 
-function parseScript(text){
+function parse(text){
   let vids={};
   events=[];
 
-  text.trim().split("\n").forEach(line=>{
-    line=line.trim();
-    if(!line) return;
+  text.trim().split("\n").forEach(l=>{
+    l=l.trim();
+    if(!l) return;
 
-    let parts=line.split(" ");
+    let p=l.split(" ");
 
-    if(parts[0]==="video"){
-      vids[parts[1]]=parts[2];
-    }
-    else if(parts[0].includes(":")){
-      events.push({
-        time:parseTime(parts[0]),
-        cmd:parts[1],
-        args:parts.slice(2)
-      });
+    if(p[0]=="video") vids[p[1]]=p[2];
+    else if(p[0].includes(":")){
+      events.push({time:parseTime(p[0]),cmd:p[1],args:p.slice(2)});
     }
   });
 
@@ -149,53 +111,60 @@ function parseScript(text){
   return vids;
 }
 
-// ---------- PLAYER ----------
-function createPlayer(name,id){
-  let div=document.createElement("div");
-  div.id="p_"+name;
-  div.className="video";
-  stage.appendChild(div);
+// PLAYER
+function create(name,id){
+  let d=document.createElement("div");
+  d.id="p_"+name;
+  d.className="video";
+  stage.appendChild(d);
 
-  players[name]=new YT.Player(div.id,{
+  players[name]=new YT.Player(d.id,{
     videoId:id,
-    playerVars:{controls:0},
     events:{
-      onReady:()=>log("ready "+name),
-      onError:e=>log("err "+name+" "+e.data)
+      onStateChange:e=>handleState(name,e.data)
     }
   });
 }
 
-// ---------- EXEC ----------
-function exec(e){
-  log(`@${e.time}s ${e.cmd} ${e.args.join(" ")}`);
+// BUFFER / PAUSE HANDLING
+function handleState(name,state){
+  // 3 = buffering
+  if(state==3){
+    log(name+" buffering → pause timeline");
+    isRunning=false;
+  }
 
-  let name=e.args[0];
-  let p=players[name];
+  // 1 = playing
+  if(state==1 && !isRunning){
+    log(name+" resumed → adjust timeline");
+    startTime=performance.now();
+    isRunning=true;
+    requestAnimationFrame(tick);
+  }
+}
+
+// EXEC
+function exec(e){
+  let p=players[e.args[0]];
   if(!p) return;
+
+  if(recording){
+    recordEvents.push(e);
+  }
 
   switch(e.cmd){
 
-    case "play":
-      syncMap[name]={ offset: now() - p.getCurrentTime() };
-      p.playVideo();
-    break;
-
-    case "pause":
-      p.pauseVideo();
-    break;
-
-    case "seek":
-      p.seekTo(parseFloat(e.args[1]),true);
-    break;
+    case "play": p.playVideo(); break;
+    case "pause": p.pauseVideo(); break;
+    case "seek": p.seekTo(parseFloat(e.args[1]),true); break;
 
     case "show":
       let el=p.getIframe();
       el.style.display="block";
-      el.style.left=e.args[1]+"px";
-      el.style.top=e.args[2]+"px";
-      el.style.width=e.args[3]+"px";
-      el.style.height=e.args[4]+"px";
+      el.style.left=e.args[1];
+      el.style.top=e.args[2];
+      el.style.width=e.args[3];
+      el.style.height=e.args[4];
     break;
 
     case "hide":
@@ -204,12 +173,12 @@ function exec(e){
   }
 }
 
-// ---------- TIMELINE ----------
+// LOOP
 function tick(){
-  if(!isPlaying) return;
+  if(!isRunning) return;
 
   let t=now();
-  timeDisplay.textContent="t="+t.toFixed(2);
+  time.innerText=t.toFixed(2);
 
   while(eventIndex<events.length && events[eventIndex].time<=t){
     exec(events[eventIndex]);
@@ -219,113 +188,59 @@ function tick(){
   requestAnimationFrame(tick);
 }
 
-// ---------- COLOR FUNCTION ----------
-function driftColor(d){
-  let a=Math.abs(d);
-  if(a < 0.3) return "lime";
-  if(a < 0.8) return "yellow";
-  return "red";
-}
-
-// ---------- SYNC LOOP ----------
-function syncLoop(){
-
-  if(!ENABLE_SYNC){
-    setTimeout(syncLoop,300);
-    return;
-  }
-
-  let t=now();
-  let monitorHTML="";
-
-  let masterTime=null;
-
-  if(MASTER && players[MASTER]){
-    try{
-      masterTime = players[MASTER].getCurrentTime();
-    }catch(e){}
-  }
-
-  for(let name in syncMap){
-
-    let p=players[name];
-    if(!p) continue;
-
-    try{
-
-      let actual=p.getCurrentTime();
-
-      let expected;
-
-      if(masterTime !== null && name !== MASTER){
-        expected = masterTime;
-      } else {
-        expected = t - syncMap[name].offset;
-      }
-
-      let drift = actual - expected;
-
-      // --- SMOOTH ---
-      if(Math.abs(drift) > SYNC_THRESHOLD && Math.abs(drift) < HARD_THRESHOLD){
-        let rate = 1 - drift*0.5;
-        rate = Math.max(0.5, Math.min(1.5, rate));
-        p.setPlaybackRate(rate);
-      } else {
-        p.setPlaybackRate(1);
-      }
-
-      // --- HARD SNAP ---
-      if(Math.abs(drift) >= HARD_THRESHOLD){
-        log("HARD SYNC "+name);
-        p.seekTo(expected,true);
-      }
-
-      // --- VISUAL BAR ---
-      let width=Math.min(100, Math.abs(drift)*50);
-      let color=driftColor(drift);
-
-      monitorHTML += `
-        <div>${name} ${drift.toFixed(2)}</div>
-        <div class="bar" style="width:${width}px;background:${color}"></div>
-      `;
-
-    }catch(e){
-      log("sync err "+e.message);
-    }
-  }
-
-  syncMonitor.innerHTML=monitorHTML;
-
-  setTimeout(syncLoop,200);
-}
-
-// ---------- START ----------
+// START
 function start(){
-
-  log("START");
-
   players={};
-  syncMap={};
   events=[];
   eventIndex=0;
 
-  let id=controlId.value.trim();
-  if(!id) return alert("enter id");
+  let id=controlId.value || "CONTROL";
 
-  let text=getControlDescription(id);
-  let vids=parseScript(text);
+  let text=sampleMeta(); // replace with API fetch later
+  let vids=parse(text);
 
   vids["this"]=id;
 
-  for(let k in vids){
-    createPlayer(k, vids[k]);
-  }
+  for(let k in vids) create(k,vids[k]);
 
   startTime=performance.now();
-  isPlaying=true;
+  pausedOffset=0;
+  isRunning=true;
 
   requestAnimationFrame(tick);
-  syncLoop();
+}
+
+// RECORD MODE
+function startRecording(){
+  recording=true;
+  recordEvents=[];
+  log("Recording started");
+
+  players={};
+  let vid=recordVid.value;
+
+  create("vidA",vid);
+
+  startTime=performance.now();
+  isRunning=true;
+}
+
+function stopRecording(){
+  recording=false;
+
+  let txt="video vidA "+recordVid.value+"\n\n";
+
+  recordEvents.forEach(e=>{
+    let m=Math.floor(e.time/60).toString().padStart(2,"0");
+    let s=Math.floor(e.time%60).toString().padStart(2,"0");
+
+    txt+=`${m}:${s} ${e.cmd} ${e.args.join(" ")}\n`;
+  });
+
+  txt+=`\n\n---\nUse with Video Mixer App\nPaste this video ID into the mixer.\n`;
+
+  output.value=txt;
+  log("Recording stopped");
 }
 </script>
 

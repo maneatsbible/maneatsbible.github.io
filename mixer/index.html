@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Video Mixer</title>
+<title>Video Commentary Mixer</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
@@ -11,6 +11,7 @@ body { background:#111; color:white; }
 .video { position:absolute; display:none; border:2px solid red; }
 #stage { position:relative; width:100%; height:60vh; background:black; }
 #debug { height:150px; overflow:auto; background:black; color:#0f0; font-size:12px; }
+video#camPreview { width:100%; max-height:200px; }
 </style>
 </head>
 
@@ -18,31 +19,33 @@ body { background:#111; color:white; }
 
 <div class="container-fluid">
 
-<div class="row mb-2">
-  <div class="col-8">
+<div class="row g-2 mb-2">
+  <div class="col-12 col-md-8">
     <input id="controlId" class="form-control" placeholder="Control Video ID">
   </div>
-  <div class="col-4">
-    <button class="btn btn-success w-100" onclick="start()">Start</button>
+  <div class="col-12 col-md-4">
+    <button class="btn btn-success w-100" onclick="startPlayback()">Start Playback</button>
   </div>
 </div>
 
-<div class="row mb-2">
-  <div class="col-6">
-    <input id="recordVid" class="form-control" placeholder="Video to comment on">
+<div class="row g-2 mb-2">
+  <div class="col-12 col-md-6">
+    <input id="recordVid" class="form-control" placeholder="Video ID to comment on (vidA)">
   </div>
-  <div class="col-3">
-    <button class="btn btn-warning w-100" onclick="startRecording()">Record</button>
+  <div class="col-6 col-md-3">
+    <button class="btn btn-warning w-100" onclick="startRecording()">Start Recording</button>
   </div>
-  <div class="col-3">
-    <button class="btn btn-danger w-100" onclick="stopRecording()">Stop</button>
+  <div class="col-6 col-md-3">
+    <button class="btn btn-danger w-100" onclick="stopRecording()">Stop Recording</button>
   </div>
 </div>
 
 <div id="stage"></div>
 
+<video id="camPreview" autoplay muted playsinline class="mt-2"></video>
+
 <div class="mt-2">
-  <b>Timeline:</b> <span id="time">0</span>
+  <strong>Time:</strong> <span id="time">0</span>
 </div>
 
 <div id="debug" class="mt-2"></div>
@@ -54,30 +57,40 @@ body { background:#111; color:white; }
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
-let players={}, events=[], eventIndex=0;
+let players = {};
+let events = [];
+let eventIndex = 0;
 
-let startTime=0;
-let pausedOffset=0;
-let isRunning=false;
+let startTime = 0;
+let isRunning = false;
 
-let recording=false;
-let recordEvents=[];
+let readyCount = 0;
+let totalPlayers = 0;
 
-function log(m){
-  debug.innerHTML += m+"<br>";
-  debug.scrollTop=debug.scrollHeight;
+// recording
+let mediaRecorder;
+let recordedChunks = [];
+let recordStart = 0;
+let recordEvents = [];
+let recording = false;
+
+// ---------- DEBUG ----------
+function log(msg){
+  debug.innerHTML += msg + "<br>";
+  debug.scrollTop = debug.scrollHeight;
 }
 
+// ---------- TIME ----------
 function now(){
-  return (performance.now()-startTime)/1000 + pausedOffset;
+  return (performance.now() - startTime) / 1000;
 }
 
-// SAMPLE METADATA (PIP)
+// ---------- SAMPLE METADATA ----------
 function sampleMeta(){
 return `
 video vidA b9_CS8gTOR0
 
-00:00 show vidA 0 0 100% 100%
+00:00 show vidA 0% 0% 100% 100%
 00:00 play vidA
 
 00:02 show this 70% 70% 30% 30%
@@ -85,23 +98,23 @@ video vidA b9_CS8gTOR0
 `;
 }
 
-// PARSE
+// ---------- PARSE ----------
 function parseTime(t){
-  let p=t.split(":").map(Number);
-  return p[0]*60+p[1];
+  let p = t.split(":").map(Number);
+  return p[0]*60 + p[1];
 }
 
 function parse(text){
-  let vids={};
-  events=[];
+  let vids = {};
+  events = [];
 
-  text.trim().split("\n").forEach(l=>{
-    l=l.trim();
+  text.trim().split("\\n").forEach(l=>{
+    l = l.trim();
     if(!l) return;
 
-    let p=l.split(" ");
+    let p = l.split(" ");
 
-    if(p[0]=="video") vids[p[1]]=p[2];
+    if(p[0]=="video") vids[p[1]] = p[2];
     else if(p[0].includes(":")){
       events.push({time:parseTime(p[0]),cmd:p[1],args:p.slice(2)});
     }
@@ -111,49 +124,69 @@ function parse(text){
   return vids;
 }
 
-// PLAYER
+// ---------- PLAYER ----------
 function create(name,id){
   let d=document.createElement("div");
   d.id="p_"+name;
   d.className="video";
   stage.appendChild(d);
 
+  totalPlayers++;
+
   players[name]=new YT.Player(d.id,{
     videoId:id,
+    playerVars:{playsinline:1},
     events:{
+      onReady:()=>{
+        readyCount++;
+        log(name+" ready");
+        if(readyCount===totalPlayers){
+          log("ALL READY → start timeline");
+          startTime = performance.now();
+          isRunning = true;
+          requestAnimationFrame(tick);
+        }
+      },
       onStateChange:e=>handleState(name,e.data)
     }
   });
 }
 
-// BUFFER / PAUSE HANDLING
+// ---------- STATE HANDLING ----------
 function handleState(name,state){
-  // 3 = buffering
+
+  // BUFFERING
   if(state==3){
-    log(name+" buffering → pause timeline");
-    isRunning=false;
+    log(name+" buffering → pause others");
+    Object.entries(players).forEach(([n,p])=>{
+      if(n!==name) p.pauseVideo();
+    });
   }
 
-  // 1 = playing
-  if(state==1 && !isRunning){
-    log(name+" resumed → adjust timeline");
-    startTime=performance.now();
-    isRunning=true;
-    requestAnimationFrame(tick);
+  // PLAYING
+  if(state==1){
+    log(name+" playing → resume others");
+    Object.entries(players).forEach(([n,p])=>{
+      if(n!==name) p.playVideo();
+    });
+  }
+
+  // RECORD TRACK
+  if(recording){
+    recordEvents.push({
+      time: (performance.now() - recordStart)/1000,
+      cmd: state==1?"play":"pause",
+      args:[name]
+    });
   }
 }
 
-// EXEC
+// ---------- EXEC ----------
 function exec(e){
-  let p=players[e.args[0]];
+  let p = players[e.args[0]];
   if(!p) return;
 
-  if(recording){
-    recordEvents.push(e);
-  }
-
   switch(e.cmd){
-
     case "play": p.playVideo(); break;
     case "pause": p.pauseVideo(); break;
     case "seek": p.seekTo(parseFloat(e.args[1]),true); break;
@@ -173,12 +206,12 @@ function exec(e){
   }
 }
 
-// LOOP
+// ---------- LOOP ----------
 function tick(){
   if(!isRunning) return;
 
-  let t=now();
-  time.innerText=t.toFixed(2);
+  let t = now();
+  time.innerText = t.toFixed(2);
 
   while(eventIndex<events.length && events[eventIndex].time<=t){
     exec(events[eventIndex]);
@@ -188,59 +221,77 @@ function tick(){
   requestAnimationFrame(tick);
 }
 
-// START
-function start(){
-  players={};
-  events=[];
-  eventIndex=0;
+// ---------- PLAYBACK ----------
+function startPlayback(){
+  players={}; events=[]; eventIndex=0;
+  readyCount=0; totalPlayers=0;
 
-  let id=controlId.value || "CONTROL";
+  let id = controlId.value || "CONTROL";
+  let text = sampleMeta(); // replace with API fetch later
 
-  let text=sampleMeta(); // replace with API fetch later
-  let vids=parse(text);
-
-  vids["this"]=id;
+  let vids = parse(text);
+  vids["this"] = id;
 
   for(let k in vids) create(k,vids[k]);
-
-  startTime=performance.now();
-  pausedOffset=0;
-  isRunning=true;
-
-  requestAnimationFrame(tick);
 }
 
-// RECORD MODE
-function startRecording(){
-  recording=true;
-  recordEvents=[];
+// ---------- RECORD ----------
+async function startRecording(){
+
+  recording = true;
+  recordEvents = [];
+  recordStart = performance.now();
+
+  let stream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  camPreview.srcObject = stream;
+
+  mediaRecorder = new MediaRecorder(stream);
+  mediaRecorder.ondataavailable = e=>recordedChunks.push(e.data);
+  mediaRecorder.start();
+
+  players={}; readyCount=0; totalPlayers=0;
+
+  let vid = recordVid.value;
+  create("vidA", vid);
+
   log("Recording started");
-
-  players={};
-  let vid=recordVid.value;
-
-  create("vidA",vid);
-
-  startTime=performance.now();
-  isRunning=true;
 }
 
 function stopRecording(){
+
   recording=false;
 
-  let txt="video vidA "+recordVid.value+"\n\n";
+  mediaRecorder.stop();
+  mediaRecorder.onstop=()=>{
 
-  recordEvents.forEach(e=>{
-    let m=Math.floor(e.time/60).toString().padStart(2,"0");
-    let s=Math.floor(e.time%60).toString().padStart(2,"0");
+    let blob = new Blob(recordedChunks,{type:"video/webm"});
+    let url = URL.createObjectURL(blob);
 
-    txt+=`${m}:${s} ${e.cmd} ${e.args.join(" ")}\n`;
-  });
+    let a=document.createElement("a");
+    a.href=url;
+    a.download="commentary.webm";
+    a.click();
 
-  txt+=`\n\n---\nUse with Video Mixer App\nPaste this video ID into the mixer.\n`;
+    // metadata
+    let txt = "video vidA "+recordVid.value+"\\n\\n";
 
-  output.value=txt;
-  log("Recording stopped");
+    recordEvents.forEach(e=>{
+      let m = String(Math.floor(e.time/60)).padStart(2,"0");
+      let s = String(Math.floor(e.time%60)).padStart(2,"0");
+
+      txt += `${m}:${s} ${e.cmd} ${e.args.join(" ")}\\n`;
+    });
+
+    txt += `
+---
+This video is a control track for the Video Mixer app.
+Paste this video ID into the mixer to replay commentary.
+`;
+
+    output.value = txt;
+
+    log("Recording saved");
+  };
 }
 </script>
 

@@ -2,23 +2,25 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Video Mixer</title>
+<title>Mixed Reviews</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
 body { background:#111; color:white; }
+
 #stage {
   position:relative;
   width:100%;
-  height:60vh;
+  height:55vh;
   background:black;
   overflow:hidden;
 }
+
 .video {
   position:absolute;
-  display:none;
 }
+
 #debug {
   height:120px;
   overflow:auto;
@@ -26,7 +28,11 @@ body { background:#111; color:white; }
   color:#0f0;
   font-size:12px;
 }
-video#cam { width:100%; max-height:200px; }
+
+video#cam {
+  width:100%;
+  max-height:180px;
+}
 </style>
 </head>
 
@@ -34,28 +40,27 @@ video#cam { width:100%; max-height:200px; }
 
 <div class="container-fluid">
 
-<div class="row g-2 mb-2">
-  <div class="col-12 col-md-8">
-    <input id="controlId" class="form-control" placeholder="Control Video ID">
-  </div>
-  <div class="col-12 col-md-4">
-    <button class="btn btn-success w-100" onclick="initPlayback()">Start Playback</button>
-  </div>
+<h4 class="text-center mb-2">Mixed Reviews</h4>
+
+<ul class="nav nav-tabs mb-2">
+  <li class="nav-item">
+    <button class="nav-link active" onclick="showTab('play')">Playback</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" onclick="showTab('record')">Record</button>
+  </li>
+</ul>
+
+<div id="playTab">
+  <input id="controlId" class="form-control mb-2" placeholder="Control Video ID">
+  <button class="btn btn-success w-100 mb-2" onclick="startPlayback()">Start Playback</button>
 </div>
 
-<div class="row g-2 mb-2">
-  <div class="col-12 col-md-6">
-    <input id="vidAInput" class="form-control" placeholder="Video ID to comment on">
-  </div>
-  <div class="col-6 col-md-2">
-    <button class="btn btn-warning w-100" onclick="startRecording()">Record</button>
-  </div>
-  <div class="col-6 col-md-2">
-    <button class="btn btn-secondary w-100" onclick="toggleCommentary()">Pause/Resume Commentary</button>
-  </div>
-  <div class="col-12 col-md-2">
-    <button class="btn btn-danger w-100" onclick="stopRecording()">Stop</button>
-  </div>
+<div id="recordTab" style="display:none;">
+  <input id="vidAInput" class="form-control mb-2" placeholder="Video ID to comment on">
+  <button class="btn btn-warning w-100 mb-2" onclick="startRecording()">Start Recording</button>
+  <button class="btn btn-secondary w-100 mb-2" onclick="toggleCommentary()">Pause/Resume Commentary</button>
+  <button class="btn btn-danger w-100 mb-2" onclick="stopRecording()">Stop Recording</button>
 </div>
 
 <div id="stage"></div>
@@ -65,7 +70,6 @@ video#cam { width:100%; max-height:200px; }
 <div id="debug" class="mt-2"></div>
 
 <textarea id="output" class="form-control mt-2" rows="6"></textarea>
-
 <button class="btn btn-primary w-100 mt-2" onclick="upload()">Upload to YouTube</button>
 
 </div>
@@ -74,17 +78,23 @@ video#cam { width:100%; max-height:200px; }
 <script src="https://accounts.google.com/gsi/client"></script>
 
 <script>
-let players={}, ready=false;
+let players={}, readyCount=0, totalPlayers=0;
 let startTime=0, running=false;
 
 let recording=false, recorder, chunks=[];
 let recordStart=0, events=[];
 let commentaryVisible=true;
 
+// ---------- UI ----------
+function showTab(tab){
+  playTab.style.display = tab==="play"?"block":"none";
+  recordTab.style.display = tab==="record"?"block":"none";
+}
+
 // ---------- DEBUG ----------
 function log(m){
-  debug.innerHTML+=m+"<br>";
-  debug.scrollTop=debug.scrollHeight;
+  debug.innerHTML += m+"<br>";
+  debug.scrollTop = debug.scrollHeight;
 }
 
 // ---------- TIME ----------
@@ -92,62 +102,105 @@ function now(){
   return (performance.now()-startTime)/1000;
 }
 
-// ---------- CREATE PLAYER ----------
-function create(name,id){
+// ---------- CREATE ----------
+function create(name,id,x,y,w,h){
+
   let div=document.createElement("div");
   div.id="p_"+name;
   div.className="video";
   stage.appendChild(div);
 
+  totalPlayers++;
+
   players[name]=new YT.Player(div.id,{
     videoId:id,
-    playerVars:{playsinline:1},
+    playerVars:{playsinline:1, controls:0},
     events:{
-      onReady:()=>{ ready=true; log(name+" ready"); },
+      onReady:()=>{
+        readyCount++;
+        log(name+" ready");
+
+        // APPLY LAYOUT
+        let el=players[name].getIframe();
+        el.style.left=x;
+        el.style.top=y;
+        el.style.width=w;
+        el.style.height=h;
+        el.style.display="block";
+
+        if(readyCount===totalPlayers){
+          log("ALL READY → START");
+
+          startTime=performance.now();
+          running=true;
+
+          // USER GESTURE PLAY
+          Object.values(players).forEach(p=>p.playVideo());
+
+          requestAnimationFrame(tick);
+        }
+      },
       onStateChange:e=>handleState(name,e.data)
     }
   });
 }
 
 // ---------- STATE ----------
+let suppress=false;
+
 function handleState(name,state){
 
-  // 3 buffering
+  if(suppress) return;
+
+  // BUFFERING
   if(state==3){
+    suppress=true;
     Object.entries(players).forEach(([n,p])=>{
       if(n!==name) p.pauseVideo();
     });
+    suppress=false;
   }
 
-  // 1 playing
+  // PLAYING
   if(state==1){
+    suppress=true;
     Object.entries(players).forEach(([n,p])=>{
       if(n!==name) p.playVideo();
     });
+    suppress=false;
   }
 
-  // RECORD EVENTS
+  // RECORD vidA
   if(recording && name==="vidA"){
-    let t=now();
+    let t=(performance.now()-recordStart)/1000;
     if(state==1) events.push({time:t,cmd:"play",args:["vidA"]});
     if(state==2) events.push({time:t,cmd:"pause",args:["vidA"]});
   }
 }
 
-// ---------- USER GESTURE START ----------
-function initPlayback(){
+// ---------- LOOP ----------
+function tick(){
+  if(!running) return;
+
+  let t=now();
+  time.innerText=t.toFixed(2);
+
+  requestAnimationFrame(tick);
+}
+
+// ---------- PLAYBACK ----------
+function startPlayback(){
 
   stage.innerHTML="";
   players={};
+  readyCount=0;
+  totalPlayers=0;
 
-  create("vidA","b9_CS8gTOR0");
+  let control=controlId.value || "dQw4w9WgXcQ";
 
-  setTimeout(()=>{
-    players["vidA"].playVideo();
-  },1000);
-
-  startTime=performance.now();
-  running=true;
+  // SAMPLE PIP
+  create("vidA","b9_CS8gTOR0","0%","0%","100%","100%");
+  create("this",control,"65%","65%","35%","35%");
 }
 
 // ---------- RECORD ----------
@@ -165,22 +218,14 @@ async function startRecording(){
   recorder.start();
 
   stage.innerHTML="";
-  create("vidA",vidAInput.value);
+  players={}; readyCount=0; totalPlayers=0;
 
-  // show vidA full
-  setTimeout(()=>{
-    let el=players["vidA"].getIframe();
-    el.style.display="block";
-    el.style.left="0";
-    el.style.top="0";
-    el.style.width="100%";
-    el.style.height="100%";
-  },1000);
+  create("vidA",vidAInput.value,"0%","0%","100%","100%");
 
   log("Recording started");
 }
 
-// ---------- COMMENTARY TOGGLE ----------
+// ---------- COMMENTARY ----------
 function toggleCommentary(){
 
   if(!recording) return;
@@ -190,12 +235,10 @@ function toggleCommentary(){
   if(commentaryVisible){
     events.push({time:t,cmd:"hide",args:["this"]});
     commentaryVisible=false;
-    log("Commentary hidden");
   } else {
-    events.push({time:t,cmd:"show",args:["this","70%","70%","30%","30%"]});
+    events.push({time:t,cmd:"show",args:["this","65%","65%","35%","35%"]});
     events.push({time:t,cmd:"play",args:["this"]});
     commentaryVisible=true;
-    log("Commentary shown");
   }
 }
 
@@ -215,7 +258,6 @@ function stopRecording(){
     a.download="commentary.webm";
     a.click();
 
-    // BUILD DESCRIPTION
     let meta="video vidA "+vidAInput.value+"\\n\\n";
 
     events.forEach(e=>{
@@ -224,13 +266,10 @@ function stopRecording(){
       meta+=`${m}:${s} ${e.cmd} ${e.args.join(" ")}\\n`;
     });
 
-    let desc=
-`This video is a commentary control track.
+    let desc=`Mixed Reviews commentary track
 
-Use it with:
+Use with:
 https://maneatsbible.live/mixer
-
-Paste this video ID into the mixer to replay synchronized commentary.
 
 ---
 
@@ -240,9 +279,9 @@ ${meta}`;
   };
 }
 
-// ---------- UPLOAD ----------
+// ---------- UPLOAD (OAUTH READY) ----------
 function upload(){
-  alert("Upload requires API key + OAuth setup. Ready to wire next.");
+  log("Upload flow requires OAuth client ID setup.");
 }
 </script>
 

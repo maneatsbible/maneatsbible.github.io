@@ -22,7 +22,7 @@ body { background:#111; color:white; }
 #pipCam {
   position:absolute;
   bottom:5%;
-  left:5%;
+  right:5%;
   width:30%;
   border:2px solid white;
   display:none;
@@ -77,170 +77,74 @@ body { background:#111; color:white; }
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
-<script src="https://accounts.google.com/gsi/client"></script>
 
 <script>
 
-/* =========================
-   CONFIG
-========================= */
+const VERSION="Mixed Reviews v13";
 
-const VERSION = "Mixed Reviews v12";
-const YT_API_KEY = "YOUR_API_KEY";
-
-/* =========================
-   LOG
-========================= */
-
-let logBox = document.getElementById("log");
-
+/* LOG */
+let logBox=document.getElementById("log");
 function log(m){
   let t=(performance.now()/1000).toFixed(2);
-  logBox.innerHTML += `[${t}] ${m}<br>`;
-  logBox.scrollTop = logBox.scrollHeight;
+  logBox.innerHTML+=`[${t}] ${m}<br>`;
+  logBox.scrollTop=logBox.scrollHeight;
 }
-
 log("INIT "+VERSION);
 
-/* =========================
-   GET PARAM
-========================= */
+/* STATE */
+let state={mode:"playback",ytReady:false};
 
-function getParam(){
-  let p=new URLSearchParams(location.search);
-  return p.get("commentary");
-}
-
-let param=getParam();
-if(param){
-  document.getElementById("commentaryId").value = param;
-  log("GET param commentary="+param);
-}
-
-/* =========================
-   STATE
-========================= */
-
-let state = { mode:"playback", ytReady:false };
-
-let playback = {
+/* ENGINES */
+let playback={
   players:{},
-  readyCount:0,
+  ready:0,
   clock:{t:0,last:0,step:0,running:false},
   timeline:[]
 };
 
-let record = {};
+let record={};
 
-/* =========================
-   UI
-========================= */
-
-tabPlay.onclick=()=>{ state.mode="playback"; renderUI(); };
-tabRec.onclick=()=>{ state.mode="record"; renderUI(); };
+/* UI */
+tabPlay.onclick=()=>{state.mode="playback";renderUI();};
+tabRec.onclick=()=>{state.mode="record";renderUI();};
 
 function renderUI(){
-  playUI.style.display = state.mode==="playback"?"block":"none";
-  recUI.style.display = state.mode==="record"?"block":"none";
+  playUI.style.display=state.mode==="playback"?"block":"none";
+  recUI.style.display=state.mode==="record"?"block":"none";
   tabPlay.classList.toggle("active-tab",state.mode==="playback");
   tabRec.classList.toggle("active-tab",state.mode==="record");
 }
 renderUI();
 
-/* =========================
-   YT READY
-========================= */
-
+/* YT READY */
 function onYouTubeIframeAPIReady(){
   state.ytReady=true;
   log("YT READY");
 }
 
-/* =========================
-   FETCH DESCRIPTION
-========================= */
-
-async function fetchDescription(id){
-
-  if(!YT_API_KEY || YT_API_KEY==="YOUR_API_KEY"){
-    log("No API key → default metadata");
-    return "";
-  }
-
-  try{
-    let url=`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${id}&key=${YT_API_KEY}`;
-    let res=await fetch(url);
-    let data=await res.json();
-
-    let desc=data.items?.[0]?.snippet?.description || "";
-    log("Description length="+desc.length);
-
-    return desc;
-
-  }catch(e){
-    log("Fetch failed");
-    return "";
-  }
-}
-
-/* =========================
-   PARSER
-========================= */
-
-function parseMetadata(text){
-
-  let events=[];
-
-  text.split("\n").forEach(line=>{
-
-    let m=line.match(/^(\d+):(\d+)\s+(.*)$/);
-    if(!m) return;
-
-    let t=parseInt(m[1])*60 + parseInt(m[2]);
-    let parts=m[3].trim().split(/\s+/);
-
-    if(parts.length<2) return;
-
-    let evt={
-      t,
-      action:parts[0],
-      target:parts[1],
-      args:parts.slice(2)
-    };
-
-    log("PARSED "+JSON.stringify(evt));
-    events.push(evt);
-  });
-
-  return events.sort((a,b)=>a.t-b.t);
-}
-
-/* =========================
-   DEFAULT
-========================= */
-
+/* DEFAULT TIMELINE */
 function defaultTimeline(){
-  log("DEFAULT TIMELINE");
-
   return [
     {t:0,action:"play",target:"subject"},
     {t:3,action:"pause",target:"subject"},
 
-    {t:3,action:"show",target:"commentary",args:["5%","65%","35%","30%"]},
+    {t:3,action:"show",target:"commentary",args:["65%","65%","30%","30%"]},
     {t:3,action:"play",target:"commentary"},
 
     {t:6,action:"pause",target:"commentary"},
     {t:6,action:"hide",target:"commentary"},
 
-    {t:6,action:"play",target:"subject"}
+    {t:6,action:"play",target:"subject"},
+
+    /* NEW: simultaneous section */
+    {t:9,action:"show",target:"commentary",args:["65%","65%","30%","30%"]},
+    {t:9,action:"play",target:"commentary"},
+    {t:9,action:"play",target:"subject"}
   ];
 }
 
-/* =========================
-   START PLAYBACK
-========================= */
-
-async function startPlayback(){
+/* START */
+function startPlayback(){
 
   if(!state.ytReady){
     log("YT NOT READY");
@@ -249,29 +153,22 @@ async function startPlayback(){
 
   stage.innerHTML="";
   playback.players={};
-  playback.readyCount=0;
+  playback.ready=0;
+  playback.timeline=defaultTimeline();
 
-  let commentary = commentaryId.value || "dQw4w9WgXcQ";
-  let subject = "b9_CS8gTOR0";
+  let commentary=commentaryId.value||"dQw4w9WgXcQ";
+  let subject="oWkDjPnbrBY";
 
-  recordSubjectId.value = subject;
+  recordSubjectId.value=subject;
 
-  log("START playback subject="+subject+" commentary="+commentary);
+  log("START subject="+subject+" commentary="+commentary);
 
-  let desc = await fetchDescription(commentary);
-  let parsed = parseMetadata(desc);
-
-  playback.timeline = parsed.length ? parsed : defaultTimeline();
-
-  createPB("subject",subject,0,0,100,100);
-  createPB("commentary",commentary,5,65,35,30);
+  createPlayer("subject",subject,0,0,100,100);
+  createPlayer("commentary",commentary,65,65,30,30);
 }
 
-/* =========================
-   PLAYER
-========================= */
-
-function createPB(name,id,x,y,w,h){
+/* PLAYER */
+function createPlayer(name,id,x,y,w,h){
 
   let div=document.createElement("div");
   div.id="pb_"+name;
@@ -292,21 +189,28 @@ function createPB(name,id,x,y,w,h){
 
         playback.players[name].playVideo();
 
-        playback.readyCount++;
+        playback.ready++;
         log("READY "+name);
 
-        if(playback.readyCount===2){
+        if(playback.ready===2){
           startClock();
+        }
+      },
+      onStateChange:(e)=>{
+        log(name+" STATE "+e.data);
+
+        if(e.data===3){ // buffering
+          log(name+" buffering → pausing others");
+          Object.keys(playback.players).forEach(k=>{
+            if(k!==name) playback.players[k].pauseVideo();
+          });
         }
       }
     }
   });
 }
 
-/* =========================
-   CLOCK
-========================= */
-
+/* CLOCK */
 function startClock(){
   playback.clock={t:0,last:performance.now(),step:0,running:true};
   log("CLOCK START");
@@ -321,15 +225,28 @@ function tick(){
   playback.clock.t+=(now-playback.clock.last)/1000;
   playback.clock.last=now;
 
+  correctDrift();
+
   runTimeline();
 
   requestAnimationFrame(tick);
 }
 
-/* =========================
-   ENGINE
-========================= */
+/* DRIFT */
+function correctDrift(){
 
+  Object.entries(playback.players).forEach(([name,p])=>{
+    let current=p.getCurrentTime();
+    let drift=Math.abs(current-playback.clock.t);
+
+    if(drift>0.8){
+      log(name+" DRIFT "+drift.toFixed(2)+" → seek");
+      p.seekTo(playback.clock.t,true);
+    }
+  });
+}
+
+/* TIMELINE */
 function runTimeline(){
 
   while(playback.clock.step < playback.timeline.length &&

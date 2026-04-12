@@ -80,12 +80,9 @@ body { background:#111; color:white; }
 
 <script>
 
-const VERSION="Mixed Reviews v17";
+const VERSION="Mixed Reviews v18";
 
-/* =========================
-   LOG
-========================= */
-
+/* LOG */
 let logBox=document.getElementById("log");
 function log(m){
   let t=(performance.now()/1000).toFixed(2);
@@ -95,35 +92,26 @@ function log(m){
 
 log("INIT "+VERSION);
 
-/* =========================
-   GET PARAM
-========================= */
-
+/* GET PARAM */
 let param=new URLSearchParams(location.search).get("commentary");
 if(param){
   commentaryId.value=param;
   log("GET commentary="+param);
 }
 
-/* =========================
-   STATE
-========================= */
-
+/* STATE */
 let state={mode:"playback",ytReady:false};
 
+/* ENGINE */
 let playback={
   players:{},
   ready:0,
+  active:false,
   clock:{t:0,last:0,step:0,running:false},
   timeline:[]
 };
 
-let record={};
-
-/* =========================
-   UI
-========================= */
-
+/* UI */
 tabPlay.onclick=()=>{state.mode="playback";renderUI();};
 tabRec.onclick=()=>{state.mode="record";renderUI();};
 
@@ -135,25 +123,34 @@ function renderUI(){
 }
 renderUI();
 
-/* =========================
-   YT READY
-========================= */
-
+/* YT */
 function onYouTubeIframeAPIReady(){
   state.ytReady=true;
   log("YT READY");
 }
 
-/* =========================
-   METADATA FETCH (UNCHANGED)
-========================= */
+/* DEFAULT SCRIPT */
+function defaultTimeline(){
+  return [
+    {t:0,action:"play",target:"subject"},
+    {t:3,action:"pause",target:"subject"},
 
+    {t:3,action:"show",target:"commentary",args:["65","65","30","30"]},
+    {t:3,action:"play",target:"commentary"},
+
+    {t:6,action:"pause",target:"commentary"},
+    {t:6,action:"hide",target:"commentary"},
+
+    {t:6,action:"play",target:"subject"}
+  ];
+}
+
+/* FETCH METADATA */
 const YT_API_KEY="YOUR_API_KEY";
 
 async function fetchDescription(id){
 
   if(!YT_API_KEY || YT_API_KEY==="YOUR_API_KEY"){
-    log("No API key → default script");
     return "";
   }
 
@@ -161,21 +158,14 @@ async function fetchDescription(id){
     let url=`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${id}&key=${YT_API_KEY}`;
     let res=await fetch(url);
     let data=await res.json();
-
-    let desc=data.items?.[0]?.snippet?.description || "";
-    log("Fetched description "+desc.length);
-    return desc;
-
+    return data.items?.[0]?.snippet?.description || "";
   }catch(e){
-    log("Fetch failed");
+    log("metadata fetch failed");
     return "";
   }
 }
 
-/* =========================
-   SCRIPT PARSER (NEW ENGINE)
-========================= */
-
+/* SCRIPT PARSER */
 function parseScript(text){
 
   let events=[];
@@ -186,53 +176,26 @@ function parseScript(text){
     if(!m) return;
 
     let t=parseInt(m[1])*60 + parseInt(m[2]);
-    let cmd=m[3].trim();
-
-    let parts=cmd.split(/\s+/);
+    let parts=m[3].split(/\s+/);
 
     let action=parts[0];
     let target=parts[1];
-    let args=parts.slice(2);
 
     if(target==="this") target="commentary";
 
-    let evt={t,action,target,args};
+    events.push({
+      t,
+      action,
+      target,
+      args:parts.slice(2)
+    });
 
-    log("SCRIPT "+JSON.stringify(evt));
-    events.push(evt);
   });
 
   return events.sort((a,b)=>a.t-b.t);
 }
 
-/* =========================
-   DEFAULT SCRIPT
-========================= */
-
-function defaultTimeline(){
-  log("DEFAULT SCRIPT");
-
-  return parseScript(`
-0:00 play subject
-0:03 pause subject
-
-0:03 show commentary 65 65 30 30
-0:03 play commentary
-
-0:06 pause commentary
-0:06 hide commentary
-
-0:06 play subject
-
-0:09 play subject
-0:09 play commentary
-  `);
-}
-
-/* =========================
-   START
-========================= */
-
+/* START */
 async function startPlayback(){
 
   if(!state.ytReady){
@@ -243,27 +206,46 @@ async function startPlayback(){
   stage.innerHTML="";
   playback.players={};
   playback.ready=0;
+  playback.active=true;
 
   let commentary=commentaryId.value||"dQw4w9WgXcQ";
   let subject="oWkDjPnbrBY";
 
   recordSubjectId.value=subject;
 
-  log("START subject="+subject+" commentary="+commentary);
-
   let desc=await fetchDescription(commentary);
-  let parsed=parseScript(desc);
+  playback.timeline=parseScript(desc)||defaultTimeline();
 
-  playback.timeline = parsed.length ? parsed : defaultTimeline();
+  log("START timeline size="+playback.timeline.length);
 
   create("subject",subject,0,0,100,100);
   create("commentary",commentary,65,65,30,30);
 }
 
-/* =========================
-   PLAYER (UNCHANGED AUDIO FIX)
-========================= */
+/* SAFE PLAYBACK CONTROL (KEY FIX) */
+function safePlay(p,name){
 
+  if(!p) return;
+
+  let tryPlay=()=>{
+    let st=p.getPlayerState();
+
+    if(st!==1){
+      try{
+        p.playVideo();
+        p.mute();
+        setTimeout(()=>p.unMute(),200);
+      }catch(e){
+        log("retry play "+name);
+        setTimeout(tryPlay,200);
+      }
+    }
+  };
+
+  tryPlay();
+}
+
+/* CREATE PLAYER */
 function create(name,id,x,y,w,h){
 
   let div=document.createElement("div");
@@ -287,7 +269,6 @@ function create(name,id,x,y,w,h){
 
         p.mute();
         p.playVideo();
-        setTimeout(()=>p.unMute(),300);
 
         playback.ready++;
         log("READY "+name);
@@ -300,10 +281,7 @@ function create(name,id,x,y,w,h){
   });
 }
 
-/* =========================
-   CLOCK
-========================= */
-
+/* CLOCK */
 function startClock(){
   playback.clock={t:0,last:performance.now(),step:0,running:true};
   log("CLOCK START");
@@ -323,10 +301,7 @@ function tick(){
   requestAnimationFrame(tick);
 }
 
-/* =========================
-   SCRIPT EXECUTOR (NEW CORE)
-========================= */
-
+/* SCRIPT EXECUTOR */
 function runScript(){
 
   while(playback.clock.step < playback.timeline.length &&
@@ -339,29 +314,25 @@ function runScript(){
     let p=playback.players[e.target];
     if(!p){ playback.clock.step++; continue; }
 
-    switch(e.action){
+    if(e.action==="play"){
+      safePlay(p,e.target);
+    }
 
-      case "play":
-        p.playVideo();
-        setTimeout(()=>p.unMute(),200);
-        break;
+    if(e.action==="pause"){
+      p.pauseVideo();
+    }
 
-      case "pause":
-        p.pauseVideo();
-        break;
+    if(e.action==="show"){
+      let el=p.getIframe();
+      el.style.display="block";
+      el.style.left=e.args[0]+"%";
+      el.style.top=e.args[1]+"%";
+      el.style.width=e.args[2]+"%";
+      el.style.height=e.args[3]+"%";
+    }
 
-      case "show":
-        let el=p.getIframe();
-        el.style.display="block";
-        el.style.left=e.args[0]+"%";
-        el.style.top=e.args[1]+"%";
-        el.style.width=e.args[2]+"%";
-        el.style.height=e.args[3]+"%";
-        break;
-
-      case "hide":
-        p.getIframe().style.display="none";
-        break;
+    if(e.action==="hide"){
+      p.getIframe().style.display="none";
     }
 
     playback.clock.step++;

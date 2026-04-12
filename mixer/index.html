@@ -8,40 +8,9 @@
 
 <style>
 body { background:#111; color:white; }
-
-#stage {
-  position:relative;
-  width:100%;
-  height:58vh;
-  background:black;
-  overflow:hidden;
-  border-radius:10px;
-}
-
-.video {
-  position:absolute;
-  transition: all 0.35s ease;
-}
-
-#debug {
-  height:160px;
-  overflow:auto;
-  background:#000;
-  color:#0f0;
-  font-size:11px;
-  display:none;
-}
-
-#cam {
-  width:100%;
-  max-height:180px;
-  border-radius:10px;
-}
-
-.tab-active {
-  background:#0d6efd !important;
-  color:white !important;
-}
+#stage { position:relative; width:100%; height:58vh; background:black; }
+.video { position:absolute; }
+#log { height:220px; overflow:auto; background:#000; color:#0f0; font-size:11px; padding:6px; }
 </style>
 </head>
 
@@ -51,32 +20,21 @@ body { background:#111; color:white; }
 
 <h4 class="text-center">Mixed Reviews</h4>
 
-<div class="d-flex gap-2 mb-2">
-  <button id="tabPlay" class="btn btn-outline-light flex-fill tab-active" onclick="setMode('play')">Playback</button>
-  <button id="tabRec" class="btn btn-outline-light flex-fill" onclick="setMode('record')">Record</button>
-</div>
+<input id="commentaryId" class="form-control mb-2" placeholder="Commentary video ID">
 
-<!-- PLAYBACK -->
-<div id="playUI">
-  <input id="commentaryId" class="form-control mb-2" placeholder="Commentary ID (or ?commentary=)">
-  <input id="subjectId" class="form-control mb-2" placeholder="Subject ID">
-  <button class="btn btn-success w-100" onclick="initPlayback()">Start Playback</button>
-</div>
+<button class="btn btn-success w-100 mb-2" onclick="startPlayback()">Start Playback</button>
 
-<!-- RECORD -->
-<div id="recordUI" style="display:none;">
-  <input id="recordSubject" class="form-control mb-2" placeholder="Subject (auto fallback from playback)">
-  <button class="btn btn-warning w-100 mb-2" onclick="startRecording()">Start Recording</button>
-  <button class="btn btn-secondary w-100 mb-2" onclick="toggleCam()">Toggle Camera PiP</button>
-  <button class="btn btn-primary w-100 mb-2" onclick="upload()">Upload (OAuth)</button>
-</div>
+<hr>
+
+<button class="btn btn-warning w-100 mb-2" onclick="startRecording()">Start Recording</button>
+<button class="btn btn-danger w-100 mb-2" onclick="stopRecording()">Stop Recording</button>
+<button class="btn btn-primary w-100 mb-2" onclick="upload()">Upload</button>
 
 <div id="stage"></div>
+<video id="cam" autoplay muted playsinline style="width:100%;max-height:150px;"></video>
 
-<video id="cam" autoplay muted playsinline></video>
-
-<button class="btn btn-dark w-100 mt-2" onclick="toggleDebug()">Toggle Debug</button>
-<div id="debug"></div>
+<h6 class="mt-3">LOG</h6>
+<div id="log"></div>
 
 </div>
 
@@ -85,242 +43,230 @@ body { background:#111; color:white; }
 
 <script>
 
-/* =========================
-   REACTIVE ENGINE STATE
-========================= */
+const VERSION="Mixed Reviews v7";
 
-let players = {};
-let mode = "play";
+/* ===== CONFIG ===== */
+const YT_API_KEY="YOUR_API_KEY";
+const CLIENT_ID="YOUR_CLIENT_ID.apps.googleusercontent.com";
 
-let clock = {
-  t: 0,
-  running: false,
-  drift: 0,
-  last: 0,
-  paused: false
-};
+/* ===== GLOBAL ===== */
+let players={}, timeline=[];
+let clock={t:0,last:0,step:0,running:false};
 
-let bufferLock = false;
-
-/* =========================
-   METADATA SYSTEM
-========================= */
-
-let meta = {
-  default: `
-00:00 play subject
-00:02 show commentary 65% 65% 35% 35%
-`
-};
-
-function getQuery(){
-  let p = new URLSearchParams(location.search);
-  return {
-    commentary: p.get("commentary") || null
-  };
-}
-
-function loadMetadata(){
-  let q = getQuery();
-  if(q.commentary){
-    commentaryId.value = q.commentary;
-    log("Loaded commentary from URL param");
-  }
-}
-
-/* =========================
-   DEBUG + LOGGING
-========================= */
-
+/* ===== LOG ===== */
 function log(m){
-  debug.innerHTML += m + "<br>";
-  debug.scrollTop = debug.scrollHeight;
+ logBox.innerHTML+=m+"<br>";
+ logBox.scrollTop=logBox.scrollHeight;
 }
 
-/* =========================
-   MODE SWITCH
-========================= */
+log("INIT "+VERSION);
 
-function setMode(m){
-  mode = m;
+/* ===== FETCH DESCRIPTION ===== */
+async function fetchDescription(id){
+ try{
+  let url=`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${id}&key=${YT_API_KEY}`;
+  let res=await fetch(url);
+  let data=await res.json();
 
-  tabPlay.classList.toggle("tab-active", m==="play");
-  tabRec.classList.toggle("tab-active", m==="record");
+  let desc=data.items?.[0]?.snippet?.description || "";
+  log("Fetched description length="+desc.length);
+  return desc;
 
-  playUI.style.display = m==="play" ? "block" : "none";
-  recordUI.style.display = m==="record" ? "block" : "none";
+ }catch(e){
+  log("Description fetch failed");
+  return "";
+ }
 }
 
-/* =========================
-   CLOCK (REACTIVE CORE)
-========================= */
+/* ===== PARSE ===== */
+function parse(text){
 
-function tick(){
-  if(!clock.running || bufferLock) return;
+ let out=[];
+ text.split("\n").forEach(line=>{
+  let m=line.match(/(\d+):(\d+)\s+(.*)/);
+  if(!m) return;
 
-  let now = performance.now();
-  let delta = (now - clock.last)/1000;
-  clock.last = now;
+  let t=+m[1]*60 + +m[2];
+  let parts=m[3].split(" ");
 
-  clock.t += delta;
+  out.push({t,action:parts[0],target:parts[1],args:parts.slice(2)});
+ });
 
-  requestAnimationFrame(tick);
+ return out;
 }
 
-/* =========================
-   PLAYBACK INIT
-========================= */
-
-function initPlayback(){
-
-  loadMetadata();
-
-  stage.innerHTML = "";
-  players = {};
-
-  create("subject", subjectId.value || "b9_CS8gTOR0", 0,0,100,100);
-  create("commentary", commentaryId.value, 65,65,35,35);
-
-  clock.t = 0;
-  clock.running = true;
-  clock.last = performance.now();
-
-  requestAnimationFrame(tick);
-
-  log("Playback started");
+/* ===== DEFAULT ===== */
+function defaultTimeline(){
+ return [
+  {t:0,action:"play",target:"subject"},
+  {t:3,action:"pause",target:"subject"},
+  {t:3,action:"play",target:"commentary"},
+  {t:6,action:"pause",target:"commentary"},
+  {t:6,action:"play",target:"subject"}
+ ];
 }
 
-/* =========================
-   PLAYER CREATION
-========================= */
+/* ===== PLAYBACK ===== */
+async function startPlayback(){
 
+ stage.innerHTML="";
+ players={};
+
+ let id=commentaryId.value || "dQw4w9WgXcQ";
+
+ let desc=await fetchDescription(id);
+ timeline=parse(desc);
+
+ if(!timeline.length){
+  log("Using default timeline");
+  timeline=defaultTimeline();
+ }
+
+ log("TIMELINE "+JSON.stringify(timeline));
+
+ create("subject","b9_CS8gTOR0",0,0,100,100);
+ create("commentary",id,65,65,35,35);
+
+ clock={t:0,last:performance.now(),step:0,running:true};
+ requestAnimationFrame(tick);
+}
+
+/* ===== CREATE ===== */
 function create(name,id,x,y,w,h){
 
-  let div = document.createElement("div");
-  div.id = "p_"+name;
-  div.className = "video";
-  stage.appendChild(div);
+ let div=document.createElement("div");
+ div.id=name;
+ div.className="video";
+ stage.appendChild(div);
 
-  players[name] = new YT.Player(div.id,{
-    videoId:id,
-    playerVars:{playsinline:1,controls:0},
-    events:{
-      onReady:()=>{
-        let el = players[name].getIframe();
-        el.style.left=x+"%";
-        el.style.top=y+"%";
-        el.style.width=w+"%";
-        el.style.height=h+"%";
-        el.style.display="block";
+ players[name]=new YT.Player(div.id,{
+  videoId:id,
+  playerVars:{playsinline:1},
+  events:{
+   onReady:()=>{
+    let el=players[name].getIframe();
+    el.style.left=x+"%";
+    el.style.top=y+"%";
+    el.style.width=w+"%";
+    el.style.height=h+"%";
 
-        log(name+" ready");
-      },
-
-      onStateChange:(e)=>handleState(name,e.data)
-    }
-  });
-}
-
-/* =========================
-   BUFFER + DRIFT CONTROL
-========================= */
-
-function pauseAll(reason){
-  bufferLock = true;
-  log("PAUSE ALL: "+reason);
-
-  Object.values(players).forEach(p=>{
-    try { p.pauseVideo(); } catch(e){}
-  });
-}
-
-function resumeAll(){
-  bufferLock = false;
-  clock.last = performance.now();
-
-  Object.values(players).forEach(p=>{
-    try { p.playVideo(); } catch(e){}
-  });
-
-  log("RESUME ALL");
-}
-
-/* =========================
-   STATE HANDLER
-========================= */
-
-function handleState(name,state){
-
-  // buffering
-  if(state === 3){
-    pauseAll(name+" buffering");
+    players[name].playVideo();
+    log("READY "+name);
+   }
   }
-
-  // playing
-  if(state === 1 && bufferLock){
-    resumeAll();
-  }
+ });
 }
 
-/* =========================
-   RECORD ENGINE (separate)
-========================= */
+/* ===== CLOCK ===== */
+function tick(){
 
-let recording = false;
-let recStart = 0;
-let recLog = [];
-let camStream;
+ if(!clock.running) return;
+
+ let now=performance.now();
+ clock.t+=(now-clock.last)/1000;
+ clock.last=now;
+
+ driftCheck();
+
+ run();
+
+ requestAnimationFrame(tick);
+}
+
+/* ===== DRIFT ===== */
+function driftCheck(){
+
+ Object.entries(players).forEach(([name,p])=>{
+  let actual=p.getCurrentTime?.();
+  if(!actual) return;
+
+  let drift=actual-clock.t;
+
+  if(Math.abs(drift)>0.5){
+   log("DRIFT "+name+" "+drift.toFixed(2));
+
+   // soft correction
+   p.seekTo(clock.t,true);
+  }
+ });
+}
+
+/* ===== ENGINE ===== */
+function run(){
+
+ while(clock.step<timeline.length && timeline[clock.step].t<=clock.t){
+
+  let e=timeline[clock.step];
+  log("EVENT "+JSON.stringify(e));
+
+  let p=players[e.target];
+  if(!p){ clock.step++; continue; }
+
+  if(e.action==="play") p.playVideo();
+  if(e.action==="pause") p.pauseVideo();
+
+  clock.step++;
+ }
+}
+
+/* ===== RECORD ===== */
+let recorder, chunks=[], blob;
 
 async function startRecording(){
+ let stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+ cam.srcObject=stream;
 
-  recording = true;
-  recStart = performance.now();
-  recLog = [];
+ recorder=new MediaRecorder(stream);
+ recorder.ondataavailable=e=>chunks.push(e.data);
+ recorder.start();
 
-  let subject = recordSubject.value || subjectId.value || "b9_CS8gTOR0";
-
-  stage.innerHTML = "";
-  players = {};
-
-  create("subject", subject, 0,0,100,100);
-
-  camStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-  cam.srcObject = camStream;
-
-  log("Recording started");
+ log("Recording...");
 }
 
-function toggleCam(){
-
-  let t = (performance.now()-recStart)/1000;
-
-  if(cam.style.display==="none"){
-    cam.style.display="block";
-    recLog.push({t,cmd:"cam_show"});
-  } else {
-    cam.style.display="none";
-    recLog.push({t,cmd:"cam_hide"});
-  }
+function stopRecording(){
+ recorder.stop();
+ recorder.onstop=()=>{
+  blob=new Blob(chunks,{type:"video/webm"});
+  log("Recorded "+blob.size+" bytes");
+ };
 }
 
-/* =========================
-   UPLOAD (OAUTH STUB)
-========================= */
+/* ===== UPLOAD ===== */
+async function upload(){
 
-function upload(){
-  log("OAuth upload placeholder (GIS + YouTube Data API v3 required)");
-  alert("Upload wiring next step.");
+ if(!blob){ log("No recording"); return; }
+
+ let token;
+
+ await new Promise(res=>{
+  google.accounts.oauth2.initTokenClient({
+   client_id:CLIENT_ID,
+   scope:"https://www.googleapis.com/auth/youtube.upload",
+   callback:r=>{ token=r.access_token; res(); }
+  }).requestAccessToken();
+ });
+
+ let form=new FormData();
+ form.append("metadata",new Blob([JSON.stringify({
+  snippet:{title:"Mixed Reviews Upload"},
+  status:{privacyStatus:"unlisted"}
+ })],{type:"application/json"}));
+ form.append("file",blob);
+
+ let res=await fetch("https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status&uploadType=multipart",{
+  method:"POST",
+  headers:{Authorization:"Bearer "+token},
+  body:form
+ });
+
+ log("UPLOAD RESULT "+await res.text());
 }
 
-/* =========================
-   DEBUG TOGGLE
-========================= */
-
-function toggleDebug(){
-  debug.style.display = debug.style.display==="none"?"block":"none";
-}
+/* ===== INIT ===== */
+let logBox=document.getElementById("log");
 
 </script>
 
 </body>
 </html>
+  

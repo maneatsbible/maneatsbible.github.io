@@ -12,7 +12,7 @@ body { background:#111; color:white; }
 #stage {
   position:relative;
   width:100%;
-  height:60vh;
+  height:58vh;
   background:black;
   overflow:hidden;
   border-radius:10px;
@@ -20,28 +20,13 @@ body { background:#111; color:white; }
 
 .video {
   position:absolute;
-  transition: all 0.6s ease;
-  transform-origin: center;
-}
-
-.pip {
-  transition: all 0.6s ease;
-}
-
-.full {
-  transform: scale(1.0);
-}
-
-.small {
-  transform: scale(0.35);
-  border:2px solid white;
-  border-radius:8px;
+  transition: all 0.35s ease;
 }
 
 #debug {
-  height:120px;
+  height:160px;
   overflow:auto;
-  background:black;
+  background:#000;
   color:#0f0;
   font-size:11px;
   display:none;
@@ -71,28 +56,27 @@ body { background:#111; color:white; }
   <button id="tabRec" class="btn btn-outline-light flex-fill" onclick="setMode('record')">Record</button>
 </div>
 
+<!-- PLAYBACK -->
 <div id="playUI">
-  <input id="commentaryId" class="form-control mb-2" placeholder="Commentary Video ID (control)">
-  <button class="btn btn-success w-100" onclick="startPlayback()">Start Playback</button>
+  <input id="commentaryId" class="form-control mb-2" placeholder="Commentary ID (or ?commentary=)">
+  <input id="subjectId" class="form-control mb-2" placeholder="Subject ID">
+  <button class="btn btn-success w-100" onclick="initPlayback()">Start Playback</button>
 </div>
 
+<!-- RECORD -->
 <div id="recordUI" style="display:none;">
-  <input id="vidA" class="form-control mb-2" placeholder="Subject Video ID">
+  <input id="recordSubject" class="form-control mb-2" placeholder="Subject (auto fallback from playback)">
   <button class="btn btn-warning w-100 mb-2" onclick="startRecording()">Start Recording</button>
-  <button class="btn btn-secondary w-100 mb-2" onclick="toggleRecordPause()">Pause/Resume Commentary</button>
-  <button class="btn btn-danger w-100" onclick="stopRecording()">Stop + Export</button>
+  <button class="btn btn-secondary w-100 mb-2" onclick="toggleCam()">Toggle Camera PiP</button>
+  <button class="btn btn-primary w-100 mb-2" onclick="upload()">Upload (OAuth)</button>
 </div>
 
-<div id="stage" class="mb-2"></div>
+<div id="stage"></div>
 
 <video id="cam" autoplay muted playsinline></video>
 
 <button class="btn btn-dark w-100 mt-2" onclick="toggleDebug()">Toggle Debug</button>
 <div id="debug"></div>
-
-<textarea id="output" class="form-control mt-2" rows="6"></textarea>
-
-<button class="btn btn-primary w-100 mt-2" onclick="uploadOAuth()">Upload to YouTube</button>
 
 </div>
 
@@ -100,181 +84,242 @@ body { background:#111; color:white; }
 <script src="https://accounts.google.com/gsi/client"></script>
 
 <script>
-let players={};
-let mode="play";
 
-let recording=false;
-let recordStart=0;
-let events=[];
+/* =========================
+   REACTIVE ENGINE STATE
+========================= */
 
-let subjectPaused=false;
-let commentaryVisible=true;
+let players = {};
+let mode = "play";
 
-// ---------- DEBUG ----------
-function log(m){
-  debug.innerHTML+=m+"<br>";
-  debug.scrollTop=debug.scrollHeight;
+let clock = {
+  t: 0,
+  running: false,
+  drift: 0,
+  last: 0,
+  paused: false
+};
+
+let bufferLock = false;
+
+/* =========================
+   METADATA SYSTEM
+========================= */
+
+let meta = {
+  default: `
+00:00 play subject
+00:02 show commentary 65% 65% 35% 35%
+`
+};
+
+function getQuery(){
+  let p = new URLSearchParams(location.search);
+  return {
+    commentary: p.get("commentary") || null
+  };
 }
 
-// ---------- MODE UI ----------
-function setMode(m){
-  mode=m;
-
-  tabPlay.classList.remove("tab-active");
-  tabRec.classList.remove("tab-active");
-
-  if(m==="play"){
-    tabPlay.classList.add("tab-active");
-    playUI.style.display="block";
-    recordUI.style.display="none";
-  } else {
-    tabRec.classList.add("tab-active");
-    playUI.style.display="none";
-    recordUI.style.display="block";
+function loadMetadata(){
+  let q = getQuery();
+  if(q.commentary){
+    commentaryId.value = q.commentary;
+    log("Loaded commentary from URL param");
   }
 }
 
-// ---------- DEBUG TOGGLE ----------
-function toggleDebug(){
-  debug.style.display = debug.style.display==="none"?"block":"none";
+/* =========================
+   DEBUG + LOGGING
+========================= */
+
+function log(m){
+  debug.innerHTML += m + "<br>";
+  debug.scrollTop = debug.scrollHeight;
 }
 
-// ---------- START PLAYBACK ----------
-function startPlayback(){
+/* =========================
+   MODE SWITCH
+========================= */
 
-  stage.innerHTML="";
-  players={};
+function setMode(m){
+  mode = m;
 
-  let commentary = commentaryId.value;
-  let subject = "b9_CS8gTOR0";
+  tabPlay.classList.toggle("tab-active", m==="play");
+  tabRec.classList.toggle("tab-active", m==="record");
 
-  create("subject",subject,0,0,100,100);
-  create("commentary",commentary,70,70,30,30);
+  playUI.style.display = m==="play" ? "block" : "none";
+  recordUI.style.display = m==="record" ? "block" : "none";
 }
 
-// ---------- CREATE PLAYER ----------
+/* =========================
+   CLOCK (REACTIVE CORE)
+========================= */
+
+function tick(){
+  if(!clock.running || bufferLock) return;
+
+  let now = performance.now();
+  let delta = (now - clock.last)/1000;
+  clock.last = now;
+
+  clock.t += delta;
+
+  requestAnimationFrame(tick);
+}
+
+/* =========================
+   PLAYBACK INIT
+========================= */
+
+function initPlayback(){
+
+  loadMetadata();
+
+  stage.innerHTML = "";
+  players = {};
+
+  create("subject", subjectId.value || "b9_CS8gTOR0", 0,0,100,100);
+  create("commentary", commentaryId.value, 65,65,35,35);
+
+  clock.t = 0;
+  clock.running = true;
+  clock.last = performance.now();
+
+  requestAnimationFrame(tick);
+
+  log("Playback started");
+}
+
+/* =========================
+   PLAYER CREATION
+========================= */
+
 function create(name,id,x,y,w,h){
 
-  let div=document.createElement("div");
-  div.id="p_"+name;
-  div.className="video";
+  let div = document.createElement("div");
+  div.id = "p_"+name;
+  div.className = "video";
   stage.appendChild(div);
 
-  players[name]=new YT.Player(div.id,{
+  players[name] = new YT.Player(div.id,{
     videoId:id,
     playerVars:{playsinline:1,controls:0},
     events:{
       onReady:()=>{
-        log(name+" ready");
-
-        let el=players[name].getIframe();
+        let el = players[name].getIframe();
         el.style.left=x+"%";
         el.style.top=y+"%";
         el.style.width=w+"%";
         el.style.height=h+"%";
         el.style.display="block";
+
+        log(name+" ready");
       },
-      onStateChange:e=>handle(name,e.data)
+
+      onStateChange:(e)=>handleState(name,e.data)
     }
   });
 }
 
-// ---------- STATE ----------
-function handle(name,state){
+/* =========================
+   BUFFER + DRIFT CONTROL
+========================= */
 
-  // BUFFERING → pause others
-  if(state===3){
-    Object.entries(players).forEach(([n,p])=>{
-      if(n!==name) p.pauseVideo();
-    });
+function pauseAll(reason){
+  bufferLock = true;
+  log("PAUSE ALL: "+reason);
+
+  Object.values(players).forEach(p=>{
+    try { p.pauseVideo(); } catch(e){}
+  });
+}
+
+function resumeAll(){
+  bufferLock = false;
+  clock.last = performance.now();
+
+  Object.values(players).forEach(p=>{
+    try { p.playVideo(); } catch(e){}
+  });
+
+  log("RESUME ALL");
+}
+
+/* =========================
+   STATE HANDLER
+========================= */
+
+function handleState(name,state){
+
+  // buffering
+  if(state === 3){
+    pauseAll(name+" buffering");
   }
 
-  // PLAYING → resume others
-  if(state===1){
-    Object.entries(players).forEach(([n,p])=>{
-      if(n!==name) p.playVideo();
-    });
-  }
-
-  // RECORD
-  if(recording && name==="subject"){
-    let t=(performance.now()-recordStart)/1000;
-    events.push({time:t,cmd:state===1?"play":"pause",args:["subject"]});
+  // playing
+  if(state === 1 && bufferLock){
+    resumeAll();
   }
 }
 
-// ---------- RECORD ----------
+/* =========================
+   RECORD ENGINE (separate)
+========================= */
+
+let recording = false;
+let recStart = 0;
+let recLog = [];
+let camStream;
+
 async function startRecording(){
 
-  events=[];
-  recording=true;
-  recordStart=performance.now();
+  recording = true;
+  recStart = performance.now();
+  recLog = [];
 
-  let stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-  cam.srcObject=stream;
+  let subject = recordSubject.value || subjectId.value || "b9_CS8gTOR0";
 
-  stage.innerHTML="";
-  players={};
+  stage.innerHTML = "";
+  players = {};
 
-  create("subject",vidA.value,0,0,100,100);
-  create("commentary",commentaryId.value,70,70,30,30);
+  create("subject", subject, 0,0,100,100);
+
+  camStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  cam.srcObject = camStream;
 
   log("Recording started");
 }
 
-// ---------- TOGGLE COMMENTARY ----------
-function toggleRecordPause(){
+function toggleCam(){
 
-  if(!recording) return;
+  let t = (performance.now()-recStart)/1000;
 
-  let t=(performance.now()-recordStart)/1000;
-
-  commentaryVisible = !commentaryVisible;
-
-  if(commentaryVisible){
-    events.push({time:t,cmd:"show",args:["commentary","70","70","30","30"]});
+  if(cam.style.display==="none"){
+    cam.style.display="block";
+    recLog.push({t,cmd:"cam_show"});
   } else {
-    events.push({time:t,cmd:"hide",args:["commentary"]});
+    cam.style.display="none";
+    recLog.push({t,cmd:"cam_hide"});
   }
 }
 
-// ---------- STOP ----------
-function stopRecording(){
+/* =========================
+   UPLOAD (OAUTH STUB)
+========================= */
 
-  recording=false;
-
-  let meta=`video subject ${vidA.value}\n\n`;
-
-  events.forEach(e=>{
-    let m=String(Math.floor(e.time/60)).padStart(2,"0");
-    let s=String(Math.floor(e.time%60)).padStart(2,"0");
-    meta+=`${m}:${s} ${e.cmd} ${e.args.join(" ")}\n`;
-  });
-
-  let desc =
-`Mixed Reviews Commentary
-
-Use with:
-https://maneatsbible.live/mixer
-
----
-
-${meta}`;
-
-  output.value=desc;
+function upload(){
+  log("OAuth upload placeholder (GIS + YouTube Data API v3 required)");
+  alert("Upload wiring next step.");
 }
 
-// ---------- OAUTH UPLOAD ----------
-function uploadOAuth(){
-  log("OAuth upload stub ready");
+/* =========================
+   DEBUG TOGGLE
+========================= */
 
-  // FULL FLOW WOULD:
-  // 1. Google login (GIS)
-  // 2. get access token
-  // 3. POST to YouTube Data API videos.insert
-
-  alert("OAuth upload requires client ID + API setup (ready to wire next step).");
+function toggleDebug(){
+  debug.style.display = debug.style.display==="none"?"block":"none";
 }
+
 </script>
 
 </body>

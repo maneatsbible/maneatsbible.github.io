@@ -80,7 +80,7 @@ body { background:#111; color:white; }
 
 <script>
 
-const VERSION="Mixed Reviews v13";
+const VERSION="Mixed Reviews v15";
 
 /* LOG */
 let logBox=document.getElementById("log");
@@ -89,12 +89,20 @@ function log(m){
   logBox.innerHTML+=`[${t}] ${m}<br>`;
   logBox.scrollTop=logBox.scrollHeight;
 }
+
 log("INIT "+VERSION);
+
+/* GET PARAM */
+let param=new URLSearchParams(location.search).get("commentary");
+if(param){
+  commentaryId.value=param;
+  log("GET commentary="+param);
+}
 
 /* STATE */
 let state={mode:"playback",ytReady:false};
 
-/* ENGINES */
+/* PLAYBACK ENGINE */
 let playback={
   players:{},
   ready:0,
@@ -102,6 +110,7 @@ let playback={
   timeline:[]
 };
 
+/* RECORD ENGINE */
 let record={};
 
 /* UI */
@@ -116,7 +125,7 @@ function renderUI(){
 }
 renderUI();
 
-/* YT READY */
+/* YT */
 function onYouTubeIframeAPIReady(){
   state.ytReady=true;
   log("YT READY");
@@ -134,12 +143,7 @@ function defaultTimeline(){
     {t:6,action:"pause",target:"commentary"},
     {t:6,action:"hide",target:"commentary"},
 
-    {t:6,action:"play",target:"subject"},
-
-    /* NEW: simultaneous section */
-    {t:9,action:"show",target:"commentary",args:["65%","65%","30%","30%"]},
-    {t:9,action:"play",target:"commentary"},
-    {t:9,action:"play",target:"subject"}
+    {t:6,action:"play",target:"subject"}
   ];
 }
 
@@ -154,7 +158,6 @@ function startPlayback(){
   stage.innerHTML="";
   playback.players={};
   playback.ready=0;
-  playback.timeline=defaultTimeline();
 
   let commentary=commentaryId.value||"dQw4w9WgXcQ";
   let subject="oWkDjPnbrBY";
@@ -163,12 +166,14 @@ function startPlayback(){
 
   log("START subject="+subject+" commentary="+commentary);
 
-  createPlayer("subject",subject,0,0,100,100);
-  createPlayer("commentary",commentary,65,65,30,30);
+  playback.timeline=defaultTimeline();
+
+  create("subject",subject,0,0,100,100);
+  create("commentary",commentary,65,65,30,30);
 }
 
 /* PLAYER */
-function createPlayer(name,id,x,y,w,h){
+function create(name,id,x,y,w,h){
 
   let div=document.createElement("div");
   div.id="pb_"+name;
@@ -197,13 +202,18 @@ function createPlayer(name,id,x,y,w,h){
         }
       },
       onStateChange:(e)=>{
-        log(name+" STATE "+e.data);
+        log(name+" state="+e.data);
 
+        /* BUFFER HANDLING ONLY */
         if(e.data===3){ // buffering
-          log(name+" buffering → pausing others");
+          log(name+" BUFFERING → pausing other");
           Object.keys(playback.players).forEach(k=>{
             if(k!==name) playback.players[k].pauseVideo();
           });
+        }
+
+        if(e.data===1){
+          log(name+" playing");
         }
       }
     }
@@ -225,47 +235,41 @@ function tick(){
   playback.clock.t+=(now-playback.clock.last)/1000;
   playback.clock.last=now;
 
-  correctDrift();
-
   runTimeline();
 
   requestAnimationFrame(tick);
 }
 
-/* DRIFT */
-function correctDrift(){
-
+/* DRIFT (LOG ONLY) */
+function logDrift(){
   Object.entries(playback.players).forEach(([name,p])=>{
-    let current=p.getCurrentTime();
-    let drift=Math.abs(current-playback.clock.t);
-
-    if(drift>0.8){
-      log(name+" DRIFT "+drift.toFixed(2)+" → seek");
-      p.seekTo(playback.clock.t,true);
-    }
+    try{
+      let t=p.getCurrentTime();
+      let drift=Math.abs(t-playback.clock.t);
+      if(drift>1){
+        log("DRIFT "+name+" = "+drift.toFixed(2));
+      }
+    }catch(e){}
   });
 }
 
 /* TIMELINE */
 function runTimeline(){
 
+  logDrift();
+
   while(playback.clock.step < playback.timeline.length &&
         playback.timeline[playback.clock.step].t <= playback.clock.t){
 
     let e=playback.timeline[playback.clock.step];
+
     log("EVENT "+JSON.stringify(e));
 
     let p=playback.players[e.target];
     if(!p){ playback.clock.step++; continue; }
 
-    if(e.action==="play"){
-      p.unMute();
-      p.playVideo();
-    }
-
-    if(e.action==="pause"){
-      p.pauseVideo();
-    }
+    if(e.action==="play") p.playVideo();
+    if(e.action==="pause") p.pauseVideo();
 
     if(e.action==="show"){
       let el=p.getIframe();

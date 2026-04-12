@@ -8,7 +8,15 @@
 
 <style>
 body { background:#111; color:white; }
-#stage { position:relative; width:100%; height:56vh; background:black; overflow:hidden; }
+
+#stage {
+  position:relative;
+  width:100%;
+  height:56vh;
+  background:black;
+  overflow:hidden;
+}
+
 .video { position:absolute; }
 
 #pipCam {
@@ -77,7 +85,7 @@ body { background:#111; color:white; }
    CONFIG
 ========================= */
 
-const VERSION = "Mixed Reviews v11";
+const VERSION = "Mixed Reviews v12";
 const YT_API_KEY = "YOUR_API_KEY";
 
 /* =========================
@@ -95,14 +103,25 @@ function log(m){
 log("INIT "+VERSION);
 
 /* =========================
+   GET PARAM
+========================= */
+
+function getParam(){
+  let p=new URLSearchParams(location.search);
+  return p.get("commentary");
+}
+
+let param=getParam();
+if(param){
+  document.getElementById("commentaryId").value = param;
+  log("GET param commentary="+param);
+}
+
+/* =========================
    STATE
 ========================= */
 
 let state = { mode:"playback", ytReady:false };
-
-/* =========================
-   PLAYBACK ENGINE
-========================= */
 
 let playback = {
   players:{},
@@ -111,11 +130,7 @@ let playback = {
   timeline:[]
 };
 
-/* =========================
-   RECORD ENGINE
-========================= */
-
-let record = { stream:null, recorder:null, chunks:[], blob:null };
+let record = {};
 
 /* =========================
    UI
@@ -148,7 +163,7 @@ function onYouTubeIframeAPIReady(){
 async function fetchDescription(id){
 
   if(!YT_API_KEY || YT_API_KEY==="YOUR_API_KEY"){
-    log("No API key → using default metadata");
+    log("No API key → default metadata");
     return "";
   }
 
@@ -158,12 +173,12 @@ async function fetchDescription(id){
     let data=await res.json();
 
     let desc=data.items?.[0]?.snippet?.description || "";
+    log("Description length="+desc.length);
 
-    log("Description fetched len="+desc.length);
     return desc;
 
   }catch(e){
-    log("Description fetch failed");
+    log("Fetch failed");
     return "";
   }
 }
@@ -181,8 +196,8 @@ function parseMetadata(text){
     let m=line.match(/^(\d+):(\d+)\s+(.*)$/);
     if(!m) return;
 
-    let t = parseInt(m[1])*60 + parseInt(m[2]);
-    let parts = m[3].trim().split(/\s+/);
+    let t=parseInt(m[1])*60 + parseInt(m[2]);
+    let parts=m[3].trim().split(/\s+/);
 
     if(parts.length<2) return;
 
@@ -205,12 +220,18 @@ function parseMetadata(text){
 ========================= */
 
 function defaultTimeline(){
-  log("USING DEFAULT TIMELINE");
+  log("DEFAULT TIMELINE");
+
   return [
     {t:0,action:"play",target:"subject"},
     {t:3,action:"pause",target:"subject"},
+
+    {t:3,action:"show",target:"commentary",args:["5%","65%","35%","30%"]},
     {t:3,action:"play",target:"commentary"},
+
     {t:6,action:"pause",target:"commentary"},
+    {t:6,action:"hide",target:"commentary"},
+
     {t:6,action:"play",target:"subject"}
   ];
 }
@@ -242,10 +263,8 @@ async function startPlayback(){
 
   playback.timeline = parsed.length ? parsed : defaultTimeline();
 
-  log("TIMELINE size="+playback.timeline.length);
-
   createPB("subject",subject,0,0,100,100);
-  createPB("commentary",commentary,65,65,35,35);
+  createPB("commentary",commentary,5,65,35,30);
 }
 
 /* =========================
@@ -317,17 +336,23 @@ function runTimeline(){
         playback.timeline[playback.clock.step].t <= playback.clock.t){
 
     let e=playback.timeline[playback.clock.step];
-
     log("EVENT "+JSON.stringify(e));
 
     let p=playback.players[e.target];
     if(!p){ playback.clock.step++; continue; }
 
-    if(e.action==="play") p.playVideo();
-    if(e.action==="pause") p.pauseVideo();
+    if(e.action==="play"){
+      p.unMute();
+      p.playVideo();
+    }
+
+    if(e.action==="pause"){
+      p.pauseVideo();
+    }
 
     if(e.action==="show"){
       let el=p.getIframe();
+      el.style.display="block";
       el.style.left=e.args[0];
       el.style.top=e.args[1];
       el.style.width=e.args[2];
@@ -340,56 +365,6 @@ function runTimeline(){
 
     playback.clock.step++;
   }
-}
-
-/* =========================
-   RECORD (UNCHANGED)
-========================= */
-
-async function startRecording(){
-
-  let subject = recordSubjectId.value || "b9_CS8gTOR0";
-
-  stage.innerHTML="";
-
-  let div=document.createElement("div");
-  div.className="video";
-  stage.appendChild(div);
-
-  new YT.Player(div,{
-    videoId:subject,
-    events:{
-      onReady:(e)=>{
-        let el=e.target.getIframe();
-        el.style.width="100%";
-        el.style.height="100%";
-        e.target.playVideo();
-      }
-    }
-  });
-
-  record.stream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-  pipCam.srcObject = record.stream;
-  pipCam.style.display="block";
-
-  record.chunks=[];
-  record.recorder=new MediaRecorder(record.stream);
-  record.recorder.ondataavailable=e=>record.chunks.push(e.data);
-  record.recorder.start();
-
-  log("RECORD START");
-}
-
-function stopRecording(){
-  record.recorder.stop();
-  record.recorder.onstop=()=>{
-    record.blob=new Blob(record.chunks,{type:"video/webm"});
-    log("REC DONE "+record.blob.size);
-  };
-}
-
-function upload(){
-  log("Upload unchanged");
 }
 
 </script>

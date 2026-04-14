@@ -13,14 +13,16 @@ body{
   color:#eee;
 }
 
-/* HEADER */
 header{
   display:flex;
   justify-content:space-between;
   padding:10px;
 }
 
-.version{font-size:11px;color:#777}
+.version{
+  font-size:11px;
+  color:#777;
+}
 
 /* USERS */
 #users{
@@ -35,7 +37,7 @@ header{
   border-radius:999px;
   font-size:12px;
   cursor:pointer;
-  opacity:0.7;
+  opacity:0.6;
 }
 
 .user.active{
@@ -50,7 +52,6 @@ header{
   background:#0b0b0b;
   border:1px solid #333;
   color:#eee;
-  padding:8px;
 }
 
 /* FEED */
@@ -65,17 +66,9 @@ header{
   margin-bottom:10px;
 }
 
-.text{
-  font-weight:600;
-}
+.text{font-weight:600}
+.meta{font-size:11px;color:#888;margin-top:4px}
 
-.meta{
-  font-size:11px;
-  color:#888;
-  margin-top:4px;
-}
-
-/* ACTIONS */
 .actions{
   margin-top:8px;
   display:flex;
@@ -91,7 +84,7 @@ button{
   font-size:12px;
 }
 
-/* DISPUTE GRID */
+/* DISPUTE */
 .dispute{
   display:none;
   grid-template-columns:1fr 1fr;
@@ -107,23 +100,19 @@ button{
   background:#141414;
   padding:8px;
   border-radius:8px;
-  min-height:80px;
 }
 
 .input{
   width:100%;
+  margin-top:6px;
   background:#0b0b0b;
   border:1px solid #333;
   color:#eee;
   padding:6px;
-  font-size:12px;
-  border-radius:6px;
-  margin-top:6px;
 }
 
 /* LOG */
 #log{
-  display:none;
   padding:10px;
   font-size:11px;
   color:#7f7;
@@ -138,7 +127,7 @@ button{
 
 <header>
   <div>Better Dispute</div>
-  <div class="version">v5.0.0</div>
+  <div class="version" id="version"></div>
 </header>
 
 <div id="users"></div>
@@ -152,17 +141,23 @@ button{
 
 <script>
 
-const VERSION="5.0.0";
+const VERSION="6.0.0";
 
-//////////////////////
-// STATE
-//////////////////////
+/* =======================
+   STATE
+======================= */
 
 let users=["alice","bob","charlie"];
 let currentUser="alice";
 
 let id=0;
 let items=[];
+
+/* =======================
+   VERSION + STARTUP LOG
+======================= */
+
+document.getElementById("version").innerText="v"+VERSION;
 
 function log(event,data){
 
@@ -180,17 +175,13 @@ function log(event,data){
   el.appendChild(div);
 }
 
-//////////////////////
-// STARTUP LOG (FIXED)
-//////////////////////
-
 function startup(){
   log("startup",{version:VERSION});
 }
 
-//////////////////////
-// USERS
-//////////////////////
+/* =======================
+   USERS
+======================= */
 
 function renderUsers(){
   const el=document.getElementById("users");
@@ -212,9 +203,9 @@ function renderUsers(){
   });
 }
 
-//////////////////////
-// CORE
-//////////////////////
+/* =======================
+   CORE
+======================= */
 
 function find(i){ return items.find(x=>x.id===i); }
 
@@ -239,6 +230,10 @@ function create(text,type,parent=null){
   log("create",item);
 }
 
+/* =======================
+   ROOT INPUT
+======================= */
+
 function createRoot(){
 
   const t=document.getElementById("composer").value.trim();
@@ -246,50 +241,83 @@ function createRoot(){
 
   create(t,"proclaim",null);
   document.getElementById("composer").value="";
+
   render();
 }
 
-//////////////////////
-// DISAGREE = REAL TWO COLUMN EXPANSION
-//////////////////////
+/* =======================
+   SELF-ACTION GUARD (FIXED)
+======================= */
+
+function canAct(id){
+  const i=find(id);
+  return i && i.user!==currentUser;
+}
+
+/* =======================
+   DISPUTE EXPAND
+======================= */
 
 function toggleDispute(id){
+
+  if(!canAct(id)) return;
+
   const el=document.getElementById("d-"+id);
   el.classList.toggle("active");
+
   log("disagree_open",{id});
 }
 
+/* =======================
+   SUBMIT LEFT / RIGHT
+======================= */
+
 function submitLeft(id){
+
+  if(!canAct(id)) return;
+
   const el=document.getElementById("l-"+id);
   const t=el.value.trim();
   if(!t) return;
 
   create(t,"question",id);
+
   el.value="";
-  render();
+  render(); // FIX: ensures immediate visibility
 }
 
 function submitRight(id){
+
+  if(!canAct(id)) return;
+
   const el=document.getElementById("r-"+id);
   const t=el.value.trim();
   if(!t) return;
 
   create(t,"proclaim",id);
+
   el.value="";
-  render();
+  render(); // FIX: ensures immediate visibility
 }
 
-//////////////////////
-// FEED RULE (FIXED)
-//////////////////////
+/* =======================
+   ACTIONS
+======================= */
+
+function agree(id){
+
+  if(!canAct(id)) return;
+
+  log("agree",{id});
+}
+
+/* =======================
+   FEED
+======================= */
 
 function topLevel(){
   return items.filter(x=>x.parent===null);
 }
-
-//////////////////////
-// RENDER
-//////////////////////
 
 function render(){
 
@@ -306,8 +334,8 @@ function render(){
         <div class="meta">${item.type.toUpperCase()} · @${item.user}</div>
 
         <div class="actions">
-          <button onclick="agree(${item.id})">Agree</button>
-          <button onclick="toggleDispute(${item.id})">Disagree</button>
+          <button onclick="agree(${item.id})" ${!canAct(item.id)?'disabled':''}>Agree</button>
+          <button onclick="toggleDispute(${item.id})" ${!canAct(item.id)?'disabled':''}>Disagree</button>
         </div>
 
         <div class="dispute" id="d-${item.id}">
@@ -323,6 +351,7 @@ function render(){
             <button onclick="submitRight(${item.id})">Submit</button>
           </div>
         </div>
+
       </div>
     `;
 
@@ -330,26 +359,16 @@ function render(){
   });
 }
 
-//////////////////////
-// ACTIONS
-//////////////////////
-
-function agree(id){
-  const i=find(id);
-  if(i.user===currentUser) return;
-  log("agree",{id});
-}
-
-//////////////////////
-// INIT
-//////////////////////
+/* =======================
+   INIT
+======================= */
 
 renderUsers();
 startup();
 
 /* seed */
-create("All claims invite dispute","proclaim",null);
-create("Is dispute always productive?","question",0);
+create("All disputes begin with a claim","proclaim",null);
+create("Can every claim be challenged?","question",0);
 
 render();
 

@@ -23,8 +23,6 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 .icon.active{opacity:1}
 .icon.dim{opacity:.25}
 
-.turn{font-size:11px;margin-top:4px;color:#aaa}
-
 .dispute{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -35,6 +33,9 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 .lane{background:#141414;padding:8px;border-radius:8px}
 
 .node{margin-top:8px;border-left:2px solid #333;padding-left:6px}
+
+.turn{font-size:11px;color:#aaa;margin-top:4px}
+.blocked{color:#f44336;font-size:11px}
 
 /* popup */
 #popup{
@@ -65,7 +66,7 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 
 <header>
   <div>Better Dispute</div>
-  <div id="version"></div>
+  <div>v29</div>
 </header>
 
 <div id="users"></div>
@@ -76,12 +77,11 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 <div id="feed"></div>
 <div id="log"></div>
 
-<!-- popup -->
 <div id="popup">
   <div class="box">
     <div>Dispute</div>
     <textarea id="ask" placeholder="Ask (challenge)"></textarea>
-    <textarea id="proclaim" placeholder="Proclaim (counter)"></textarea>
+    <textarea id="proclaim" placeholder="Proclaim (counter / answer)"></textarea>
     <div class="row">
       <span class="btn ok" onclick="submit()">✔</span>
       <span class="btn cancel" onclick="cancel()">✖</span>
@@ -91,9 +91,6 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 
 <script>
 
-let VERSION=28;
-document.getElementById("version").innerText="v"+VERSION;
-
 let users=["alice","bob","charlie"];
 let currentUser="alice";
 
@@ -101,7 +98,6 @@ let id=0;
 let items=[];
 let logs=[];
 let reactions={};
-
 let active=null;
 
 /* log */
@@ -111,7 +107,25 @@ function log(e,d){
 
 /* helpers */
 function find(i){return items.find(x=>x.id===i);}
-function isOwner(node){return node.user===currentUser;}
+
+/* detect unanswered obligation */
+function owesAnswer(user){
+
+  for(let node of items){
+
+    if(node.type==="question"){
+      const children = items.filter(x=>x.parent===node.id);
+      const answered = children.some(c=>c.type==="answer");
+
+      if(!answered && node.duel && node.duel.turn===user){
+        return true;
+      }
+    }
+
+  }
+
+  return false;
+}
 
 /* users */
 function renderUsers(){
@@ -147,8 +161,14 @@ function createRoot(){
 
 /* reactions */
 function react(i,type){
+
+  if(owesAnswer(currentUser)){
+    log("blocked_disagree_due_to_unanswered");
+    return;
+  }
+
   const node=find(i);
-  if(!node || isOwner(node)) return;
+  if(!node || node.user===currentUser) return;
 
   reactions[i]=reactions[i]||{};
   reactions[i][currentUser]=type;
@@ -196,8 +216,16 @@ function submit(){
     });
   }
 
-  if(ask) push(ask,"question");
-  if(pro) push(pro,"proclaim");
+  const children = items.filter(x=>x.parent===active);
+  const last = children[children.length-1];
+
+  if(last && last.type==="question" && last.user!==currentUser){
+    if(!pro){cancel();return;}
+    push(pro,"answer");
+  }else{
+    if(ask) push(ask,"question");
+    if(pro) push(pro,"proclaim");
+  }
 
   cancel();
   render();
@@ -209,6 +237,8 @@ function render(){
 
   const feed=document.getElementById("feed");
   feed.innerHTML="";
+
+  const blocked = owesAnswer(currentUser);
 
   items.filter(x=>x.parent===null).forEach(root=>{
 
@@ -234,13 +264,11 @@ function render(){
 
           ${node.duel ? `<div class="turn">turn: ${node.duel.turn}</div>`:""}
 
+          ${blocked ? `<div class="blocked">answer required before disputing</div>`:""}
+
           <div class="dispute">
-            <div class="lane">
-              ${left.map(renderNode).join("")}
-            </div>
-            <div class="lane">
-              ${right.map(renderNode).join("")}
-            </div>
+            <div class="lane">${left.map(renderNode).join("")}</div>
+            <div class="lane">${right.map(renderNode).join("")}</div>
           </div>
         </div>
       `;
@@ -249,7 +277,6 @@ function render(){
     feed.innerHTML += `<div class="card">${renderNode(root)}</div>`;
   });
 
-  /* log latest correct */
   const logEl=document.getElementById("log");
   logEl.innerHTML="";
   logs.slice(-200).forEach(l=>{
@@ -259,15 +286,22 @@ function render(){
   });
 }
 
-/* init */
+/* INIT */
 renderUsers();
+
+/* TEST DATA (visible immediately for Alice) */
+items.push({id:id++,text:"Truth claims should be examined",user:"alice",parent:null,type:"proclaim"});
+items.push({
+  id:id++,
+  text:"What makes a claim examinable?",
+  user:"bob",
+  parent:0,
+  type:"question",
+  duel:{a:"alice",b:"bob",turn:"alice"}
+});
+
 render();
 
-/* test */
-items.push({id:id++,text:"All claims can be challenged",user:"alice",parent:null,type:"proclaim"});
-items.push({id:id++,text:"Some claims resist challenge",user:"bob",parent:null,type:"proclaim"});
-
 </script>
-
 </body>
 </html>

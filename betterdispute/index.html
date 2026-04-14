@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -36,10 +36,7 @@ header{
   opacity:0.6;
 }
 
-.user.active{
-  opacity:1;
-  border-color:#fff;
-}
+.user.active{opacity:1;border-color:#fff}
 
 #composer{
   width:100%;
@@ -49,7 +46,7 @@ header{
   color:#eee;
 }
 
-#feed{padding:10px;}
+#feed{padding:10px}
 
 .card{
   background:#1a1a1a;
@@ -61,11 +58,7 @@ header{
 .text{font-weight:600}
 .meta{font-size:11px;color:#888;margin-top:4px}
 
-.actions{
-  margin-top:8px;
-  display:flex;
-  gap:6px;
-}
+.actions{margin-top:8px;display:flex;gap:6px}
 
 button{
   background:#222;
@@ -76,19 +69,21 @@ button{
   font-size:12px;
 }
 
-.dispute{
-  margin-top:10px;
+/* SPLIT LANES */
+.lanes{
   display:none;
+  margin-top:10px;
   grid-template-columns:1fr 1fr;
   gap:10px;
 }
 
-.dispute.open{display:grid}
+.lanes.open{display:grid}
 
-.col{
+.lane{
   background:#141414;
   padding:8px;
   border-radius:8px;
+  min-height:60px;
 }
 
 .input{
@@ -102,12 +97,11 @@ button{
   border-radius:6px;
 }
 
-/* embedded child disputes */
 .child{
   margin-left:10px;
   border-left:2px solid #333;
   padding-left:10px;
-  margin-top:10px;
+  margin-top:8px;
 }
 
 /* LOG */
@@ -135,12 +129,11 @@ button{
 <button onclick="createRoot()">Proclaim</button>
 
 <div id="feed"></div>
-
 <div id="log"></div>
 
 <script>
 
-const VERSION="13.0.0";
+const VERSION="14.0.0";
 document.getElementById("version").innerText="v"+VERSION;
 
 /* STATE */
@@ -159,6 +152,7 @@ function log(e,data){
 /* HELPERS */
 function find(id){ return items.find(x=>x.id===id); }
 
+/* HARD RULE: no self interaction EVER */
 function canInteract(item){
   return item.user !== currentUser;
 }
@@ -191,7 +185,8 @@ function createRoot(){
     type:"proclaim",
     user:currentUser,
     parent:null,
-    open:true
+    open:true,
+    side:null
   });
 
   document.getElementById("composer").value="";
@@ -199,45 +194,56 @@ function createRoot(){
   render();
 }
 
-/* DISPUTE TOGGLE */
+/* DISPUTE = ALWAYS SPLIT */
 function toggleDispute(id){
-  const item=find(id);
-  if(!item || !canInteract(item)) return;
 
-  item.open = !item.open;
-  log("toggle",{id});
+  const item=find(id);
+  if(!item) return;
+
+  if(!canInteract(item)) return; // HARD BLOCK
+
+  // ALWAYS FORCE SPLIT OPEN
+  item.open = true;
+
+  // create two lane placeholders if not exist
+  if(!item.left) item.left=[];
+  if(!item.right) item.right=[];
+
+  log("dispute_split",{id});
   render();
 }
 
-/* CHILD */
-function addChild(parentId,text,type){
-  const parent=find(parentId);
-  if(!parent || !canInteract(parent)) return;
+/* CHILD ROUTING INTO LANES */
+function addLeft(parentId,text){
+  const p=find(parentId);
+  if(!p || p.user===currentUser) return;
 
-  items.push({
-    id:id++,
-    text,
-    type,
-    user:currentUser,
-    parent:parentId,
-    open:true
-  });
+  if(!p.left) p.left=[];
+  p.left.push({id:id++,text,user:currentUser});
+  log("left",{parentId,text});
+}
 
-  log("child",{parentId,text,type});
+function addRight(parentId,text){
+  const p=find(parentId);
+  if(!p || p.user===currentUser) return;
+
+  if(!p.right) p.right=[];
+  p.right.push({id:id++,text,user:currentUser});
+  log("right",{parentId,text});
 }
 
 /* SUBMIT */
 function submitLeft(id){
   const v=document.getElementById("l-"+id).value.trim();
   if(!v) return;
-  addChild(id,v,"question");
+  addLeft(id,v);
   render();
 }
 
 function submitRight(id){
   const v=document.getElementById("r-"+id).value.trim();
   if(!v) return;
-  addChild(id,v,"proclaim");
+  addRight(id,v);
   render();
 }
 
@@ -249,54 +255,50 @@ function agree(id){
   log("agree",{id});
 }
 
-/* RENDER TREE */
+/* RENDER NODE */
 function renderNode(item){
 
   const disabled = (item.user === currentUser);
 
   let html=`
-    <div class="card">
-      <div class="text">${item.text}</div>
-      <div class="meta">@${item.user}</div>
+  <div class="card">
+    <div class="text">${item.text}</div>
+    <div class="meta">@${item.user}</div>
 
-      <div class="actions">
-        <button onclick="agree(${item.id})" ${disabled?'disabled':''}>Agree</button>
-        <button onclick="toggleDispute(${item.id})" ${disabled?'disabled':''}>Disagree</button>
+    <div class="actions">
+      <button onclick="agree(${item.id})" ${disabled?'disabled':''}>Agree</button>
+      <button onclick="toggleDispute(${item.id})" ${disabled?'disabled':''}>Disagree</button>
+    </div>
+
+    <div class="lanes ${item.open?'open':''}">
+      <div class="lane">
+        <div>Challenge</div>
+        <input class="input" id="l-${item.id}" placeholder="Ask / challenge...">
+        <button onclick="submitLeft(${item.id})">Submit</button>
       </div>
 
-      <div class="dispute ${item.open?'open':''}">
-        <div class="col">
-          <div>Challenge</div>
-          <input class="input" id="l-${item.id}" placeholder="Ask / challenge...">
-          <button onclick="submitLeft(${item.id})">Submit</button>
-        </div>
-
-        <div class="col">
-          <div>Counter</div>
-          <input class="input" id="r-${item.id}" placeholder="Proclaim counter...">
-          <button onclick="submitRight(${item.id})">Submit</button>
-        </div>
+      <div class="lane">
+        <div>Counter</div>
+        <input class="input" id="r-${item.id}" placeholder="Proclaim counter...">
+        <button onclick="submitRight(${item.id})">Submit</button>
       </div>
+    </div>
   `;
-
-  const children = items.filter(x=>x.parent===item.id);
-  children.forEach(c=>{
-    html += `<div class="child">${renderNode(c)}</div>`;
-  });
 
   return html + `</div>`;
 }
 
-/* MAIN RENDER */
+/* RENDER */
 function render(){
 
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  items.filter(x=>x.parent===null)
-       .forEach(root=>{
-          feed.innerHTML += renderNode(root);
-       });
+  items.forEach(i=>{
+    if(i.parent===null){
+      feed.innerHTML += renderNode(i);
+    }
+  });
 
   const logEl=document.getElementById("log");
   logEl.innerHTML="";
@@ -312,16 +314,7 @@ renderUsers();
 render();
 
 /* seed */
-items.push({
-  id:id++,
-  text:"All claims can be challenged",
-  type:"proclaim",
-  user:"alice",
-  parent:null,
-  open:true
-});
-
-render();
+items.push({id:id++,text:"All claims can be challenged",user:"alice",parent:null,open:false});
 
 </script>
 

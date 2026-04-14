@@ -15,10 +15,10 @@ body{
 }
 
 .container{
-  max-width:700px;
+  max-width:750px;
 }
 
-/* ENTRY COMPOSER (FIXED BIG INPUT) */
+/* ENTRY */
 .composer{
   background:#111;
   padding:10px;
@@ -35,19 +35,28 @@ textarea{
   border:1px solid #444;
   padding:8px;
   border-radius:6px;
-  resize:vertical;
 }
 
-.card{
-  background:#1b1b1b;
-  padding:10px;
-  border-radius:8px;
-  margin-bottom:10px;
+/* STATEMENT (IMPORTANT: PROMINENT) */
+.statement{
+  background:#242424; /* brighter than before */
+  padding:12px;
+  border-radius:10px;
+  margin-bottom:8px;
+  border:1px solid #3a3a3a;
+}
+
+.statement .text{
+  font-size:15px;
+  font-weight:600;
+  color:#fff; /* NOT gray */
+  margin-top:4px;
 }
 
 .meta{
   font-size:11px;
   color:#aaa;
+  margin-top:4px;
 }
 
 button{
@@ -55,18 +64,37 @@ button{
   margin-right:4px;
 }
 
-.child{
-  margin-left:14px;
-  border-left:2px solid #2a2a2a;
-  padding-left:10px;
+/* TWO-COLUMN STRUCTURE */
+.columns{
+  display:flex;
+  gap:10px;
+  margin-top:6px;
 }
 
+.col{
+  flex:1;
+  background:#141414;
+  border-radius:8px;
+  padding:8px;
+  min-height:40px;
+}
+
+/* CHILD STATEMENT */
+.child{
+  background:#1b1b1b;
+  padding:8px;
+  border-radius:8px;
+  margin-bottom:6px;
+}
+
+/* DEBUG (HIDDEN BY DEFAULT) */
 .debug{
+  display:none;
   position:fixed;
   bottom:0;
   left:0;
   right:0;
-  height:140px;
+  height:160px;
   background:#0a0a0a;
   border-top:1px solid #333;
   overflow:auto;
@@ -78,8 +106,8 @@ button{
 .userbar{
   display:flex;
   gap:6px;
-  flex-wrap:wrap;
   margin-bottom:8px;
+  flex-wrap:wrap;
 }
 
 .user{
@@ -93,6 +121,14 @@ button{
 .active{
   background:#2a2a2a;
 }
+
+/* DEBUG TOGGLE */
+.debug-toggle{
+  position:fixed;
+  bottom:165px;
+  right:10px;
+  font-size:11px;
+}
 </style>
 </head>
 
@@ -104,7 +140,7 @@ button{
 
 <div class="userbar" id="users"></div>
 
-<!-- FIXED ENTRY POINT (BIG COMPOSER) -->
+<!-- ENTRY -->
 <div class="composer">
   <textarea id="composer" placeholder="Start a Proclamation..."></textarea>
   <button class="btn btn-primary btn-sm mt-2" onclick="submitProclamation()">Proclaim</button>
@@ -113,6 +149,9 @@ button{
 <div id="feed"></div>
 
 </div>
+
+<!-- DEBUG TOGGLE -->
+<button class="btn btn-dark debug-toggle" onclick="toggleDebug()">Debug</button>
 
 <div class="debug" id="debug"></div>
 
@@ -141,7 +180,7 @@ background:#222; padding:12px; border-radius:8px; width:90%; max-width:320px; z-
 // VERSION + DEBUG
 //////////////////////
 
-const APP_VERSION="1.0.2";
+const APP_VERSION="1.0.3";
 
 function log(event,data){
 
@@ -162,8 +201,14 @@ function log(event,data){
   el.scrollTop=el.scrollHeight;
 }
 
+function toggleDebug(){
+  let d=document.getElementById("debug");
+  d.style.display = d.style.display==="none" || d.style.display==="" ? "block" : "none";
+  log("debug_toggle",{});
+}
+
 //////////////////////
-// USERS (TEST MODE)
+// USERS
 //////////////////////
 
 let users=["alice","bob","charlie"];
@@ -189,11 +234,10 @@ function renderUsers(){
 }
 
 //////////////////////
-// DATA MODEL
+// DATA
 //////////////////////
 
 let id=0;
-
 let items=[];
 
 function find(i){
@@ -201,22 +245,7 @@ function find(i){
 }
 
 //////////////////////
-// PROCLAMATION ENTRY (BIG INPUT FIX)
-//////////////////////
-
-function submitProclamation(){
-
-  let text=document.getElementById("composer").value.trim();
-  if(!text) return;
-
-  create(text,"proclaim",null);
-
-  document.getElementById("composer").value="";
-  log("proclaim_create",{text});
-}
-
-//////////////////////
-// CREATE STATEMENTS
+// CREATE
 //////////////////////
 
 function create(text,type,parent=null){
@@ -240,6 +269,21 @@ function create(text,type,parent=null){
   log("create",item);
 
   render();
+}
+
+//////////////////////
+// ENTRY
+//////////////////////
+
+function submitProclamation(){
+
+  let text=document.getElementById("composer").value.trim();
+  if(!text) return;
+
+  create(text,"proclaim",null);
+
+  document.getElementById("composer").value="";
+  log("proclaim_create",{text});
 }
 
 //////////////////////
@@ -278,7 +322,7 @@ function agree(id){
 }
 
 //////////////////////
-// RENDER (STATEMENT-FIRST MODEL)
+// RENDER TWO-COLUMN PER STATEMENT
 //////////////////////
 
 function render(){
@@ -286,48 +330,51 @@ function render(){
   let feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  items
-    .filter(x=>x.parent===null)
-    .forEach(x=>renderItem(x,feed,0));
+  items.filter(x=>x.parent===null)
+       .forEach(x=>renderItem(x,feed,0));
 }
 
 function renderItem(item,container,depth){
 
-  let div=document.createElement("div");
-  div.className="card";
-  div.style.marginLeft=depth*10+"px";
+  let wrap=document.createElement("div");
 
-  // MAIN STATEMENT (PRIMARY FOCUS)
-  div.innerHTML=`
-    <b>${item.type.toUpperCase()}</b>
-    <div style="margin-top:4px">${item.text}</div>
+  wrap.innerHTML=`
+    <div class="statement">
+      <div class="text">${item.text}</div>
+      <div class="meta">${item.type.toUpperCase()} · @${item.user}</div>
 
-    <div class="meta">@${item.user}</div>
+      <button class="btn btn-sm btn-success" onclick="agree(${item.id})">Agree</button>
+      <button class="btn btn-sm btn-danger" onclick="disagree(${item.id})">Disagree</button>
+    </div>
 
-    <button class="btn btn-sm btn-success" onclick="agree(${item.id})">Agree</button>
-    <button class="btn btn-sm btn-danger" onclick="disagree(${item.id})">Disagree</button>
+    <div class="columns">
+      <div class="col" id="left-${item.id}"></div>
+      <div class="col" id="right-${item.id}"></div>
+    </div>
   `;
 
-  container.appendChild(div);
+  container.appendChild(wrap);
 
-  // CHILDREN STACK DIRECTLY BELOW (NO LANE LABELS)
+  let left=document.getElementById(`left-${item.id}`);
+  let right=document.getElementById(`right-${item.id}`);
+
   item.children.map(find)
     .filter(Boolean)
     .forEach(c=>{
-      let child=document.createElement("div");
-      child.className="child";
+      let el=document.createElement("div");
+      el.className="child";
 
-      child.innerHTML=`
-        <b>${c.type.toUpperCase()}</b>
+      el.innerHTML=`
+        <div><b>${c.type.toUpperCase()}</b></div>
         <div>${c.text}</div>
         <div class="meta">@${c.user}</div>
 
         <button class="btn btn-sm btn-danger" onclick="disagree(${c.id})">Disagree</button>
       `;
 
-      container.appendChild(child);
-
-      renderItem(c,container,depth+1);
+      // simple rule: proclaims/questions/answers go left/right? (neutral default split)
+      if(c.type==="proclaim") left.appendChild(el);
+      else right.appendChild(el);
     });
 }
 

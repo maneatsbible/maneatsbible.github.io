@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dispute Graph System (Fully Restored)</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body { background:#0f0f0f; color:#eee; font-size:14px; }
+
+.node {
+  border-left:2px solid #333;
+  margin-left:10px;
+  padding-left:10px;
+  margin-top:10px;
+}
+
+.statement {
+  padding:6px;
+  border-radius:6px;
+  margin-bottom:5px;
+}
+
+.meta { font-size:11px; color:#aaa; }
+
+button { font-size:11px!important; margin-right:3px; }
+
+.agree { border-left:3px solid #3ddc84; }
+.disagree { border-left:3px solid #ff4d4d; }
+
+.focused { outline:2px solid yellow; }
+
+.chat {
+  margin-left:15px;
+  padding:4px;
+  font-size:11px;
+  color:#bbb;
+  border-left:2px dashed #555;
+}
+
+.small { font-size:11px; color:#aaa; }
+</style>
+</head>
+
+<body>
+
+<div class="container p-2">
+
+<h5 class="text-center">⚖️ Fully Restored Dispute Graph</h5>
+
+<button class="btn btn-sm btn-outline-light" onclick="login()">Login</button>
+<div id="userBox" class="small mb-2"></div>
+
+<div id="root"></div>
+
+</div>
+
+<script>
+
+//////////////////////
+// AUTH
+//////////////////////
+
+let user = { login:"anon" };
+
+function login(){
+  user.login = prompt("username","user"+Math.floor(Math.random()*1000));
+  document.getElementById("userBox").innerText = "@"+user.login;
+}
+
+//////////////////////
+// CORE STATE
+//////////////////////
+
+let id = 0;
+let nodes = [];
+
+function find(i){ return nodes.find(n=>n.id===i); }
+
+function score(n){
+  return (n.votes.agree.length - n.votes.disagree.length);
+}
+
+//////////////////////
+// NODE MODEL (FULL)
+//////////////////////
+
+function create(text,type,parent=null){
+
+  let n = {
+    id:id++,
+    text,
+    type, // proclamation | question | answer
+    user:user.login,
+    parent,
+    children:[],
+    votes:{ agree:[], disagree:[] },
+    chat:[]
+  };
+
+  nodes.push(n);
+
+  if(parent!==null){
+    let p = find(parent);
+    if(p) p.children.push(n.id);
+  }
+
+  return n;
+}
+
+//////////////////////
+// ACTIONS (FULL FLOW RESTORED)
+//////////////////////
+
+function post(parent){
+  let text = prompt("Proclamation:");
+  if(!text) return;
+  create(text,"proclamation",parent);
+  render();
+}
+
+function ask(parent){
+  let text = prompt("Question:");
+  if(!text) return;
+  create(text,"question",parent);
+  render();
+}
+
+function answer(qid){
+  let text = prompt("Answer:");
+  if(!text) return;
+  create(text,"answer",qid);
+  render();
+}
+
+//////////////////////
+// CHAT (SIDE LAYER RESTORED)
+//////////////////////
+
+function chat(id){
+
+  let n = find(id);
+  if(!n) return;
+
+  let text = prompt("Chat:");
+  if(!text) return;
+
+  n.chat.push({
+    user:user.login,
+    text,
+    time:Date.now()
+  });
+
+  render();
+}
+
+//////////////////////
+// VOTING (RESTORED FULL CONSISTENCY)
+//////////////////////
+
+function agree(id){
+  let n = find(id);
+  if(!n) return;
+
+  n.votes.disagree = n.votes.disagree.filter(u=>u!==user.login);
+
+  if(!n.votes.agree.includes(user.login)){
+    n.votes.agree.push(user.login);
+  }
+
+  render();
+}
+
+function disagree(id){
+  let n = find(id);
+  if(!n) return;
+
+  n.votes.agree = n.votes.agree.filter(u=>u!==user.login);
+
+  if(!n.votes.disagree.includes(user.login)){
+    n.votes.disagree.push(user.login);
+  }
+
+  render();
+}
+
+//////////////////////
+// RENDER (FULL GRAPH + CHAT + SCORING)
+//////////////////////
+
+function render(){
+
+  let el = document.getElementById("root");
+  el.innerHTML="";
+
+  nodes.filter(n=>n.parent===null)
+       .forEach(n=>renderNode(n,el));
+}
+
+function renderNode(n,container){
+
+  let div = document.createElement("div");
+
+  let s = score(n);
+
+  div.className =
+    "statement "+n.type+" "+(s>0?"agree":s<0?"disagree":"");
+
+  div.innerHTML = `
+<b>${n.type.toUpperCase()}</b>: ${n.text}
+
+<div class="meta">@${n.user} score:${s}</div>
+
+<button onclick="post(${n.id})">Proclaim</button>
+<button onclick="ask(${n.id})">Q</button>
+<button onclick="answer(${n.id})">A</button>
+<button onclick="agree(${n.id})">Agree</button>
+<button onclick="disagree(${n.id})">Disagree</button>
+<button onclick="chat(${n.id})">Chat</button>
+`;
+
+  container.appendChild(div);
+
+  // CHAT LAYER (RESTORED)
+  n.chat.forEach(c=>{
+    let d = document.createElement("div");
+    d.className="chat";
+    d.innerText = `${c.user}: ${c.text}`;
+    container.appendChild(d);
+  });
+
+  let box = document.createElement("div");
+  box.className="node";
+  container.appendChild(box);
+
+  n.children.map(find).filter(Boolean)
+    .forEach(c=>renderNode(c,box));
+}
+
+//////////////////////
+// INIT
+//////////////////////
+
+create("Root Statement","proclamation",null);
+render();
+
+</script>
+
+</body>
+</html>

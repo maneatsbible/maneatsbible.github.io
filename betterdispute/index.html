@@ -11,8 +11,6 @@ body{
   font-family:system-ui;
   background:#0f0f0f;
   color:#eee;
-  transition:0.2s;
-  border-top:4px solid transparent;
 }
 
 /* HEADER */
@@ -20,12 +18,11 @@ header{
   display:flex;
   justify-content:space-between;
   padding:10px;
-  font-size:14px;
 }
 
 .version{font-size:11px;color:#777}
 
-/* USER SWITCH */
+/* USERS */
 #users{
   display:flex;
   gap:6px;
@@ -38,13 +35,12 @@ header{
   border-radius:999px;
   font-size:12px;
   cursor:pointer;
-  opacity:0.6;
+  opacity:0.7;
 }
 
 .user.active{
   opacity:1;
   border-color:#fff;
-  background:#222;
 }
 
 /* COMPOSER */
@@ -69,8 +65,15 @@ header{
   margin-bottom:10px;
 }
 
-.text{font-weight:600}
-.meta{font-size:11px;color:#888;margin-top:4px}
+.text{
+  font-weight:600;
+}
+
+.meta{
+  font-size:11px;
+  color:#888;
+  margin-top:4px;
+}
 
 /* ACTIONS */
 .actions{
@@ -88,30 +91,46 @@ button{
   font-size:12px;
 }
 
-/* BROWSE */
-#browse{
-  padding:10px;
-  border-top:1px solid #222;
+/* DISPUTE GRID */
+.dispute{
   display:none;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:10px;
+}
+
+.dispute.active{
+  display:grid;
+}
+
+.col{
+  background:#141414;
+  padding:8px;
+  border-radius:8px;
+  min-height:80px;
+}
+
+.input{
+  width:100%;
+  background:#0b0b0b;
+  border:1px solid #333;
+  color:#eee;
+  padding:6px;
   font-size:12px;
-  color:#aaa;
+  border-radius:6px;
+  margin-top:6px;
 }
 
 /* LOG */
 #log{
   display:none;
-  font-size:11px;
   padding:10px;
+  font-size:11px;
+  color:#7f7;
   border-top:1px solid #222;
   max-height:200px;
   overflow:auto;
-  color:#7f7;
 }
-
-/* THEME ACCENTS */
-.theme-alice{ border-top-color:#3a3a3a; }
-.theme-bob{ border-top-color:#3a2a4a; }
-.theme-charlie{ border-top-color:#1f3a2f; }
 </style>
 </head>
 
@@ -119,7 +138,7 @@ button{
 
 <header>
   <div>Better Dispute</div>
-  <div class="version">v4.0.0</div>
+  <div class="version">v5.0.0</div>
 </header>
 
 <div id="users"></div>
@@ -129,10 +148,15 @@ button{
 
 <div id="feed"></div>
 
-<div id="browse"></div>
 <div id="log"></div>
 
 <script>
+
+const VERSION="5.0.0";
+
+//////////////////////
+// STATE
+//////////////////////
 
 let users=["alice","bob","charlie"];
 let currentUser="alice";
@@ -140,21 +164,33 @@ let currentUser="alice";
 let id=0;
 let items=[];
 
-const VERSION="4.0.0";
+function log(event,data){
 
-//////////////////////
-// USER UI (FIXED VISUAL STATE)
-//////////////////////
+  const el=document.getElementById("log");
 
-function applyUserUI(){
-
-  document.body.className="theme-"+currentUser;
-
-  document.querySelectorAll(".user").forEach(u=>{
-    u.classList.remove("active");
-    if(u.dataset.u===currentUser) u.classList.add("active");
+  const div=document.createElement("div");
+  div.innerText=JSON.stringify({
+    time:Date.now(),
+    version:VERSION,
+    user:currentUser,
+    event,
+    data
   });
+
+  el.appendChild(div);
 }
+
+//////////////////////
+// STARTUP LOG (FIXED)
+//////////////////////
+
+function startup(){
+  log("startup",{version:VERSION});
+}
+
+//////////////////////
+// USERS
+//////////////////////
 
 function renderUsers(){
   const el=document.getElementById("users");
@@ -162,25 +198,22 @@ function renderUsers(){
 
   users.forEach(u=>{
     const d=document.createElement("div");
-    d.className="user";
+    d.className="user"+(u===currentUser?" active":"");
     d.innerText=u;
-    d.dataset.u=u;
 
     d.onclick=()=>{
       currentUser=u;
       log("switch",{user:u});
-      applyUserUI();
+      renderUsers();
       render();
     };
 
     el.appendChild(d);
   });
-
-  applyUserUI();
 }
 
 //////////////////////
-// CORE DATA
+// CORE
 //////////////////////
 
 function find(i){ return items.find(x=>x.id===i); }
@@ -204,89 +237,92 @@ function create(text,type,parent=null){
   }
 
   log("create",item);
-  render();
-  renderBrowse();
 }
 
 function createRoot(){
+
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
 
   create(t,"proclaim",null);
   document.getElementById("composer").value="";
+  render();
 }
 
 //////////////////////
-// DISAGREE (FIXED: REAL BRANCH CREATION)
+// DISAGREE = REAL TWO COLUMN EXPANSION
 //////////////////////
 
-function disagree(id){
-
-  const parent=find(id);
-  if(!parent || parent.user===currentUser) return;
-
-  const counter=createNode(
-    "Counter: "+parent.text,
-    "proclaim",
-    id
-  );
-
-  log("disagree_branch_created",{parent:id,child:counter.id});
+function toggleDispute(id){
+  const el=document.getElementById("d-"+id);
+  el.classList.toggle("active");
+  log("disagree_open",{id});
 }
 
-function agree(id){
-  const item=find(id);
-  if(item.user===currentUser) return;
-  log("agree",{id});
+function submitLeft(id){
+  const el=document.getElementById("l-"+id);
+  const t=el.value.trim();
+  if(!t) return;
+
+  create(t,"question",id);
+  el.value="";
+  render();
 }
 
-function createNode(text,type,parent){
+function submitRight(id){
+  const el=document.getElementById("r-"+id);
+  const t=el.value.trim();
+  if(!t) return;
 
-  const item={
-    id:id++,
-    text,
-    type,
-    user:currentUser,
-    parent,
-    children:[]
-  };
-
-  items.push(item);
-
-  const p=find(parent);
-  if(p) p.children.push(item.id);
-
-  return item;
+  create(t,"proclaim",id);
+  el.value="";
+  render();
 }
 
 //////////////////////
-// FEED (ACTION-DRIVEN)
+// FEED RULE (FIXED)
 //////////////////////
 
-function feedItems(){
-
-  return items.filter(i=>{
-    return i.user!==currentUser && i.parent===null;
-  });
+function topLevel(){
+  return items.filter(x=>x.parent===null);
 }
+
+//////////////////////
+// RENDER
+//////////////////////
 
 function render(){
 
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  feedItems().forEach(item=>{
+  topLevel().forEach(item=>{
 
     const div=document.createElement("div");
-    div.className="card";
 
     div.innerHTML=`
-      <div class="text">${item.text}</div>
-      <div class="meta">${item.type} · @${item.user}</div>
+      <div class="card">
+        <div class="text">${item.text}</div>
+        <div class="meta">${item.type.toUpperCase()} · @${item.user}</div>
 
-      <div class="actions">
-        <button onclick="agree(${item.id})">Agree</button>
-        <button onclick="disagree(${item.id})">Disagree</button>
+        <div class="actions">
+          <button onclick="agree(${item.id})">Agree</button>
+          <button onclick="toggleDispute(${item.id})">Disagree</button>
+        </div>
+
+        <div class="dispute" id="d-${item.id}">
+          <div class="col">
+            <div>Challenge</div>
+            <input class="input" id="l-${item.id}" placeholder="Ask / challenge...">
+            <button onclick="submitLeft(${item.id})">Submit</button>
+          </div>
+
+          <div class="col">
+            <div>Counter</div>
+            <input class="input" id="r-${item.id}" placeholder="Proclaim counter...">
+            <button onclick="submitRight(${item.id})">Submit</button>
+          </div>
+        </div>
       </div>
     `;
 
@@ -295,38 +331,13 @@ function render(){
 }
 
 //////////////////////
-// BROWSE (FULL STRUCTURE)
+// ACTIONS
 //////////////////////
 
-function renderBrowse(){
-
-  const b=document.getElementById("browse");
-  b.innerHTML="";
-
-  items.forEach(i=>{
-    const d=document.createElement("div");
-    d.innerText=`${i.type.toUpperCase()} @${i.user}: ${i.text}`;
-    b.appendChild(d);
-  });
-}
-
-//////////////////////
-// LOG
-//////////////////////
-
-function log(event,data){
-  const el=document.getElementById("log");
-
-  const div=document.createElement("div");
-  div.innerText=JSON.stringify({
-    time:Date.now(),
-    v:VERSION,
-    user:currentUser,
-    event,
-    data
-  });
-
-  el.appendChild(div);
+function agree(id){
+  const i=find(id);
+  if(i.user===currentUser) return;
+  log("agree",{id});
 }
 
 //////////////////////
@@ -334,10 +345,11 @@ function log(event,data){
 //////////////////////
 
 renderUsers();
+startup();
 
 /* seed */
-create("All claims require challenge","proclaim",null);
-create("Is challenge always necessary?","question",0);
+create("All claims invite dispute","proclaim",null);
+create("Is dispute always productive?","question",0);
 
 render();
 

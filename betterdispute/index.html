@@ -36,10 +36,7 @@ header{
   opacity:0.6;
 }
 
-.user.active{
-  opacity:1;
-  border-color:#fff;
-}
+.user.active{opacity:1;border-color:#fff}
 
 #composer{
   width:100%;
@@ -76,12 +73,28 @@ button{
   font-size:12px;
 }
 
-.child{
-  margin-left:10px;
-  border-left:2px solid #333;
-  padding-left:10px;
-  margin-top:8px;
+/* TRUE SPLIT VIEW */
+.dispute{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:10px;
 }
+
+.lane{
+  background:#141414;
+  padding:8px;
+  border-radius:8px;
+  min-height:40px;
+}
+
+.child{
+  margin-top:6px;
+  font-size:12px;
+  color:#ddd;
+}
+
+.child span{color:#888}
 
 /* POPUP */
 #popup{
@@ -105,7 +118,7 @@ button{
 
 input{
   width:100%;
-  margin-top:6px;
+  margin-top:8px;
   background:#0b0b0b;
   border:1px solid #333;
   color:#eee;
@@ -149,14 +162,14 @@ input{
 <!-- POPUP -->
 <div id="popup">
   <div class="box">
-    <div id="title"></div>
+    <div>Dispute (choose one)</div>
 
-    <input id="challengeInput" placeholder="Ask (challenge)">
-    <input id="counterInput" placeholder="Proclaim (counter)">
+    <input id="challenge" placeholder="Ask (challenge)">
+    <input id="counter" placeholder="Proclaim (counter)">
 
     <div class="row">
-      <button onclick="submitChallenge()">Submit Challenge</button>
-      <button onclick="submitCounter()">Submit Counter</button>
+      <button onclick="submitChallenge()">Submit Ask</button>
+      <button onclick="submitCounter()">Submit Proclaim</button>
       <button onclick="closePopup()">Close</button>
     </div>
   </div>
@@ -164,7 +177,7 @@ input{
 
 <script>
 
-let VERSION=19;
+let VERSION=20;
 document.getElementById("version").innerText=VERSION;
 
 let users=["alice","bob","charlie"];
@@ -173,6 +186,10 @@ let currentUser="alice";
 let id=0;
 let items=[];
 let logs=[];
+
+/* track per-user disputes */
+let disputes = {}; 
+// key: statementId -> set(users who already disagreed)
 
 let active=null;
 
@@ -184,14 +201,11 @@ function log(e,d){
 /* HELP */
 function find(i){return items.find(x=>x.id===i);}
 
-function isOwner(item){
-  return item.user===currentUser;
-}
-
 /* USERS */
 function renderUsers(){
   const el=document.getElementById("users");
   el.innerHTML="";
+
   users.forEach(u=>{
     const d=document.createElement("div");
     d.className="user"+(u===currentUser?" active":"");
@@ -201,14 +215,14 @@ function renderUsers(){
       currentUser=u;
       renderUsers();
       render();
-      log("switch",u);
+      log("switch",u); // FIX: immediate logging
     };
 
     el.appendChild(d);
   });
 }
 
-/* CREATE */
+/* CREATE ROOT */
 function createRoot(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
@@ -225,16 +239,19 @@ function createRoot(){
   log("create",t);
 }
 
-/* OPEN DISPUTE */
+/* DISPUTE OPEN */
 function openDispute(i){
   const item=find(i);
-  if(!item || isOwner(item)) return;
+  if(!item || item.user===currentUser) return;
+
+  if(!disputes[i]) disputes[i]=new Set();
+  if(disputes[i].has(currentUser)) return; // ONLY ONE DISAGREE PER USER
 
   active=i;
   document.getElementById("popup").classList.add("open");
 
-  document.getElementById("challengeInput").value="";
-  document.getElementById("counterInput").value="";
+  document.getElementById("challenge").value="";
+  document.getElementById("counter").value="";
 }
 
 /* CLOSE */
@@ -243,9 +260,9 @@ function closePopup(){
   document.getElementById("popup").classList.remove("open");
 }
 
-/* SUBMIT CHILDREN */
+/* SUBMIT BRANCH */
 function submitChallenge(){
-  const v=document.getElementById("challengeInput").value.trim();
+  const v=document.getElementById("challenge").value.trim();
   if(!v) return;
 
   items.push({
@@ -253,8 +270,12 @@ function submitChallenge(){
     text:v,
     user:currentUser,
     parent:active,
-    type:"question"
+    type:"question",
+    lane:"left"
   });
+
+  if(!disputes[active]) disputes[active]=new Set();
+  disputes[active].add(currentUser);
 
   closePopup();
   render();
@@ -262,7 +283,7 @@ function submitChallenge(){
 }
 
 function submitCounter(){
-  const v=document.getElementById("counterInput").value.trim();
+  const v=document.getElementById("counter").value.trim();
   if(!v) return;
 
   items.push({
@@ -270,18 +291,22 @@ function submitCounter(){
     text:v,
     user:currentUser,
     parent:active,
-    type:"proclaim"
+    type:"proclaim",
+    lane:"right"
   });
+
+  if(!disputes[active]) disputes[active]=new Set();
+  disputes[active].add(currentUser);
 
   closePopup();
   render();
   log("counter",v);
 }
 
-/* AGREE (NOT SHOWN FOR OWN ITEMS) */
+/* AGREEMENT */
 function agree(i){
   const item=find(i);
-  if(!item || isOwner(item)) return;
+  if(!item || item.user===currentUser) return;
   log("agree",i);
 }
 
@@ -291,15 +316,21 @@ function render(){
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  items.filter(x=>x.parent===null)
-  .forEach(r=>{
+  const roots = items.filter(x=>x.parent===null);
 
-    const hideActions = isOwner(r); // HARD RULE
+  roots.forEach(r=>{
 
     const children = items.filter(x=>x.parent===r.id);
 
-    let childHtml = children.map(c=>
-      `<div class="child">${c.text} <span style="color:#888">@${c.user}</span></div>`
+    const left = children.filter(c=>c.lane==="left" || c.type==="question");
+    const right = children.filter(c=>c.lane==="right" || c.type==="proclaim");
+
+    let leftHtml = left.map(c=>
+      `<div class="child">${c.text} <span>@${c.user}</span></div>`
+    ).join("");
+
+    let rightHtml = right.map(c=>
+      `<div class="child">${c.text} <span>@${c.user}</span></div>`
     ).join("");
 
     feed.innerHTML += `
@@ -307,14 +338,24 @@ function render(){
         <div class="text">${r.text}</div>
         <div class="meta">@${r.user}</div>
 
-        ${!hideActions ? `
+        ${r.user !== currentUser ? `
         <div class="actions">
           <button onclick="agree(${r.id})">Agree</button>
           <button onclick="openDispute(${r.id})">Disagree</button>
         </div>
         ` : ""}
 
-        ${childHtml}
+        <div class="dispute">
+          <div class="lane">
+            <div>Ask</div>
+            ${leftHtml}
+          </div>
+
+          <div class="lane">
+            <div>Proclaim</div>
+            ${rightHtml}
+          </div>
+        </div>
       </div>
     `;
   });
@@ -328,13 +369,13 @@ function render(){
   });
 }
 
-/* TEST DATA */
-items.push({id:id++,text:"All claims can be challenged",user:"alice",parent:null});
-items.push({id:id++,text:"Some claims resist challenge",user:"bob",parent:null});
-
 /* INIT */
 renderUsers();
 render();
+
+/* TEST DATA */
+items.push({id:id++,text:"All claims can be challenged",user:"alice",parent:null});
+items.push({id:id++,text:"Some claims resist challenge",user:"bob",parent:null});
 
 </script>
 

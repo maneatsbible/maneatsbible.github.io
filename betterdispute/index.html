@@ -14,53 +14,62 @@ header{display:flex;justify-content:space-between;padding:10px}
 .user{padding:4px 8px;border:1px solid #333;border-radius:999px;cursor:pointer;opacity:.6}
 .user.active{opacity:1;border-color:#fff}
 
-textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #333;padding:8px}
+textarea{width:100%;height:80px;background:#0b0b0b;color:#eee;border:1px solid #333;padding:8px}
 
-.card{background:#1a1a1a;margin:10px;padding:10px;border-radius:10px}
+.card{background:#1a1a1a;margin:10px;padding:10px;border-radius:10px;position:relative}
 
 .meta{font-size:11px;color:#888}
 
 .actions{margin-top:6px}
-.icon{font-size:20px;cursor:pointer;margin-right:10px}
-.icon.active{opacity:1}
+.icon{font-size:18px;cursor:pointer;margin-right:8px}
 .icon.dim{opacity:.25}
+.icon.active{opacity:1}
 
-.branch{
-  margin-top:8px;
-  padding:8px;
-  background:#141414;
-  border-radius:8px;
-  cursor:pointer;
+.resolved{color:#4caf50;font-size:11px;margin-top:4px}
+
+.dispute{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:10px;
 }
 
-.answer{
-  margin-top:6px;
-  padding-left:10px;
-  border-left:2px solid #4caf50;
+.lane{background:#141414;padding:8px;border-radius:8px}
+
+.sidebar{
+  position:absolute;
+  right:-220px;
+  top:0;
+  width:200px;
+  background:#101010;
+  border-left:1px solid #333;
+  height:100%;
+  padding:6px;
+  font-size:11px;
 }
 
-.answerBtn{font-size:12px;color:#4caf50;cursor:pointer}
+.chatlog{
+  max-height:120px;
+  overflow:auto;
+  margin-bottom:6px;
+}
+
+.chatinput{
+  width:100%;
+  height:50px;
+  background:#0b0b0b;
+  color:#eee;
+  border:1px solid #333;
+}
 
 .turn{font-size:11px;color:#aaa;margin-top:4px}
 
-.nav{
-  padding:10px;
-  cursor:pointer;
+.resolveBtn{
+  font-size:11px;
   color:#4caf50;
+  cursor:pointer;
+  margin-top:4px;
 }
-
-/* popup */
-#popup{
-  display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,.85);
-  align-items:center;justify-content:center;
-}
-#popup.open{display:flex}
-.box{background:#1a1a1a;padding:12px;border-radius:10px;width:90%;max-width:420px}
-.row{display:flex;justify-content:space-between;margin-top:10px}
-.btn{font-size:22px;cursor:pointer;color:#fff}
-.btn.ok{color:#4caf50}
-.btn.cancel{color:#f44336}
 
 /* log */
 #log{
@@ -78,7 +87,7 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 
 <header>
   <div>Better Dispute</div>
-  <div>v33</div>
+  <div>v34</div>
 </header>
 
 <div id="users"></div>
@@ -86,170 +95,99 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 <textarea id="composer" placeholder="Start a fire..."></textarea>
 <button onclick="createRoot()">Proclaim</button>
 
-<div id="nav"></div>
 <div id="feed"></div>
 <div id="log"></div>
 
-<div id="popup">
-  <div class="box">
-    <div id="modeTitle">Respond</div>
-    <textarea id="ask" placeholder="Ask"></textarea>
-    <textarea id="proclaim" placeholder="Proclaim / Answer"></textarea>
-    <div class="row">
-      <span class="btn ok" onclick="submit()">✔</span>
-      <span class="btn cancel" onclick="cancel()">✖</span>
-    </div>
-  </div>
-</div>
-
 <script>
 
-let users=["alice","bob","charlie"];
+let users=["alice","bob","charlie","dana"];
 let currentUser="alice";
 
 let id=0;
 let items=[];
 
-/* per-user isolated state */
+/* per-user state */
 let state={};
 
 function getState(){
   if(!state[currentUser]){
     state[currentUser]={
-      reactions:{},
-      navStack:[],
-      logs:[]
+      reacted:{},      // nodeId -> up/down
+      resolved:{},     // nodeId -> true
+      chat:{}          // nodeId -> messages
     };
   }
   return state[currentUser];
 }
 
-/* helpers */
+/* log */
+let logs=[];
+
+function log(e,d){
+  logs.push({t:new Date().toISOString(),u:currentUser,e,d});
+}
+
+/* find */
 function find(i){return items.find(x=>x.id===i);}
 
-/* log */
-function log(e,d){
-  getState().logs.push({t:new Date().toISOString(),u:currentUser,e,d});
-}
-
-/* owes answer */
-function owesAnswer(user){
-  for(let n of items){
-    if(n.type==="question"){
-      const children = items.filter(x=>x.parent===n.id);
-      const answered = children.some(c=>c.type==="answer");
-      if(!answered && n.duel && n.duel.turn===user){
-        return n;
-      }
-    }
-  }
-  return null;
-}
-
-/* users */
-function renderUsers(){
-  const el=document.getElementById("users");
-  el.innerHTML="";
-  users.forEach(u=>{
-    const d=document.createElement("div");
-    d.className="user"+(u===currentUser?" active":"");
-    d.textContent=u;
-    d.onclick=()=>{
-      currentUser=u;
-      renderUsers();
-      render();
-    };
-    el.appendChild(d);
-  });
-}
-
-/* root */
+/* create */
 function createRoot(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
 
-  items.push({id:id++,text:t,user:currentUser,parent:null,type:"proclaim",side:"left"});
+  items.push({
+    id:id++,
+    text:t,
+    user:currentUser,
+    parent:null,
+    type:"proclaim",
+    side:"left",
+    resolved:false
+  });
+
   document.getElementById("composer").value="";
   render();
+  log("create",t);
 }
 
-/* react */
+/* reaction rules */
 function react(i,type){
 
-  if(owesAnswer(currentUser)) return;
-
+  const s=getState();
   const node=find(i);
   if(!node || node.user===currentUser) return;
 
+  if(s.resolved[i]) return;
+
+  if(s.reacted[i]){
+    if(s.reacted[i]===type) return;     // no double
+    if(type==="up" && s.reacted[i]==="down") return; // no revert
+  }
+
+  s.reacted[i]=type;
+
+  log(type,i);
+  render();
+}
+
+/* resolve */
+function resolve(i){
   const s=getState();
-  s.reactions[i]=type;
-
-  window.pendingSide = (type==="up")?"left":"right";
-  openDispute(i,false);
-}
-
-/* popup */
-let active=null,answerMode=false;
-
-function openDispute(i,isAnswer){
-  active=i;
-  answerMode=isAnswer;
-
-  document.getElementById("popup").classList.add("open");
-  document.getElementById("modeTitle").innerText=isAnswer?"Answer":"Respond";
-  document.getElementById("ask").style.display=isAnswer?"none":"block";
-}
-
-function cancel(){
-  active=null;
-  document.getElementById("popup").classList.remove("open");
-}
-
-function submit(){
-
-  const ask=document.getElementById("ask").value.trim();
-  const pro=document.getElementById("proclaim").value.trim();
-
-  const parent=find(active);
-  if(!parent){ cancel(); return; }
-
-  let duel = parent.duel || {a:parent.user,b:currentUser,turn:currentUser};
-  if(duel.turn!==currentUser){ cancel(); return; }
-
-  const opponent = currentUser===duel.a ? duel.b : duel.a;
-
-  function push(text,type){
-    items.push({
-      id:id++,
-      text,
-      user:currentUser,
-      parent:active,
-      type,
-      side:window.pendingSide,
-      duel:{a:duel.a,b:duel.b,turn:opponent}
-    });
-  }
-
-  if(answerMode){
-    if(!pro){ cancel(); return; }
-    push(pro,"answer");
-  }else{
-    if(ask) push(ask,"question");
-    if(pro) push(pro,"proclaim");
-  }
-
-  cancel();
+  s.resolved[i]=true;
+  log("resolve",i);
   render();
 }
 
-/* navigation */
-function enter(id){
-  getState().navStack.push(id);
-  render();
-}
+/* chat */
+function chat(i){
+  const msg = prompt("chat:");
+  if(!msg) return;
 
-function back(){
-  getState().navStack.pop();
+  const s=getState();
+  s.chat[i]=s.chat[i]||[];
+  s.chat[i].push({u:currentUser,m:msg});
+
+  log("chat",i);
   render();
 }
 
@@ -257,88 +195,75 @@ function back(){
 function render(){
 
   const feed=document.getElementById("feed");
-  const nav=document.getElementById("nav");
-
   feed.innerHTML="";
-  nav.innerHTML="";
 
   const s=getState();
-
-  if(s.navStack.length){
-    nav.innerHTML=`<div class="nav" onclick="back()">⬅ back</div>`;
-  }
-
-  let roots;
-
-  if(s.navStack.length){
-    roots=[find(s.navStack[s.navStack.length-1])];
-  }else{
-    roots=items.filter(x=>x.parent===null);
-  }
 
   function renderNode(node){
 
     const children = items.filter(x=>x.parent===node.id);
-    const answers = children.filter(c=>c.type==="answer");
 
-    const my = s.reactions[node.id];
+    const my = s.reacted[node.id];
+    const resolved = s.resolved[node.id];
 
     return `
       <div class="card">
+
         <div>${node.text} <span class="meta">@${node.user}</span></div>
 
-        ${node.user!==currentUser?`
+        ${resolved?`<div class="resolved">resolved ✓</div>`:""}
+
+        ${node.user!==currentUser && !resolved?`
         <div class="actions">
           <span class="icon ${my==='up'?'active':my?'dim':''}" onclick="react(${node.id},'up')">👍</span>
           <span class="icon ${my==='down'?'active':my?'dim':''}" onclick="react(${node.id},'down')">👎</span>
         </div>`:""}
 
-        ${node.type==="question" && node.duel && node.duel.turn===currentUser?`
-          <div class="answerBtn" onclick="openDispute(${node.id},true)">Answer</div>
-        `:""}
+        ${!resolved?`<div class="resolveBtn" onclick="resolve(${node.id})">resolve</div>`:""}
 
-        ${node.duel?`<div class="turn">turn: ${node.duel.turn}</div>`:""}
+        <div onclick="chat(${node.id})" style="cursor:pointer;font-size:11px;color:#888">💬 chat</div>
 
-        ${answers.map(a=>`
-          <div class="answer">${a.text} <span class="meta">@${a.user}</span></div>
-        `).join("")}
+        <div class="dispute">
 
-        ${children.filter(c=>c.type!=="answer").map(c=>`
-          <div class="branch" onclick="enter(${c.id})">
-            ${c.text} → 
+          <div class="lane">
+            ${children.filter(c=>c.side==="left").map(renderNode).join("")}
           </div>
-        `).join("")}
+
+          <div class="lane">
+            ${children.filter(c=>c.side==="right").map(renderNode).join("")}
+          </div>
+
+        </div>
+
+        <div class="sidebar">
+          <div class="chatlog">
+            ${(s.chat[node.id]||[]).map(c=>`<div><b>${c.u}</b>: ${c.m}</div>`).join("")}
+          </div>
+          <div>node chat</div>
+        </div>
+
       </div>
     `;
   }
 
-  roots.forEach(r=>{
-    feed.innerHTML+=renderNode(r);
+  items.filter(x=>x.parent===null).forEach(r=>{
+    feed.innerHTML += renderNode(r);
   });
 
   const logEl=document.getElementById("log");
   logEl.innerHTML="";
-  s.logs.slice(-200).forEach(l=>{
+  logs.slice(-200).reverse().forEach(l=>{
     const d=document.createElement("div");
     d.textContent=JSON.stringify(l);
     logEl.appendChild(d);
   });
 }
 
-/* init */
-renderUsers();
-
-/* test */
-items.push({id:id++,text:"Truth claims should be examined",user:"alice",parent:null,type:"proclaim",side:"left"});
-items.push({
-  id:id++,
-  text:"What makes a claim examinable?",
-  user:"bob",
-  parent:0,
-  type:"question",
-  side:"right",
-  duel:{a:"alice",b:"bob",turn:"alice"}
-});
+/* seed data */
+items.push({id:id++,text:"Truth claims should be tested",user:"alice",parent:null,type:"proclaim",side:"left",resolved:false});
+items.push({id:id++,text:"Evidence is subjective",user:"bob",parent:0,type:"proclaim",side:"right",resolved:false});
+items.push({id:id++,text:"But reproducibility matters",user:"charlie",parent:1,type:"proclaim",side:"left",resolved:false});
+items.push({id:id++,text:"Who defines reproducibility?",user:"dana",parent:2,type:"proclaim",side:"right",resolved:false});
 
 render();
 

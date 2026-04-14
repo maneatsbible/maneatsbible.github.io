@@ -12,18 +12,16 @@ body{
   background:#0f0f0f;
   color:#eee;
   font-size:14px;
+  transition:background 0.3s;
 }
 
-.container{
-  max-width:800px;
-}
+.container{ max-width:800px; }
 
 /* HEADER */
 .header{
   display:flex;
   justify-content:space-between;
   align-items:center;
-  margin-bottom:10px;
 }
 
 .version{
@@ -35,8 +33,8 @@ body{
 .userbar{
   display:flex;
   gap:6px;
+  margin:10px 0;
   flex-wrap:wrap;
-  margin-bottom:10px;
 }
 
 .user{
@@ -51,7 +49,7 @@ body{
   background:#2a2a2a;
 }
 
-/* COMPOSER (ONLY PROCLAMATIONS) */
+/* COMPOSER */
 .composer{
   background:#111;
   padding:10px;
@@ -70,7 +68,7 @@ textarea{
   border-radius:6px;
 }
 
-/* STATEMENT */
+/* STATEMENTS */
 .statement{
   background:#262626;
   padding:12px;
@@ -91,12 +89,7 @@ textarea{
   margin-top:4px;
 }
 
-button{
-  font-size:11px !important;
-  margin-right:4px;
-}
-
-/* TWO COLUMN DISPUTE AREA */
+/* TWO COLUMN */
 .dispute{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -118,7 +111,7 @@ button{
   margin-bottom:6px;
 }
 
-/* INLINE INPUTS (REQUIRED FIX) */
+/* INPUTS */
 .inputBox{
   width:100%;
   background:#0b0b0b;
@@ -127,7 +120,6 @@ button{
   border-radius:6px;
   padding:6px;
   font-size:12px;
-  margin-top:6px;
 }
 
 /* LOG */
@@ -138,9 +130,14 @@ button{
   font-size:11px;
   color:#9f9;
   padding:8px;
-  max-height:200px;
+  max-height:180px;
   overflow:auto;
 }
+
+/* USER THEMES (TEST VISUAL SHIFT) */
+.theme-alice{ background:#0f0f0f; }
+.theme-bob{ background:#111018; }
+.theme-charlie{ background:#101010; }
 </style>
 </head>
 
@@ -150,15 +147,13 @@ button{
 
 <div class="header">
   <h5>Better Dispute</h5>
-  <div class="version">v2.1.0</div>
+  <div class="version">v2.2.0</div>
 </div>
 
-<!-- USER SWITCHER (RESTORED) -->
 <div class="userbar" id="users"></div>
 
-<!-- ONLY ENTRY POINT -->
 <div class="composer">
-  <textarea id="composer" placeholder="Start a Proclamation..."></textarea>
+  <textarea id="composer" placeholder="Start a fire..."></textarea>
   <button class="btn btn-primary btn-sm mt-2" onclick="createRoot()">Proclaim</button>
 </div>
 
@@ -170,41 +165,18 @@ button{
 
 <script>
 
-//////////////////////
-// VERSION
-//////////////////////
-
-const APP_VERSION="2.1.0";
+const APP_VERSION="2.2.0";
 
 //////////////////////
-// LOG
-//////////////////////
-
-function log(event,data){
-
-  const el=document.getElementById("log");
-
-  const entry={
-    time:Date.now(),
-    version:APP_VERSION,
-    user:currentUser,
-    event,
-    data
-  };
-
-  const div=document.createElement("div");
-  div.innerText=JSON.stringify(entry);
-
-  el.appendChild(div);
-  el.scrollTop=el.scrollHeight;
-}
-
-//////////////////////
-// USERS (RESTORED)
+// USERS
 //////////////////////
 
 let users=["alice","bob","charlie"];
 let currentUser="alice";
+
+function applyTheme(){
+  document.body.className="theme-"+currentUser;
+}
 
 function renderUsers(){
   const el=document.getElementById("users");
@@ -217,12 +189,15 @@ function renderUsers(){
 
     d.onclick=()=>{
       currentUser=u;
+      applyTheme();
       log("user_switch",{user:u});
       renderUsers();
     };
 
     el.appendChild(d);
   });
+
+  applyTheme();
 }
 
 //////////////////////
@@ -237,7 +212,36 @@ function find(i){
 }
 
 //////////////////////
-// CREATE ROOT STATEMENT ONLY
+// SEED DATA (TEST DISPUTES)
+//////////////////////
+
+function seed(){
+
+  const a=addSeed("Truth requires confrontation","proclaim","alice",null);
+  const b=addSeed("Is that always the case?","question","bob",a);
+  const c=addSeed("Only in contested claims","proclaim","charlie",a);
+
+  const d=addSeed("Faith overrides contradiction","proclaim","bob",null);
+  const e=addSeed("How do you define contradiction?","question","alice",d);
+  const f=addSeed("By consistency failure","proclaim","bob",d);
+}
+
+function addSeed(text,type,user,parent){
+
+  const item={id:id++,text,type,user,parent,children:[]};
+
+  items.push(item);
+
+  if(parent!==null){
+    const p=find(parent);
+    if(p) p.children.push(item.id);
+  }
+
+  return item.id;
+}
+
+//////////////////////
+// CREATE ROOT
 //////////////////////
 
 function createRoot(){
@@ -261,21 +265,21 @@ function createRoot(){
 }
 
 //////////////////////
-// CORE ACTIONS (STRICT)
+// ACTIONS
 //////////////////////
 
 function agree(id){
+  const item=find(id);
+  if(item.user===currentUser) return; // BLOCK SELF ACTION
   log("agree",{id,user:currentUser});
 }
 
 function disagree(id){
-  log("disagree_open",{id});
-  render(); // expand UI state implicitly
+  const item=find(id);
+  if(item.user===currentUser) return; // BLOCK SELF ACTION
+  log("disagree",{id,user:currentUser});
+  render();
 }
-
-//////////////////////
-// INLINE DISPUTE INPUTS (REQUIRED FIX)
-//////////////////////
 
 function submitLeft(id){
   const el=document.getElementById("left-"+id);
@@ -312,12 +316,34 @@ function addChild(parent,text,type){
   if(p) p.children.push(item.id);
 
   log("create_child",{parent,text,type});
-
   render();
 }
 
 //////////////////////
-// RENDER (TRUE TWO-COLUMN STREAM)
+// LOG
+//////////////////////
+
+function log(event,data){
+
+  const el=document.getElementById("log");
+
+  const entry={
+    time:Date.now(),
+    version:APP_VERSION,
+    user:currentUser,
+    event,
+    data
+  };
+
+  const div=document.createElement("div");
+  div.innerText=JSON.stringify(entry);
+
+  el.appendChild(div);
+  el.scrollTop=el.scrollHeight;
+}
+
+//////////////////////
+// RENDER
 //////////////////////
 
 function render(){
@@ -338,17 +364,20 @@ function renderItem(item,container){
       <div class="text">${item.text}</div>
       <div class="meta">${item.type.toUpperCase()} · @${item.user}</div>
 
-      <button class="btn btn-sm btn-success" onclick="agree(${item.id})">Agree</button>
-      <button class="btn btn-sm btn-danger" onclick="disagree(${item.id})">Disagree</button>
+      <button class="btn btn-sm btn-success" onclick="agree(${item.id})"
+        ${item.user===currentUser?'disabled':''}>Agree</button>
+
+      <button class="btn btn-sm btn-danger" onclick="disagree(${item.id})"
+        ${item.user===currentUser?'disabled':''}>Disagree</button>
     </div>
 
     <div class="dispute">
-      <div class="col" id="leftcol-${item.id}">
+      <div class="col">
         <input class="inputBox" id="left-${item.id}" placeholder="Question (optional)">
         <button class="btn btn-sm btn-primary mt-1" onclick="submitLeft(${item.id})">Submit</button>
       </div>
 
-      <div class="col" id="rightcol-${item.id}">
+      <div class="col">
         <input class="inputBox" id="right-${item.id}" placeholder="Proclamation (optional)">
         <button class="btn btn-sm btn-primary mt-1" onclick="submitRight(${item.id})">Submit</button>
       </div>
@@ -357,7 +386,6 @@ function renderItem(item,container){
 
   container.appendChild(div);
 
-  // render children into columns
   item.children.map(find)
     .filter(Boolean)
     .forEach(c=>{
@@ -370,14 +398,17 @@ function renderItem(item,container){
         <div>${c.text}</div>
         <div class="meta">@${c.user}</div>
 
-        <button class="btn btn-sm btn-success" onclick="agree(${c.id})">Agree</button>
-        <button class="btn btn-sm btn-danger" onclick="disagree(${c.id})">Disagree</button>
+        <button class="btn btn-sm btn-success" onclick="agree(${c.id})"
+          ${c.user===currentUser?'disabled':''}>Agree</button>
+
+        <button class="btn btn-sm btn-danger" onclick="disagree(${c.id})"
+          ${c.user===currentUser?'disabled':''}>Disagree</button>
       `;
 
       if(c.type==="question"){
-        document.getElementById(`leftcol-${item.id}`).appendChild(el);
+        container.querySelector(`#left-${item.id}`).parentElement.appendChild(el);
       } else {
-        document.getElementById(`rightcol-${item.id}`).appendChild(el);
+        container.querySelector(`#right-${item.id}`).parentElement.appendChild(el);
       }
     });
 }
@@ -387,6 +418,7 @@ function renderItem(item,container){
 //////////////////////
 
 renderUsers();
+seed();
 render();
 
 </script>

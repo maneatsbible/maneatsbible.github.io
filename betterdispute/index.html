@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v34</title>
+<title>Better Dispute v35</title>
 
 <style>
 body{margin:0;font-family:system-ui;background:#0f0f0f;color:#eee}
@@ -16,23 +16,13 @@ header{display:flex;justify-content:space-between;padding:10px}
 
 textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #333;padding:8px}
 
-.card{background:#1a1a1a;margin:10px;padding:10px;border-radius:10px}
-
-.meta{font-size:11px;color:#888}
-
-.actions{margin-top:6px}
-.icon{font-size:20px;cursor:pointer;margin-right:10px}
-.icon.dim{opacity:.3}
-.icon.active{opacity:1}
-
-.dispute{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:10px;
+.rootItem{
+  margin:10px;
+  padding:10px;
+  background:#1a1a1a;
+  border-radius:10px;
+  cursor:pointer;
 }
-
-.lane{background:#141414;padding:8px;border-radius:8px}
 
 .nav{
   padding:10px;
@@ -40,13 +30,42 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
   cursor:pointer;
 }
 
-/* root list */
-.rootItem{
-  padding:10px;
+.dispute{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
   margin:10px;
+}
+
+.lane{
+  background:#141414;
+  padding:8px;
+  border-radius:8px;
+  min-height:120px;
+}
+
+.card{
   background:#1a1a1a;
-  border-radius:10px;
-  cursor:pointer;
+  padding:10px;
+  margin-bottom:8px;
+  border-radius:8px;
+}
+
+.meta{font-size:11px;color:#888}
+
+.actions{margin-top:6px}
+.icon{font-size:18px;cursor:pointer;margin-right:8px}
+.icon.dim{opacity:.3}
+.icon.active{opacity:1}
+
+/* log */
+#log{
+  border-top:1px solid #222;
+  padding:10px;
+  font-size:11px;
+  color:#7f7;
+  max-height:160px;
+  overflow:auto;
 }
 </style>
 </head>
@@ -55,7 +74,7 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 
 <header>
   <div>Better Dispute</div>
-  <div>v34</div>
+  <div>v35</div>
 </header>
 
 <div id="users"></div>
@@ -66,9 +85,11 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 <div id="nav"></div>
 <div id="view"></div>
 
+<div id="log"></div>
+
 <script>
 
-let users=["alice","bob","charlie"];
+let users=["alice","bob","charlie","dana"];
 let currentUser="alice";
 
 let id=0;
@@ -77,11 +98,17 @@ let items=[];
 /* state */
 let state={};
 
+let logs=[];
+
+function log(e,d){
+  logs.push({t:Date.now(),u:currentUser,e,d});
+}
+
+/* per-user state */
 function getState(){
   if(!state[currentUser]){
     state[currentUser]={
-      reactions:{},
-      stack:[]   // drill-down stack
+      stack:{}
     };
   }
   return state[currentUser];
@@ -122,36 +149,43 @@ function create(){
 
   document.getElementById("composer").value="";
   render();
+  log("create",t);
 }
 
-/* navigation */
+/* navigation stack (global view stack) */
+let stack=[];
+
 function enter(id){
-  getState().stack.push(id);
+  stack.push(id);
+  log("enter",id);
   render();
 }
 
 function back(){
-  getState().stack.pop();
+  stack.pop();
+  log("back","");
   render();
 }
 
 /* react */
+let reactions={};
+
 function react(id,type){
   const n=find(id);
   if(!n || n.user===currentUser) return;
 
-  getState().reactions[id]=type;
+  reactions[currentUser+"|"+id]=type;
+  log(type,id);
   render();
 }
 
-/* render single dispute view */
+/* render dispute (NO nesting UI allowed) */
 function renderDispute(node){
 
   const children = items.filter(x=>x.parent===node.id);
+
   const left = children.filter(c=>c.side==="left");
   const right = children.filter(c=>c.side==="right");
-
-  const r = getState().reactions[node.id];
 
   return `
     <div class="card">
@@ -160,29 +194,18 @@ function renderDispute(node){
 
       ${node.user!==currentUser ? `
         <div class="actions">
-          <span class="icon ${r==='up'?'active':r?'dim':''}" onclick="react(${node.id},'up')">👍</span>
-          <span class="icon ${r==='down'?'active':r?'dim':''}" onclick="react(${node.id},'down')">👎</span>
+          <span class="icon ${reactions[currentUser+"|"+node.id]==='up'?'active':'dim'}"
+                onclick="react(${node.id},'up')">👍</span>
+
+          <span class="icon ${reactions[currentUser+"|"+node.id]==='down'?'active':'dim'}"
+                onclick="react(${node.id},'down')">👎</span>
         </div>
       `:""}
 
-      <div class="dispute">
-
-        <div class="lane">
-          ${left.map(renderDispute).join("")}
-        </div>
-
-        <div class="lane">
-          ${right.map(renderDispute).join("")}
-        </div>
-
+      <div style="margin-top:6px;color:#4caf50;cursor:pointer;font-size:12px"
+           onclick="enter(${node.id})">
+        open dispute →
       </div>
-
-      ${children.map(c=>`
-        <div style="margin-top:6px;cursor:pointer;color:#aaa"
-             onclick="enter(${c.id})">
-          ↳ ${c.text}
-        </div>
-      `).join("")}
 
     </div>
   `;
@@ -197,10 +220,8 @@ function render(){
   view.innerHTML="";
   nav.innerHTML="";
 
-  const s=getState();
-
-  /* ROOT MODE */
-  if(s.stack.length===0){
+  /* ROOT VIEW */
+  if(stack.length===0){
 
     items.filter(x=>x.parent===null).forEach(n=>{
       view.innerHTML += `
@@ -210,25 +231,49 @@ function render(){
       `;
     });
 
-    return;
+  } else {
+
+    const current = find(stack[stack.length-1]);
+
+    nav.innerHTML = `<div class="nav" onclick="back()">⬅ back</div>`;
+
+    const children = items.filter(x=>x.parent===current.id);
+
+    const left = children.filter(c=>c.side==="left");
+    const right = children.filter(c=>c.side==="right");
+
+    view.innerHTML = `
+      <div class="dispute">
+
+        <div class="lane">
+          ${left.map(renderDispute).join("")}
+        </div>
+
+        <div class="lane">
+          ${right.map(renderDispute).join("")}
+        </div>
+
+      </div>
+    `;
   }
 
-  /* SINGLE DISPUTE MODE */
-  const current = find(s.stack[s.stack.length-1]);
-
-  nav.innerHTML = `<div class="nav" onclick="back()">⬅ back</div>`;
-  view.innerHTML = renderDispute(current);
+  /* log */
+  const logEl=document.getElementById("log");
+  logEl.innerHTML = logs.slice(-200).reverse()
+    .map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* init */
+/* seed test data (rich branching) */
+
+items.push({id:id++,text:"Reality is structured",user:"alice",parent:null,side:null});
+items.push({id:id++,text:"Structure depends on observer",user:"bob",parent:0,side:"right"});
+items.push({id:id++,text:"Observer depends on language",user:"charlie",parent:1,side:"left"});
+items.push({id:id++,text:"Language is structured by reality",user:"dana",parent:2,side:"right"});
+items.push({id:id++,text:"Therefore reality is circular",user:"bob",parent:3,side:"left"});
+items.push({id:id++,text:"Circular systems still require grounding",user:"alice",parent:4,side:"right"});
+items.push({id:id++,text:"Grounding is assumed, not proven",user:"charlie",parent:5,side:"left"});
+
 renderUsers();
-
-/* seed data */
-items.push({id:id++,text:"Truth is structured",user:"alice",parent:null,side:null});
-items.push({id:id++,text:"Structure is interpretation",user:"bob",parent:0,side:"right"});
-items.push({id:id++,text:"Interpretation needs constraints",user:"charlie",parent:1,side:"left"});
-items.push({id:id++,text:"Constraints are subjective",user:"bob",parent:2,side:"right"});
-
 render();
 
 </script>

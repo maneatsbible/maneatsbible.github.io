@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v33 (Restored)</title>
+<title>Better Dispute v34</title>
 
 <style>
 body{margin:0;font-family:system-ui;background:#0f0f0f;color:#eee}
@@ -22,7 +22,7 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 
 .actions{margin-top:6px}
 .icon{font-size:20px;cursor:pointer;margin-right:10px}
-.icon.dim{opacity:.25}
+.icon.dim{opacity:.3}
 .icon.active{opacity:1}
 
 .dispute{
@@ -34,36 +34,19 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 
 .lane{background:#141414;padding:8px;border-radius:8px}
 
-.branch{
-  margin-top:8px;
-  padding:6px;
-  background:#101010;
-  border:1px solid #333;
-  border-radius:6px;
-  cursor:pointer;
-}
-
-.answer{
-  margin-top:6px;
-  padding-left:10px;
-  border-left:2px solid #4caf50;
-}
-
-.turn{font-size:11px;color:#aaa;margin-top:4px}
-
 .nav{
   padding:10px;
-  cursor:pointer;
   color:#4caf50;
+  cursor:pointer;
 }
 
-#log{
-  border-top:1px solid #222;
+/* root list */
+.rootItem{
   padding:10px;
-  font-size:11px;
-  color:#7f7;
-  max-height:160px;
-  overflow:auto;
+  margin:10px;
+  background:#1a1a1a;
+  border-radius:10px;
+  cursor:pointer;
 }
 </style>
 </head>
@@ -72,17 +55,16 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 
 <header>
   <div>Better Dispute</div>
-  <div>v33 (restored)</div>
+  <div>v34</div>
 </header>
 
 <div id="users"></div>
 
 <textarea id="composer" placeholder="Start a fire..."></textarea>
-<button onclick="createRoot()">Proclaim</button>
+<button onclick="create()">Proclaim</button>
 
 <div id="nav"></div>
-<div id="feed"></div>
-<div id="log"></div>
+<div id="view"></div>
 
 <script>
 
@@ -92,41 +74,21 @@ let currentUser="alice";
 let id=0;
 let items=[];
 
-/* per-user isolated state */
+/* state */
 let state={};
 
 function getState(){
   if(!state[currentUser]){
     state[currentUser]={
       reactions:{},
-      navStack:[],
-      logs:[]
+      stack:[]   // drill-down stack
     };
   }
   return state[currentUser];
 }
 
-/* logging */
-function log(e,d){
-  getState().logs.push({t:new Date().toISOString(),u:currentUser,e,d});
-}
-
 /* helpers */
 function find(i){return items.find(x=>x.id===i);}
-
-/* unanswered detection */
-function owesAnswer(user){
-  for(let n of items){
-    if(n.type==="question"){
-      const children = items.filter(x=>x.parent===n.id);
-      const answered = children.some(c=>c.type==="answer");
-      if(!answered && n.duel && n.duel.turn===user){
-        return n;
-      }
-    }
-  }
-  return null;
-}
 
 /* users */
 function renderUsers(){
@@ -145,8 +107,8 @@ function renderUsers(){
   });
 }
 
-/* root */
-function createRoot(){
+/* create root */
+function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
 
@@ -155,154 +117,117 @@ function createRoot(){
     text:t,
     user:currentUser,
     parent:null,
-    type:"proclaim",
-    side:"left",
-    duel:null
+    side:null
   });
 
   document.getElementById("composer").value="";
   render();
-  log("create",t);
-}
-
-/* react */
-function react(i,type){
-
-  if(owesAnswer(currentUser)) return;
-
-  const node=find(i);
-  if(!node || node.user===currentUser) return;
-
-  let s=getState();
-  s.reactions[i]=type;
-
-  if(type==="down") openDispute(i);
-}
-
-/* open dispute */
-let active=null;
-
-function openDispute(i){
-  active=i;
-  render();
-}
-
-/* submit simple branch */
-function submitBranch(text,type,parentId,side){
-
-  items.push({
-    id:id++,
-    text,
-    user:currentUser,
-    parent:parentId,
-    type,
-    side,
-    duel:null
-  });
-
-  render();
-  log("submit",text);
 }
 
 /* navigation */
 function enter(id){
-  getState().navStack.push(id);
+  getState().stack.push(id);
   render();
 }
 
 function back(){
-  getState().navStack.pop();
+  getState().stack.pop();
   render();
 }
 
-/* render */
-function render(){
+/* react */
+function react(id,type){
+  const n=find(id);
+  if(!n || n.user===currentUser) return;
 
-  const feed=document.getElementById("feed");
-  const nav=document.getElementById("nav");
+  getState().reactions[id]=type;
+  render();
+}
 
-  feed.innerHTML="";
-  nav.innerHTML="";
+/* render single dispute view */
+function renderDispute(node){
 
-  let s=getState();
+  const children = items.filter(x=>x.parent===node.id);
+  const left = children.filter(c=>c.side==="left");
+  const right = children.filter(c=>c.side==="right");
 
-  if(s.navStack.length){
-    nav.innerHTML=`<div class="nav" onclick="back()">⬅ back</div>`;
-  }
+  const r = getState().reactions[node.id];
 
-  let roots = s.navStack.length
-    ? [find(s.navStack[s.navStack.length-1])]
-    : items.filter(x=>x.parent===null);
+  return `
+    <div class="card">
 
-  function renderNode(node){
+      <div>${node.text} <span class="meta">@${node.user}</span></div>
 
-    const children = items.filter(x=>x.parent===node.id);
-
-    const left = children.filter(c=>c.side==="left");
-    const right = children.filter(c=>c.side==="right");
-
-    const my = s.reactions[node.id];
-
-    return `
-      <div class="card">
-
-        <div>${node.text} <span class="meta">@${node.user}</span></div>
-
-        ${node.user!==currentUser ? `
+      ${node.user!==currentUser ? `
         <div class="actions">
-          <span class="icon ${my==='up'?'active':my?'dim':''}" onclick="react(${node.id},'up')">👍</span>
-          <span class="icon ${my==='down'?'active':my?'dim':''}" onclick="react(${node.id},'down')">👎</span>
-        </div>`:""}
+          <span class="icon ${r==='up'?'active':r?'dim':''}" onclick="react(${node.id},'up')">👍</span>
+          <span class="icon ${r==='down'?'active':r?'dim':''}" onclick="react(${node.id},'down')">👎</span>
+        </div>
+      `:""}
 
-        ${node.type==="question" && node.duel && node.duel.turn===currentUser ? `
-          <div onclick="submitBranch('answer','answer',${node.id},'left')" style="color:#4caf50;cursor:pointer;font-size:12px">answer</div>
-        `:""}
+      <div class="dispute">
 
-        ${node.duel?`<div class="turn">turn: ${node.duel.turn}</div>`:""}
-
-        <div class="dispute">
-
-          <div class="lane">
-            ${left.map(renderNode).join("")}
-          </div>
-
-          <div class="lane">
-            ${right.map(renderNode).join("")}
-          </div>
-
+        <div class="lane">
+          ${left.map(renderDispute).join("")}
         </div>
 
-        ${children.filter(c=>c.type!=="answer").map(c=>`
-          <div class="branch" onclick="enter(${c.id})">
-            ${c.text} →
-          </div>
-        `).join("")}
+        <div class="lane">
+          ${right.map(renderDispute).join("")}
+        </div>
 
       </div>
-    `;
+
+      ${children.map(c=>`
+        <div style="margin-top:6px;cursor:pointer;color:#aaa"
+             onclick="enter(${c.id})">
+          ↳ ${c.text}
+        </div>
+      `).join("")}
+
+    </div>
+  `;
+}
+
+/* main render */
+function render(){
+
+  const view=document.getElementById("view");
+  const nav=document.getElementById("nav");
+
+  view.innerHTML="";
+  nav.innerHTML="";
+
+  const s=getState();
+
+  /* ROOT MODE */
+  if(s.stack.length===0){
+
+    items.filter(x=>x.parent===null).forEach(n=>{
+      view.innerHTML += `
+        <div class="rootItem" onclick="enter(${n.id})">
+          ${n.text} <span class="meta">@${n.user}</span>
+        </div>
+      `;
+    });
+
+    return;
   }
 
-  roots.forEach(r=>{
-    feed.innerHTML += renderNode(r);
-  });
+  /* SINGLE DISPUTE MODE */
+  const current = find(s.stack[s.stack.length-1]);
 
-  const logEl=document.getElementById("log");
-  logEl.innerHTML="";
-  s.logs.slice(-200).forEach(l=>{
-    const d=document.createElement("div");
-    d.textContent=JSON.stringify(l);
-    logEl.appendChild(d);
-  });
+  nav.innerHTML = `<div class="nav" onclick="back()">⬅ back</div>`;
+  view.innerHTML = renderDispute(current);
 }
 
 /* init */
 renderUsers();
 
-/* test data */
-items.push({id:id++,text:"Truth claims should be examined",user:"alice",parent:null,type:"proclaim",side:"left"});
-items.push({id:id++,text:"What defines truth?",user:"bob",parent:0,type:"question",side:"right",duel:{a:"alice",b:"bob",turn:"alice"}});
-items.push({id:id++,text:"Truth is correspondence",user:"charlie",parent:1,type:"proclaim",side:"left"});
-items.push({id:id++,text:"Correspondence assumes realism",user:"bob",parent:2,type:"proclaim",side:"right"});
+/* seed data */
+items.push({id:id++,text:"Truth is structured",user:"alice",parent:null,side:null});
+items.push({id:id++,text:"Structure is interpretation",user:"bob",parent:0,side:"right"});
+items.push({id:id++,text:"Interpretation needs constraints",user:"charlie",parent:1,side:"left"});
+items.push({id:id++,text:"Constraints are subjective",user:"bob",parent:2,side:"right"});
 
 render();
 

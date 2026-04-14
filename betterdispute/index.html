@@ -103,6 +103,16 @@ button{
   font-size:12px;
   border-radius:6px;
 }
+
+/* LOG */
+#log{
+  padding:10px;
+  font-size:11px;
+  color:#7f7;
+  border-top:1px solid #222;
+  max-height:200px;
+  overflow:auto;
+}
 </style>
 </head>
 
@@ -120,25 +130,53 @@ button{
 
 <div id="feed"></div>
 
+<div id="log"></div>
+
 <script>
 
-const VERSION="10.0.0";
+const VERSION="11.0.0";
 document.getElementById("version").innerText="v"+VERSION;
 
-/* =========================
-   STATE
-========================= */
+/* ======================
+   STATE (ONLY SOURCE OF TRUTH)
+====================== */
 
 let users=["alice","bob","charlie"];
 let currentUser="alice";
 
 let id=0;
-
 let items=[];
 
-/* =========================
-   HELPERS (SOURCE OF TRUTH)
-========================= */
+let logs=[];
+
+/* ======================
+   LOGGING (FIXED: STORED STATE)
+====================== */
+
+function log(event,data){
+  logs.push({
+    time:Date.now(),
+    version:VERSION,
+    user:currentUser,
+    event,
+    data
+  });
+  renderLog();
+}
+
+function renderLog(){
+  const el=document.getElementById("log");
+  el.innerHTML="";
+  logs.forEach(l=>{
+    const d=document.createElement("div");
+    d.textContent=JSON.stringify(l);
+    el.appendChild(d);
+  });
+}
+
+/* ======================
+   HELPERS
+====================== */
 
 function find(id){
   return items.find(x=>x.id===id);
@@ -148,9 +186,9 @@ function canInteract(item){
   return item.user !== currentUser;
 }
 
-/* =========================
-   USERS (FIXED FULL RE-RENDER)
-========================= */
+/* ======================
+   USERS (FIXED: ALWAYS RE-RENDER FEED)
+====================== */
 
 function renderUsers(){
   const el=document.getElementById("users");
@@ -159,21 +197,22 @@ function renderUsers(){
   users.forEach(u=>{
     const d=document.createElement("div");
     d.className="user"+(u===currentUser?" active":"");
-    d.innerText=u;
+    d.textContent=u;
 
     d.onclick=()=>{
       currentUser=u;
+      log("switch",{user:u});
       renderUsers();
-      render(); // CRITICAL: recompute everything
+      render(); // CRITICAL FIX
     };
 
     el.appendChild(d);
   });
 }
 
-/* =========================
-   CREATE ROOT
-========================= */
+/* ======================
+   CREATE
+====================== */
 
 function createRoot(){
   const text=document.getElementById("composer").value.trim();
@@ -189,32 +228,31 @@ function createRoot(){
   });
 
   document.getElementById("composer").value="";
+  log("create_root",text);
   render();
 }
 
-/* =========================
-   DISPUTE EXPANSION (ONLY STATE CHANGE)
-========================= */
+/* ======================
+   DISPUTE TOGGLE (STATE ONLY)
+====================== */
 
-function toggleDispute(statementId){
+function toggleDispute(id){
+  const item=find(id);
+  if(!item || !canInteract(item)) return;
 
-  const item=find(statementId);
-  if(!item) return;
-  if(!canInteract(item)) return;
-
-  item.disputeOpen = true; // IMPORTANT: NO TOGGLE BACK (prevents confusion)
+  item.disputeOpen = !item.disputeOpen;
+  log("toggle_dispute",{id,item:item.disputeOpen});
   render();
 }
 
-/* =========================
-   CHILD CREATION (FIXED BINDING)
-========================= */
+/* ======================
+   CHILD CREATION (FIXED RELIABILITY)
+====================== */
 
 function addChild(parentId,text,type){
 
   const parent=find(parentId);
-  if(!parent) return;
-  if(!canInteract(parent)) return;
+  if(!parent || !canInteract(parent)) return;
 
   items.push({
     id:id++,
@@ -224,95 +262,101 @@ function addChild(parentId,text,type){
     parent:parentId,
     disputeOpen:false
   });
+
+  log("child_created",{parentId,text,type});
 }
 
-/* =========================
-   SUBMIT LEFT / RIGHT
-========================= */
+/* ======================
+   SUBMIT (FIXED: ALWAYS CLOSES UI VIA RERENDER)
+====================== */
 
 function submitLeft(parentId){
-  const val=document.getElementById("l-"+parentId).value.trim();
-  if(!val) return;
+  const v=document.getElementById("l-"+parentId).value.trim();
+  if(!v) return;
 
-  addChild(parentId,val,"question");
+  addChild(parentId,v,"question");
+  document.getElementById("l-"+parentId).value="";
   render();
 }
 
 function submitRight(parentId){
-  const val=document.getElementById("r-"+parentId).value.trim();
-  if(!val) return;
+  const v=document.getElementById("r-"+parentId).value.trim();
+  if(!v) return;
 
-  addChild(parentId,val,"proclaim");
+  addChild(parentId,v,"proclaim");
+  document.getElementById("r-"+parentId).value="";
   render();
 }
 
-/* =========================
+/* ======================
    ACTIONS
-========================= */
+====================== */
 
 function agree(id){
   const item=find(id);
   if(!item || !canInteract(item)) return;
+
+  log("agree",{id});
 }
 
-/* =========================
-   RENDER (PURE STATE FUNCTION)
-========================= */
+/* ======================
+   RENDER (FULL REBUILD EVERY TIME)
+====================== */
 
 function render(){
 
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  items
-    .filter(x=>x.parent===null)
-    .forEach(item=>{
+  items.filter(x=>x.parent===null)
+       .forEach(item=>{
 
-      const disabled = !canInteract(item);
+    const disabled = !canInteract(item);
 
-      const div=document.createElement("div");
+    const div=document.createElement("div");
 
-      div.innerHTML=`
-        <div class="card">
-          <div class="text">${item.text}</div>
-          <div class="meta">@${item.user}</div>
+    div.innerHTML=`
+      <div class="card">
+        <div class="text">${item.text}</div>
+        <div class="meta">@${item.user}</div>
 
-          <div class="actions">
-            <button onclick="agree(${item.id})" ${disabled?'disabled':''}>Agree</button>
-            <button onclick="toggleDispute(${item.id})" ${disabled?'disabled':''}>Disagree</button>
-          </div>
-
-          <div class="dispute ${item.disputeOpen?'open':''}">
-            <div class="col">
-              <div>Challenge</div>
-              <input class="input" id="l-${item.id}" placeholder="Ask / challenge...">
-              <button onclick="submitLeft(${item.id})">Submit</button>
-            </div>
-
-            <div class="col">
-              <div>Counter</div>
-              <input class="input" id="r-${item.id}" placeholder="Proclaim counter...">
-              <button onclick="submitRight(${item.id})">Submit</button>
-            </div>
-          </div>
-
+        <div class="actions">
+          <button onclick="agree(${item.id})" ${disabled?'disabled':''}>Agree</button>
+          <button onclick="toggleDispute(${item.id})" ${disabled?'disabled':''}>Disagree</button>
         </div>
-      `;
 
-      feed.appendChild(div);
-    });
+        <div class="dispute ${item.disputeOpen?'open':''}">
+          <div class="col">
+            <div>Challenge</div>
+            <input class="input" id="l-${item.id}" placeholder="Ask / challenge...">
+            <button onclick="submitLeft(${item.id})">Submit</button>
+          </div>
+
+          <div class="col">
+            <div>Counter</div>
+            <input class="input" id="r-${item.id}" placeholder="Proclaim counter...">
+            <button onclick="submitRight(${item.id})">Submit</button>
+          </div>
+        </div>
+
+      </div>
+    `;
+
+    feed.appendChild(div);
+  });
 }
 
-/* =========================
+/* ======================
    INIT
-========================= */
+====================== */
 
 renderUsers();
 render();
+renderLog();
 
 /* seed */
-items.push({id:id++,text:"All claims are contestable",type:"proclaim",user:"alice",parent:null,disputeOpen:false});
-items.push({id:id++,text:"Some claims resist contestation",type:"proclaim",user:"bob",parent:null,disputeOpen:false});
+items.push({id:id++,text:"All claims can be challenged",type:"proclaim",user:"alice",parent:null,disputeOpen:false});
+items.push({id:id++,text:"Some claims resist challenge",type:"proclaim",user:"bob",parent:null,disputeOpen:false});
 
 render();
 

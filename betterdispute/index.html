@@ -38,14 +38,6 @@ header{
 
 .user.active{opacity:1;border-color:#fff}
 
-#composer{
-  width:100%;
-  height:70px;
-  background:#0b0b0b;
-  border:1px solid #333;
-  color:#eee;
-}
-
 #feed{padding:10px}
 
 .card{
@@ -69,12 +61,12 @@ button{
   font-size:12px;
 }
 
-/* SPLIT LANES */
+/* DISPUTE */
 .lanes{
   display:none;
-  margin-top:10px;
   grid-template-columns:1fr 1fr;
   gap:10px;
+  margin-top:10px;
 }
 
 .lanes.open{display:grid}
@@ -83,34 +75,50 @@ button{
   background:#141414;
   padding:8px;
   border-radius:8px;
-  min-height:60px;
 }
 
-.input{
+/* MODAL */
+#modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.8);
+  align-items:center;
+  justify-content:center;
+}
+
+#modal.open{display:flex}
+
+.modalBox{
+  width:90%;
+  max-width:420px;
+  background:#1a1a1a;
+  padding:12px;
+  border-radius:10px;
+}
+
+input{
   width:100%;
   margin-top:6px;
   background:#0b0b0b;
   border:1px solid #333;
   color:#eee;
-  padding:6px;
-  font-size:12px;
+  padding:8px;
   border-radius:6px;
 }
 
-.child{
-  margin-left:10px;
-  border-left:2px solid #333;
-  padding-left:10px;
-  margin-top:8px;
+.modalBtns{
+  display:flex;
+  gap:6px;
+  margin-top:10px;
 }
 
-/* LOG */
 #log{
   padding:10px;
   font-size:11px;
   color:#7f7;
   border-top:1px solid #222;
-  max-height:160px;
+  max-height:140px;
   overflow:auto;
 }
 </style>
@@ -131,12 +139,27 @@ button{
 <div id="feed"></div>
 <div id="log"></div>
 
+<!-- MODAL -->
+<div id="modal">
+  <div class="modalBox">
+    <div id="modalTitle"></div>
+
+    <input id="askInput" placeholder="Ask">
+    <input id="proclaimInput" placeholder="Proclaim">
+
+    <div class="modalBtns">
+      <button onclick="submitAsk()">Submit Ask</button>
+      <button onclick="submitProclaim()">Submit Proclaim</button>
+      <button onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 
-const VERSION="14.0.0";
+const VERSION="15.0.0";
 document.getElementById("version").innerText="v"+VERSION;
 
-/* STATE */
 let users=["alice","bob","charlie"];
 let currentUser="alice";
 
@@ -144,15 +167,20 @@ let id=0;
 let items=[];
 let logs=[];
 
+let activeTarget=null;
+
 /* LOG */
 function log(e,data){
   logs.push({t:Date.now(),u:currentUser,e,data});
 }
 
-/* HELPERS */
-function find(id){ return items.find(x=>x.id===id); }
+/* STARTUP LOG */
+log("startup",{version:VERSION});
 
-/* HARD RULE: no self interaction EVER */
+/* HELPERS */
+function find(id){return items.find(x=>x.id===id);}
+
+/* STRICT SELF BLOCK */
 function canInteract(item){
   return item.user !== currentUser;
 }
@@ -165,16 +193,19 @@ function renderUsers(){
     const d=document.createElement("div");
     d.className="user"+(u===currentUser?" active":"");
     d.textContent=u;
+
     d.onclick=()=>{
       currentUser=u;
       renderUsers();
-      render();
+      render(); // CRITICAL FIX
+      log("switch",{u});
     };
+
     el.appendChild(d);
   });
 }
 
-/* CREATE ROOT */
+/* CREATE */
 function createRoot(){
   const text=document.getElementById("composer").value.trim();
   if(!text) return;
@@ -182,110 +213,77 @@ function createRoot(){
   items.push({
     id:id++,
     text,
-    type:"proclaim",
     user:currentUser,
     parent:null,
-    open:true,
-    side:null
+    open:false
   });
 
   document.getElementById("composer").value="";
+  render();
   log("create",{text});
+}
+
+/* DISPUTE OPEN */
+function openDispute(item){
+  if(!item || !canInteract(item)) return;
+  item.open=true;
   render();
+  log("dispute_open",{id:item.id});
 }
 
-/* DISPUTE = ALWAYS SPLIT */
-function toggleDispute(id){
-
-  const item=find(id);
-  if(!item) return;
-
-  if(!canInteract(item)) return; // HARD BLOCK
-
-  // ALWAYS FORCE SPLIT OPEN
-  item.open = true;
-
-  // create two lane placeholders if not exist
-  if(!item.left) item.left=[];
-  if(!item.right) item.right=[];
-
-  log("dispute_split",{id});
-  render();
+/* MODAL CONTROL */
+function openModal(id){
+  activeTarget=id;
+  document.getElementById("modal").classList.add("open");
+  document.getElementById("askInput").value="";
+  document.getElementById("proclaimInput").value="";
 }
 
-/* CHILD ROUTING INTO LANES */
-function addLeft(parentId,text){
-  const p=find(parentId);
-  if(!p || p.user===currentUser) return;
-
-  if(!p.left) p.left=[];
-  p.left.push({id:id++,text,user:currentUser});
-  log("left",{parentId,text});
-}
-
-function addRight(parentId,text){
-  const p=find(parentId);
-  if(!p || p.user===currentUser) return;
-
-  if(!p.right) p.right=[];
-  p.right.push({id:id++,text,user:currentUser});
-  log("right",{parentId,text});
+function closeModal(){
+  activeTarget=null;
+  document.getElementById("modal").classList.remove("open");
 }
 
 /* SUBMIT */
-function submitLeft(id){
-  const v=document.getElementById("l-"+id).value.trim();
+function submitAsk(){
+  const v=document.getElementById("askInput").value.trim();
   if(!v) return;
-  addLeft(id,v);
+
+  items.push({
+    id:id++,
+    text:v,
+    user:currentUser,
+    parent:activeTarget,
+    type:"ask"
+  });
+
+  closeModal();
   render();
+  log("ask",{activeTarget,v});
 }
 
-function submitRight(id){
-  const v=document.getElementById("r-"+id).value.trim();
+function submitProclaim(){
+  const v=document.getElementById("proclaimInput").value.trim();
   if(!v) return;
-  addRight(id,v);
+
+  items.push({
+    id:id++,
+    text:v,
+    user:currentUser,
+    parent:activeTarget,
+    type:"proclaim"
+  });
+
+  closeModal();
   render();
+  log("proclaim",{activeTarget,v});
 }
 
-/* AGREEMENT (STRICT SELF BLOCK) */
+/* AGREEMENT (SELF BLOCKED) */
 function agree(id){
   const item=find(id);
-  if(!item) return;
-  if(item.user===currentUser) return;
+  if(!item || item.user===currentUser) return;
   log("agree",{id});
-}
-
-/* RENDER NODE */
-function renderNode(item){
-
-  const disabled = (item.user === currentUser);
-
-  let html=`
-  <div class="card">
-    <div class="text">${item.text}</div>
-    <div class="meta">@${item.user}</div>
-
-    <div class="actions">
-      <button onclick="agree(${item.id})" ${disabled?'disabled':''}>Agree</button>
-      <button onclick="toggleDispute(${item.id})" ${disabled?'disabled':''}>Disagree</button>
-    </div>
-
-    <div class="lanes ${item.open?'open':''}">
-      <div class="lane">
-        <div>Challenge</div>
-        <input class="input" id="l-${item.id}" placeholder="Ask / challenge...">
-        <button onclick="submitLeft(${item.id})">Submit</button>
-      </div>
-
-      <div class="lane">
-        <div>Counter</div>
-        <input class="input" id="r-${item.id}" placeholder="Proclaim counter...">
-        <button onclick="submitRight(${item.id})">Submit</button>
-      </div>
-    </div>
-  `;
-
-  return html + `</div>`;
 }
 
 /* RENDER */
@@ -294,10 +292,33 @@ function render(){
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  items.forEach(i=>{
-    if(i.parent===null){
-      feed.innerHTML += renderNode(i);
-    }
+  items.filter(x=>x.parent===null)
+  .forEach(root=>{
+
+    const disabled = root.user===currentUser;
+
+    let children = items.filter(x=>x.parent===root.id);
+
+    let childHtml = children.map(c=>
+      `<div style="margin-left:10px;border-left:2px solid #333;padding-left:8px;margin-top:6px;">
+        ${c.text} <span style="color:#888">@${c.user}</span>
+      </div>`
+    ).join("");
+
+    feed.innerHTML += `
+      <div class="card">
+        <div class="text">${root.text}</div>
+        <div class="meta">@${root.user}</div>
+
+        <div class="actions">
+          <button onclick="agree(${root.id})" ${disabled?'disabled':''}>Agree</button>
+          <button onclick="openDispute(find(${root.id}))" ${disabled?'disabled':''}>Disagree</button>
+          <button onclick="openModal(${root.id})" ${disabled?'disabled':''}>Respond</button>
+        </div>
+
+        ${childHtml}
+      </div>
+    `;
   });
 
   const logEl=document.getElementById("log");
@@ -312,9 +333,6 @@ function render(){
 /* INIT */
 renderUsers();
 render();
-
-/* seed */
-items.push({id:id++,text:"All claims can be challenged",user:"alice",parent:null,open:false});
 
 </script>
 

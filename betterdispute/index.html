@@ -1,177 +1,191 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Better Dispute</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
-body { background:#0f0f0f; color:#eee; font-size:14px; }
-
-.node {
-  border-left:2px solid #333;
-  margin-left:10px;
-  padding-left:10px;
-  margin-top:10px;
+body{
+  background:#0f0f0f;
+  color:#eee;
+  font-size:14px;
 }
 
-.card-node {
+h5{
+  text-align:center;
+  margin-bottom:10px;
+}
+
+.container{
+  max-width:1000px;
+}
+
+.columns{
+  display:flex;
+  gap:10px;
+}
+
+.col{
+  flex:1;
+  background:#141414;
+  border-radius:8px;
+  padding:10px;
+  min-height:80vh;
+}
+
+.claim{
+  background:#1f1f1f;
   padding:8px;
   border-radius:6px;
-  margin-bottom:6px;
-  background:#1b1b1b;
+  margin-bottom:8px;
 }
 
-.meta { font-size:11px; color:#aaa; }
-
-.chat {
-  margin-left:12px;
+.meta{
   font-size:11px;
-  color:#bbb;
-  border-left:2px dashed #555;
-  padding-left:6px;
+  color:#aaa;
 }
 
-button { font-size:11px!important; margin-right:3px; }
-
-.resolved-supported {
-  border-left:4px solid #3ddc84;
+.flow{
+  margin-left:10px;
+  border-left:2px solid #333;
+  padding-left:8px;
 }
 
-.resolved-rejected {
-  border-left:4px solid #ff4d4d;
+button{
+  font-size:11px !important;
+  margin-right:5px;
 }
 
-.resolved-unresolved {
-  border-left:4px solid #666;
+.modal{
+  display:none;
+  position:fixed;
+  top:20%;
+  left:50%;
+  transform:translateX(-50%);
+  background:#222;
+  padding:15px;
+  border-radius:8px;
+  width:300px;
+  z-index:999;
 }
 
-.badge {
-  font-size:10px;
-  margin-top:4px;
+textarea{
+  width:100%;
+  height:80px;
+  background:#111;
+  color:#eee;
+  border:1px solid #444;
 }
 </style>
 </head>
 
 <body>
 
-<div class="container p-2">
+<div class="container">
 
-<h5 class="text-center">⚖️ Better Dispute</h5>
+<h5>Better Dispute</h5>
 
-<div class="small mb-2">
-Users are actively disputing and resolving nodes based on votes.
+<div class="columns">
+
+  <div class="col">
+    <b>Continuing</b>
+    <div id="agreeCol"></div>
+  </div>
+
+  <div class="col">
+    <b>Disputed</b>
+    <div id="disagreeCol"></div>
+  </div>
+
 </div>
 
-<div id="root"></div>
+</div>
 
+<!-- CHALLENGE MODAL -->
+<div id="modal" class="modal">
+  <div id="modalTitle"></div>
+
+  <select id="mode" class="form-control mb-2">
+    <option value="claim">Make Counter-Claim</option>
+    <option value="question">Ask Question</option>
+  </select>
+
+  <textarea id="text"></textarea>
+
+  <button class="btn btn-sm btn-success mt-2" onclick="submitChallenge()">Submit</button>
+  <button class="btn btn-sm btn-secondary mt-2" onclick="closeModal()">Cancel</button>
 </div>
 
 <script>
 
 //////////////////////
-// DATA
+// DATA MODEL
 //////////////////////
 
-let id = 0;
-let nodes = [];
+let id=0;
 
-let users = ["alice","bob","charlie"];
-let currentUser = "alice";
+let claims=[
+  {
+    id:id++,
+    text:"Root claim: something is happening",
+    side:"agree"
+  }
+];
 
-function find(i){ return nodes.find(n=>n.id===i); }
+let activeTarget=null;
 
-function score(n){
-  return (n.votes.agree.length - n.votes.disagree.length);
+//////////////////////
+// UI HELPERS
+//////////////////////
+
+function openModal(id){
+  activeTarget=id;
+  document.getElementById("modal").style.display="block";
+}
+
+function closeModal(){
+  document.getElementById("modal").style.display="none";
+  document.getElementById("text").value="";
 }
 
 //////////////////////
-// RESOLUTION ENGINE (DERIVED ONLY)
+// CORE ACTIONS
 //////////////////////
 
-function resolution(n){
-
-  let s = score(n);
-
-  if(s >= 3) return "supported";
-  if(s <= -3) return "rejected";
-  return "unresolved";
+function continueClaim(id){
+  // for now: just duplicate continuation into agree column
+  let c=claims.find(x=>x.id===id);
+  claims.push({
+    id:id++,
+    text:c.text+" (continued)",
+    side:"agree"
+  });
+  render();
 }
 
-//////////////////////
-// CREATE
-//////////////////////
+function challengeClaim(id){
+  openModal(id);
+}
 
-function create(text,type,parent=null){
+function submitChallenge(){
 
-  let n = {
+  let mode=document.getElementById("mode").value;
+  let text=document.getElementById("text").value;
+
+  if(!text) return;
+
+  claims.push({
     id:id++,
     text,
-    type,
-    user:currentUser,
-    parent,
-    children:[],
-    votes:{agree:[],disagree:[]},
-    chat:[]
-  };
+    side:"disagree",
+    parent:activeTarget,
+    type:mode
+  });
 
-  nodes.push(n);
-
-  if(parent!==null){
-    let p = find(parent);
-    if(p) p.children.push(n.id);
-  }
-
-  return n;
-}
-
-//////////////////////
-// ACTIONS
-//////////////////////
-
-function interact(id){
-
-  let mode = prompt("1 Proclaim\n2 Question\n3 Answer");
-
-  if(mode==="1"){
-    let t = prompt("Proclamation:");
-    if(t) create(t,"proclamation",id);
-  }
-
-  if(mode==="2"){
-    let t = prompt("Question:");
-    if(t) create(t,"question",id);
-  }
-
-  if(mode==="3"){
-    let t = prompt("Answer:");
-    if(t) create(t,"answer",id);
-  }
-
-  render();
-}
-
-function voteAgree(id){
-  let n = find(id);
-  n.votes.disagree = n.votes.disagree.filter(u=>u!==currentUser);
-  if(!n.votes.agree.includes(currentUser)) n.votes.agree.push(currentUser);
-  render();
-}
-
-function voteDisagree(id){
-  let n = find(id);
-  n.votes.agree = n.votes.agree.filter(u=>u!==currentUser);
-  if(!n.votes.disagree.includes(currentUser)) n.votes.disagree.push(currentUser);
-  render();
-}
-
-function chat(id){
-  let n = find(id);
-  let t = prompt("Chat:");
-  if(!t) return;
-  n.chat.push({user:currentUser,text:t,time:Date.now()});
+  closeModal();
   render();
 }
 
@@ -181,66 +195,38 @@ function chat(id){
 
 function render(){
 
-  let el = document.getElementById("root");
-  el.innerHTML="";
+  let agreeCol=document.getElementById("agreeCol");
+  let disagreeCol=document.getElementById("disagreeCol");
 
-  nodes.filter(n=>n.parent===null)
-       .forEach(n=>renderNode(n,el));
-}
+  agreeCol.innerHTML="";
+  disagreeCol.innerHTML="";
 
-function renderNode(n,container){
+  claims.forEach(c=>{
 
-  let div = document.createElement("div");
+    let div=document.createElement("div");
+    div.className="claim";
 
-  let s = score(n);
-  let r = resolution(n);
+    div.innerHTML=`
+      ${c.text}
+      <div class="meta">${c.type||"claim"}</div>
 
-  let cls =
-    r==="supported" ? "resolved-supported" :
-    r==="rejected" ? "resolved-rejected" :
-    "resolved-unresolved";
+      <button onclick="continueClaim(${c.id})">Continue</button>
+      <button onclick="challengeClaim(${c.id})">Disagree</button>
+    `;
 
-  div.className = "card-node "+cls;
+    if(c.side==="agree"){
+      agreeCol.appendChild(div);
+    }else{
+      disagreeCol.appendChild(div);
+    }
 
-  div.innerHTML = `
-<b>${n.type.toUpperCase()}</b>: ${n.text}
-
-<div class="meta">
-@${n.user} | score: ${s}
-</div>
-
-<div class="badge">
-Resolution: ${r.toUpperCase()}
-</div>
-
-<button onclick="interact(${n.id})">Interact</button>
-<button onclick="voteAgree(${n.id})">👍</button>
-<button onclick="voteDisagree(${n.id})">👎</button>
-<button onclick="chat(${n.id})">Chat</button>
-`;
-
-  container.appendChild(div);
-
-  n.chat.forEach(c=>{
-    let d=document.createElement("div");
-    d.className="chat";
-    d.innerText=`${c.user}: ${c.text}`;
-    container.appendChild(d);
   });
-
-  let box=document.createElement("div");
-  box.className="node";
-  container.appendChild(box);
-
-  n.children.map(find).filter(Boolean)
-    .forEach(c=>renderNode(c,box));
 }
 
 //////////////////////
 // INIT
 //////////////////////
 
-create("Root Dispute Node","proclamation",null);
 render();
 
 </script>

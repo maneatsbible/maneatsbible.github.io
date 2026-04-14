@@ -36,20 +36,9 @@ header{
   opacity:0.6;
 }
 
-.user.active{
-  opacity:1;
-  border-color:#fff;
-}
+.user.active{opacity:1;border-color:#fff}
 
-#composer{
-  width:100%;
-  height:70px;
-  background:#0b0b0b;
-  border:1px solid #333;
-  color:#eee;
-}
-
-#feed{padding:10px;}
+#feed{padding:10px}
 
 .card{
   background:#1a1a1a;
@@ -76,12 +65,12 @@ button{
   font-size:12px;
 }
 
-/* dispute */
+/* DISPUTE VIEW */
 .dispute{
   display:none;
+  margin-top:10px;
   grid-template-columns:1fr 1fr;
   gap:10px;
-  margin-top:10px;
 }
 
 .dispute.open{display:grid}
@@ -92,14 +81,40 @@ button{
   border-radius:8px;
 }
 
-.input{
+/* POPUP */
+#popup{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.85);
+  align-items:center;
+  justify-content:center;
+}
+
+#popup.open{display:flex}
+
+.box{
+  width:90%;
+  max-width:420px;
+  background:#1a1a1a;
+  padding:12px;
+  border-radius:10px;
+}
+
+input{
   width:100%;
   margin-top:6px;
   background:#0b0b0b;
   border:1px solid #333;
   color:#eee;
-  padding:6px;
+  padding:8px;
   border-radius:6px;
+}
+
+.actionsRow{
+  display:flex;
+  gap:6px;
+  margin-top:10px;
 }
 
 /* nested */
@@ -137,9 +152,25 @@ button{
 <div id="feed"></div>
 <div id="log"></div>
 
+<!-- POPUP -->
+<div id="popup">
+  <div class="box">
+    <div id="popupTitle"></div>
+
+    <input id="askField" placeholder="Ask">
+    <input id="proclaimField" placeholder="Proclaim">
+
+    <div class="actionsRow">
+      <button onclick="submitAsk()">Submit Ask</button>
+      <button onclick="submitProclaim()">Submit Proclaim</button>
+      <button onclick="closePopup()">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 
-let VERSION = 16;
+let VERSION = 17;
 document.getElementById("version").innerText = VERSION;
 
 let users=["alice","bob","charlie"];
@@ -148,6 +179,8 @@ let currentUser="alice";
 let id=0;
 let items=[];
 let logs=[];
+
+let activeTarget=null;
 
 /* LOG */
 function log(e,data){
@@ -165,7 +198,6 @@ function isOwner(item){
 function renderUsers(){
   const el=document.getElementById("users");
   el.innerHTML="";
-
   users.forEach(u=>{
     const d=document.createElement("div");
     d.className="user"+(u===currentUser?" active":"");
@@ -175,14 +207,13 @@ function renderUsers(){
       currentUser=u;
       renderUsers();
       render();
-      log("switch",u);
     };
 
     el.appendChild(d);
   });
 }
 
-/* CREATE ROOT */
+/* CREATE */
 function createRoot(){
   const text=document.getElementById("composer").value.trim();
   if(!text) return;
@@ -190,10 +221,8 @@ function createRoot(){
   items.push({
     id:id++,
     text,
-    type:"proclaim",
     user:currentUser,
     parent:null,
-    dispute:false,
     open:false
   });
 
@@ -202,52 +231,61 @@ function createRoot(){
   log("create",text);
 }
 
-/* DISPUTE OPEN = SPLIT */
-function toggleDispute(id){
+/* DISAGREE => OPEN POPUP */
+function openDispute(id){
   const item=find(id);
   if(!item || isOwner(item)) return;
 
-  item.dispute=true;
-  item.open=true;
+  activeTarget=id;
 
-  render();
-  log("dispute",id);
+  document.getElementById("askField").value="";
+  document.getElementById("proclaimField").value="";
+
+  document.getElementById("popup").classList.add("open");
+  log("dispute_open",id);
 }
 
-/* SUBMIT LEFT/RIGHT */
-function submitLeft(id){
-  const v=document.getElementById("l-"+id).value.trim();
+function closePopup(){
+  activeTarget=null;
+  document.getElementById("popup").classList.remove("open");
+}
+
+/* SUBMIT */
+function submitAsk(){
+  const v=document.getElementById("askField").value.trim();
   if(!v) return;
 
   items.push({
-    id:idCounter++,
+    id:id++,
     text:v,
     type:"question",
     user:currentUser,
-    parent:id
+    parent:activeTarget
   });
 
+  closePopup();
   render();
   log("ask",v);
 }
 
-function submitRight(id){
-  const v=document.getElementById("r-"+id).value.trim();
+function submitProclaim(){
+  const v=document.getElementById("proclaimField").value.trim();
   if(!v) return;
 
   items.push({
-    id:idCounter++,
+    id:id++,
     text:v,
     type:"proclaim",
     user:currentUser,
-    parent:id
+    parent:activeTarget
   });
 
+  closePopup();
   render();
   log("proclaim",v);
 }
 
-/* AGREEMENT */
+/* AGREEMENT (HARD BLOCK SELF) */
 function agree(id){
   const item=find(id);
   if(!item || isOwner(item)) return;
@@ -264,7 +302,7 @@ function render(){
 
   roots.forEach(item=>{
 
-    const blocked = isOwner(item);
+    const blocked = isOwner(item); // CRITICAL FIX
 
     const children = items.filter(x=>x.parent===item.id);
 
@@ -279,21 +317,7 @@ function render(){
 
         <div class="actions">
           <button onclick="agree(${item.id})" ${blocked?'disabled':''}>Agree</button>
-          <button onclick="toggleDispute(${item.id})" ${blocked?'disabled':''}>Disagree</button>
-        </div>
-
-        <div class="dispute ${item.open?'open':''}">
-          <div class="lane">
-            <div>Ask</div>
-            <input class="input" id="l-${item.id}">
-            <button onclick="submitLeft(${item.id})">Submit</button>
-          </div>
-
-          <div class="lane">
-            <div>Proclaim</div>
-            <input class="input" id="r-${item.id}">
-            <button onclick="submitRight(${item.id})">Submit</button>
-          </div>
+          <button onclick="openDispute(${item.id})" ${blocked?'disabled':''}>Disagree</button>
         </div>
 
         ${childHtml}
@@ -313,7 +337,6 @@ function render(){
 /* INIT */
 renderUsers();
 render();
-log("startup","v"+VERSION);
 
 </script>
 

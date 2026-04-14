@@ -71,15 +71,29 @@ header{
   font-size:20px;
   cursor:pointer;
   user-select:none;
-  opacity:0.9; /* BOTH BRIGHT DEFAULT */
-  transition:0.15s;
+  opacity:0.9;
 }
 
-.icon.dim{
-  opacity:0.25;
+.icon.dim{opacity:0.25}
+
+.state{
+  font-size:12px;
+  color:#aaa;
+  margin-left:6px;
 }
 
-.icon:hover{opacity:1}
+.dispute{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:10px;
+}
+
+.lane{
+  background:#141414;
+  padding:8px;
+  border-radius:8px;
+}
 
 /* POPUP */
 #popup{
@@ -103,12 +117,12 @@ header{
 
 .title{
   font-weight:600;
-  margin-bottom:10px;
+  margin-bottom:8px;
 }
 
 textarea.input{
   width:100%;
-  height:80px;
+  height:90px;
   background:#0b0b0b;
   border:1px solid #333;
   color:#eee;
@@ -118,6 +132,7 @@ textarea.input{
   margin-top:8px;
 }
 
+/* active buttons always bright */
 .row{
   display:flex;
   justify-content:space-between;
@@ -125,9 +140,9 @@ textarea.input{
 }
 
 .iconBtn{
-  font-size:20px;
+  font-size:22px;
   cursor:pointer;
-  opacity:1; /* ALWAYS FULL BRIGHT */
+  opacity:1;
 }
 
 /* LOG */
@@ -174,7 +189,7 @@ textarea.input{
 
 <script>
 
-let VERSION=23;
+let VERSION=24;
 document.getElementById("version").innerText="v"+VERSION;
 
 let users=["alice","bob","charlie"];
@@ -184,21 +199,32 @@ let id=0;
 let items=[];
 let logs=[];
 
-let reactions={};     // {id:{user:"up"|"down"}}
+let reactions={};
 let active=null;
 let disagreed={};
 
-/* LOG */
 function log(e,d){
-  logs.push({t:new Date().toISOString(),u:currentUser,e,d});
+  logs.push({
+    t:new Date().toISOString(),
+    u:currentUser,
+    e,
+    d
+  });
 }
 
-/* HELP */
+/* FIX: always render fresh log */
+function renderLog(){
+  const el=document.getElementById("log");
+  el.innerHTML="";
+  logs.slice(-200).forEach(l=>{
+    const d=document.createElement("div");
+    d.textContent=JSON.stringify(l);
+    el.appendChild(d);
+  });
+}
+
 function find(i){return items.find(x=>x.id===i);}
-
-function isOwner(item){
-  return item.user===currentUser;
-}
+function isOwner(item){return item.user===currentUser;}
 
 /* USERS */
 function renderUsers(){
@@ -238,7 +264,7 @@ function createRoot(){
   log("create",t);
 }
 
-/* REACTION */
+/* REACT */
 function react(i,type){
   const item=find(i);
   if(!item || isOwner(item)) return;
@@ -252,7 +278,7 @@ function react(i,type){
   log(type,i);
 }
 
-/* OPEN DISPUTE */
+/* DISPUTE */
 function openDispute(i){
   const item=find(i);
   if(!item || isOwner(item)) return;
@@ -278,7 +304,7 @@ function submitDispute(){
   const c=document.getElementById("challenge").value.trim();
   const p=document.getElementById("counter").value.trim();
 
-  if(!c && !p) return;
+  if(!c && !p) return; // allow either empty
 
   if(c){
     items.push({
@@ -337,21 +363,21 @@ function render(){
         <div class="actions">
           <span class="icon ${my==='up'?'':'dim'}" onclick="react(${r.id},'up')">👍</span>
           <span class="icon ${my==='down'?'':'dim'}" onclick="react(${r.id},'down')">👎</span>
+          <span class="state">${my || '—'}</span>
         </div>
         ` : ""}
+
+        <div class="dispute">
+          <div class="lane"></div>
+          <div class="lane"></div>
+        </div>
 
         ${childHtml}
       </div>
     `;
   });
 
-  const logEl=document.getElementById("log");
-  logEl.innerHTML="";
-  logs.forEach(l=>{
-    const d=document.createElement("div");
-    d.textContent=JSON.stringify(l);
-    logEl.appendChild(d);
-  });
+  renderLog(); // FIX: always latest
 }
 
 /* INIT */

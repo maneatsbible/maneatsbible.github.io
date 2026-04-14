@@ -1,234 +1,160 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Better Dispute</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Better Dispute</title>
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<style>
-body{
-  background:#0f0f0f;
-  color:#eee;
-  font-size:14px;
-}
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+    }
+    .column {
+      min-height: 70vh;
+      border: 1px solid #444;
+      border-radius: 10px;
+      padding: 10px;
+      background: #1a1a1a;
+    }
+    .message {
+      margin-bottom: 10px;
+      padding: 8px;
+      border-radius: 6px;
+    }
+    .proclamation { background: #2a2a2a; }
+    .question { background: #1f3a5f; }
+    .answer { background: #1f5f3a; }
 
-h5{
-  text-align:center;
-  margin-bottom:10px;
-}
+    .locked {
+      opacity: 0.4;
+      pointer-events: none;
+    }
 
-.container{
-  max-width:1000px;
-}
-
-.columns{
-  display:flex;
-  gap:10px;
-}
-
-.col{
-  flex:1;
-  background:#141414;
-  border-radius:8px;
-  padding:10px;
-  min-height:80vh;
-}
-
-.claim{
-  background:#1f1f1f;
-  padding:8px;
-  border-radius:6px;
-  margin-bottom:8px;
-}
-
-.meta{
-  font-size:11px;
-  color:#aaa;
-}
-
-.flow{
-  margin-left:10px;
-  border-left:2px solid #333;
-  padding-left:8px;
-}
-
-button{
-  font-size:11px !important;
-  margin-right:5px;
-}
-
-.modal{
-  display:none;
-  position:fixed;
-  top:20%;
-  left:50%;
-  transform:translateX(-50%);
-  background:#222;
-  padding:15px;
-  border-radius:8px;
-  width:300px;
-  z-index:999;
-}
-
-textarea{
-  width:100%;
-  height:80px;
-  background:#111;
-  color:#eee;
-  border:1px solid #444;
-}
-</style>
+    .score {
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+  </style>
 </head>
-
 <body>
 
-<div class="container">
+<div class="container-fluid p-2">
+  <h4 class="text-center mb-3">⚖️ Better Dispute</h4>
 
-<h5>Better Dispute</h5>
+  <div class="row g-2">
+    <!-- LEFT SIDE -->
+    <div class="col-6">
+      <div class="column" id="leftColumn"></div>
 
-<div class="columns">
+      <div class="mt-2">
+        <select id="leftType" class="form-select mb-1">
+          <option value="proclamation">Proclamation</option>
+          <option value="question">Question</option>
+          <option value="answer">Answer</option>
+        </select>
+        <textarea id="leftInput" class="form-control mb-1" placeholder="Enter message"></textarea>
+        <button class="btn btn-primary w-100" onclick="submitMessage('left')">Send</button>
+      </div>
 
-  <div class="col">
-    <b>Continuing</b>
-    <div id="agreeCol"></div>
+      <div class="score mt-2">
+        Unanswered: <span id="leftUnanswered">0</span>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDE -->
+    <div class="col-6">
+      <div class="column" id="rightColumn"></div>
+
+      <div class="mt-2">
+        <select id="rightType" class="form-select mb-1">
+          <option value="proclamation">Proclamation</option>
+          <option value="question">Question</option>
+          <option value="answer">Answer</option>
+        </select>
+        <textarea id="rightInput" class="form-control mb-1" placeholder="Enter message"></textarea>
+        <button class="btn btn-danger w-100" onclick="submitMessage('right')">Send</button>
+      </div>
+
+      <div class="score mt-2">
+        Unanswered: <span id="rightUnanswered">0</span>
+      </div>
+    </div>
   </div>
-
-  <div class="col">
-    <b>Disputed</b>
-    <div id="disagreeCol"></div>
-  </div>
-
-</div>
-
-</div>
-
-<!-- CHALLENGE MODAL -->
-<div id="modal" class="modal">
-  <div id="modalTitle"></div>
-
-  <select id="mode" class="form-control mb-2">
-    <option value="claim">Make Counter-Claim</option>
-    <option value="question">Ask Question</option>
-  </select>
-
-  <textarea id="text"></textarea>
-
-  <button class="btn btn-sm btn-success mt-2" onclick="submitChallenge()">Submit</button>
-  <button class="btn btn-sm btn-secondary mt-2" onclick="closeModal()">Cancel</button>
 </div>
 
 <script>
-
-//////////////////////
-// DATA MODEL
-//////////////////////
-
-let id=0;
-
-let claims=[
-  {
-    id:id++,
-    text:"Root claim: something is happening",
-    side:"agree"
+let state = {
+  pendingQuestion: null, // { to: 'left'|'right' }
+  unanswered: {
+    left: 0,
+    right: 0
   }
-];
+};
 
-let activeTarget=null;
+function submitMessage(side) {
+  const input = document.getElementById(side + "Input");
+  const type = document.getElementById(side + "Type").value;
+  const text = input.value.trim();
 
-//////////////////////
-// UI HELPERS
-//////////////////////
+  if (!text) return;
 
-function openModal(id){
-  activeTarget=id;
-  document.getElementById("modal").style.display="block";
-}
+  const opponent = side === 'left' ? 'right' : 'left';
 
-function closeModal(){
-  document.getElementById("modal").style.display="none";
-  document.getElementById("text").value="";
-}
+  // RULE: must answer pending question
+  if (state.pendingQuestion && state.pendingQuestion.to === side && type !== "answer") {
+    alert("You must answer the pending question first.");
+    return;
+  }
 
-//////////////////////
-// CORE ACTIONS
-//////////////////////
+  // Render message
+  renderMessage(side, type, text);
 
-function continueClaim(id){
-  // for now: just duplicate continuation into agree column
-  let c=claims.find(x=>x.id===id);
-  claims.push({
-    id:id++,
-    text:c.text+" (continued)",
-    side:"agree"
-  });
-  render();
-}
+  // Handle logic
+  if (type === "question") {
+    state.pendingQuestion = { to: opponent };
+    state.unanswered[side]++;
+    updateScores();
+    lockSide(side, true);
+    lockSide(opponent, false);
+  }
 
-function challengeClaim(id){
-  openModal(id);
-}
-
-function submitChallenge(){
-
-  let mode=document.getElementById("mode").value;
-  let text=document.getElementById("text").value;
-
-  if(!text) return;
-
-  claims.push({
-    id:id++,
-    text,
-    side:"disagree",
-    parent:activeTarget,
-    type:mode
-  });
-
-  closeModal();
-  render();
-}
-
-//////////////////////
-// RENDER
-//////////////////////
-
-function render(){
-
-  let agreeCol=document.getElementById("agreeCol");
-  let disagreeCol=document.getElementById("disagreeCol");
-
-  agreeCol.innerHTML="";
-  disagreeCol.innerHTML="";
-
-  claims.forEach(c=>{
-
-    let div=document.createElement("div");
-    div.className="claim";
-
-    div.innerHTML=`
-      ${c.text}
-      <div class="meta">${c.type||"claim"}</div>
-
-      <button onclick="continueClaim(${c.id})">Continue</button>
-      <button onclick="challengeClaim(${c.id})">Disagree</button>
-    `;
-
-    if(c.side==="agree"){
-      agreeCol.appendChild(div);
-    }else{
-      disagreeCol.appendChild(div);
+  if (type === "answer") {
+    if (state.pendingQuestion && state.pendingQuestion.to === side) {
+      state.pendingQuestion = null;
+      lockSide('left', false);
+      lockSide('right', false);
     }
+  }
 
-  });
+  input.value = "";
 }
 
-//////////////////////
-// INIT
-//////////////////////
+function renderMessage(side, type, text) {
+  const col = document.getElementById(side + "Column");
+  const div = document.createElement("div");
+  div.className = "message " + type;
+  div.innerText = type.toUpperCase() + ": " + text;
+  col.appendChild(div);
+  col.scrollTop = col.scrollHeight;
+}
 
-render();
+function lockSide(side, locked) {
+  const controls = document.querySelector(`#${side}Type`).parentElement;
+  if (locked) {
+    controls.classList.add("locked");
+  } else {
+    controls.classList.remove("locked");
+  }
+}
 
+function updateScores() {
+  document.getElementById("leftUnanswered").innerText = state.unanswered.left;
+  document.getElementById("rightUnanswered").innerText = state.unanswered.right;
+}
 </script>
 
 </body>

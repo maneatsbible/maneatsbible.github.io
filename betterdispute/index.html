@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Better Dispute</title>
 
 <style>
@@ -19,7 +19,7 @@ header{
   padding:10px;
 }
 
-.version{font-size:11px;color:#777}
+.version{font-size:12px;color:#777}
 
 #users{
   display:flex;
@@ -36,9 +36,20 @@ header{
   opacity:0.6;
 }
 
-.user.active{opacity:1;border-color:#fff}
+.user.active{
+  opacity:1;
+  border-color:#fff;
+}
 
-#feed{padding:10px}
+#composer{
+  width:100%;
+  height:70px;
+  background:#0b0b0b;
+  border:1px solid #333;
+  color:#eee;
+}
+
+#feed{padding:10px;}
 
 .card{
   background:#1a1a1a;
@@ -50,7 +61,11 @@ header{
 .text{font-weight:600}
 .meta{font-size:11px;color:#888;margin-top:4px}
 
-.actions{margin-top:8px;display:flex;gap:6px}
+.actions{
+  margin-top:8px;
+  display:flex;
+  gap:6px;
+}
 
 button{
   background:#222;
@@ -61,15 +76,15 @@ button{
   font-size:12px;
 }
 
-/* DISPUTE */
-.lanes{
+/* dispute */
+.dispute{
   display:none;
   grid-template-columns:1fr 1fr;
   gap:10px;
   margin-top:10px;
 }
 
-.lanes.open{display:grid}
+.dispute.open{display:grid}
 
 .lane{
   background:#141414;
@@ -77,48 +92,31 @@ button{
   border-radius:8px;
 }
 
-/* MODAL */
-#modal{
-  display:none;
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.8);
-  align-items:center;
-  justify-content:center;
-}
-
-#modal.open{display:flex}
-
-.modalBox{
-  width:90%;
-  max-width:420px;
-  background:#1a1a1a;
-  padding:12px;
-  border-radius:10px;
-}
-
-input{
+.input{
   width:100%;
   margin-top:6px;
   background:#0b0b0b;
   border:1px solid #333;
   color:#eee;
-  padding:8px;
+  padding:6px;
   border-radius:6px;
 }
 
-.modalBtns{
-  display:flex;
-  gap:6px;
-  margin-top:10px;
+/* nested */
+.child{
+  margin-left:10px;
+  border-left:2px solid #333;
+  padding-left:10px;
+  margin-top:8px;
 }
 
+/* log */
 #log{
   padding:10px;
   font-size:11px;
   color:#7f7;
   border-top:1px solid #222;
-  max-height:140px;
+  max-height:160px;
   overflow:auto;
 }
 </style>
@@ -139,26 +137,10 @@ input{
 <div id="feed"></div>
 <div id="log"></div>
 
-<!-- MODAL -->
-<div id="modal">
-  <div class="modalBox">
-    <div id="modalTitle"></div>
-
-    <input id="askInput" placeholder="Ask">
-    <input id="proclaimInput" placeholder="Proclaim">
-
-    <div class="modalBtns">
-      <button onclick="submitAsk()">Submit Ask</button>
-      <button onclick="submitProclaim()">Submit Proclaim</button>
-      <button onclick="closeModal()">Close</button>
-    </div>
-  </div>
-</div>
-
 <script>
 
-const VERSION="15.0.0";
-document.getElementById("version").innerText="v"+VERSION;
+let VERSION = 16;
+document.getElementById("version").innerText = VERSION;
 
 let users=["alice","bob","charlie"];
 let currentUser="alice";
@@ -167,28 +149,23 @@ let id=0;
 let items=[];
 let logs=[];
 
-let activeTarget=null;
-
 /* LOG */
 function log(e,data){
   logs.push({t:Date.now(),u:currentUser,e,data});
 }
 
-/* STARTUP LOG */
-log("startup",{version:VERSION});
-
 /* HELPERS */
-function find(id){return items.find(x=>x.id===id);}
+function find(id){ return items.find(x=>x.id===id); }
 
-/* STRICT SELF BLOCK */
-function canInteract(item){
-  return item.user !== currentUser;
+function isOwner(item){
+  return item.user===currentUser;
 }
 
 /* USERS */
 function renderUsers(){
   const el=document.getElementById("users");
   el.innerHTML="";
+
   users.forEach(u=>{
     const d=document.createElement("div");
     d.className="user"+(u===currentUser?" active":"");
@@ -197,15 +174,15 @@ function renderUsers(){
     d.onclick=()=>{
       currentUser=u;
       renderUsers();
-      render(); // CRITICAL FIX
-      log("switch",{u});
+      render();
+      log("switch",u);
     };
 
     el.appendChild(d);
   });
 }
 
-/* CREATE */
+/* CREATE ROOT */
 function createRoot(){
   const text=document.getElementById("composer").value.trim();
   if(!text) return;
@@ -213,77 +190,68 @@ function createRoot(){
   items.push({
     id:id++,
     text,
+    type:"proclaim",
     user:currentUser,
     parent:null,
+    dispute:false,
     open:false
   });
 
   document.getElementById("composer").value="";
   render();
-  log("create",{text});
+  log("create",text);
 }
 
-/* DISPUTE OPEN */
-function openDispute(item){
-  if(!item || !canInteract(item)) return;
+/* DISPUTE OPEN = SPLIT */
+function toggleDispute(id){
+  const item=find(id);
+  if(!item || isOwner(item)) return;
+
+  item.dispute=true;
   item.open=true;
+
   render();
-  log("dispute_open",{id:item.id});
+  log("dispute",id);
 }
 
-/* MODAL CONTROL */
-function openModal(id){
-  activeTarget=id;
-  document.getElementById("modal").classList.add("open");
-  document.getElementById("askInput").value="";
-  document.getElementById("proclaimInput").value="";
-}
-
-function closeModal(){
-  activeTarget=null;
-  document.getElementById("modal").classList.remove("open");
-}
-
-/* SUBMIT */
-function submitAsk(){
-  const v=document.getElementById("askInput").value.trim();
+/* SUBMIT LEFT/RIGHT */
+function submitLeft(id){
+  const v=document.getElementById("l-"+id).value.trim();
   if(!v) return;
 
   items.push({
-    id:id++,
+    id:idCounter++,
     text:v,
+    type:"question",
     user:currentUser,
-    parent:activeTarget,
-    type:"ask"
+    parent:id
   });
 
-  closeModal();
   render();
-  log("ask",{activeTarget,v});
+  log("ask",v);
 }
 
-function submitProclaim(){
-  const v=document.getElementById("proclaimInput").value.trim();
+function submitRight(id){
+  const v=document.getElementById("r-"+id).value.trim();
   if(!v) return;
 
   items.push({
-    id:id++,
+    id:idCounter++,
     text:v,
+    type:"proclaim",
     user:currentUser,
-    parent:activeTarget,
-    type:"proclaim"
+    parent:id
   });
 
-  closeModal();
   render();
-  log("proclaim",{activeTarget,v});
+  log("proclaim",v);
 }
 
-/* AGREEMENT (SELF BLOCKED) */
+/* AGREEMENT */
 function agree(id){
   const item=find(id);
-  if(!item || item.user===currentUser) return;
-  log("agree",{id});
+  if(!item || isOwner(item)) return;
+  log("agree",id);
 }
 
 /* RENDER */
@@ -292,28 +260,40 @@ function render(){
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  items.filter(x=>x.parent===null)
-  .forEach(root=>{
+  const roots = items.filter(x=>x.parent===null);
 
-    const disabled = root.user===currentUser;
+  roots.forEach(item=>{
 
-    let children = items.filter(x=>x.parent===root.id);
+    const blocked = isOwner(item);
+
+    const children = items.filter(x=>x.parent===item.id);
 
     let childHtml = children.map(c=>
-      `<div style="margin-left:10px;border-left:2px solid #333;padding-left:8px;margin-top:6px;">
-        ${c.text} <span style="color:#888">@${c.user}</span>
-      </div>`
+      `<div class="child">${c.text} <span style="color:#888">@${c.user}</span></div>`
     ).join("");
 
     feed.innerHTML += `
       <div class="card">
-        <div class="text">${root.text}</div>
-        <div class="meta">@${root.user}</div>
+        <div class="text">${item.text}</div>
+        <div class="meta">@${item.user}</div>
 
         <div class="actions">
-          <button onclick="agree(${root.id})" ${disabled?'disabled':''}>Agree</button>
-          <button onclick="openDispute(find(${root.id}))" ${disabled?'disabled':''}>Disagree</button>
-          <button onclick="openModal(${root.id})" ${disabled?'disabled':''}>Respond</button>
+          <button onclick="agree(${item.id})" ${blocked?'disabled':''}>Agree</button>
+          <button onclick="toggleDispute(${item.id})" ${blocked?'disabled':''}>Disagree</button>
+        </div>
+
+        <div class="dispute ${item.open?'open':''}">
+          <div class="lane">
+            <div>Ask</div>
+            <input class="input" id="l-${item.id}">
+            <button onclick="submitLeft(${item.id})">Submit</button>
+          </div>
+
+          <div class="lane">
+            <div>Proclaim</div>
+            <input class="input" id="r-${item.id}">
+            <button onclick="submitRight(${item.id})">Submit</button>
+          </div>
         </div>
 
         ${childHtml}
@@ -333,6 +313,7 @@ function render(){
 /* INIT */
 renderUsers();
 render();
+log("startup","v"+VERSION);
 
 </script>
 

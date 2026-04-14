@@ -19,7 +19,10 @@ header{
   padding:10px;
 }
 
-.version{font-size:12px;color:#777}
+.version{
+  font-size:12px;
+  color:#777;
+}
 
 #users{
   display:flex;
@@ -36,7 +39,10 @@ header{
   opacity:0.6;
 }
 
-.user.active{opacity:1;border-color:#fff}
+.user.active{
+  opacity:1;
+  border-color:#fff;
+}
 
 #composer{
   width:100%;
@@ -61,19 +67,25 @@ header{
 .actions{
   margin-top:8px;
   display:flex;
-  gap:6px;
+  gap:8px;
+  align-items:center;
 }
 
-button{
-  background:#222;
-  color:#eee;
-  border:1px solid #333;
-  padding:6px 8px;
-  border-radius:8px;
-  font-size:12px;
+.iconBtn{
+  cursor:pointer;
+  font-size:18px;
+  user-select:none;
+  opacity:0.7;
 }
 
-/* TRUE SPLIT VIEW */
+.iconBtn:hover{opacity:1}
+
+.state{
+  font-size:11px;
+  color:#777;
+  margin-left:6px;
+}
+
 .dispute{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -85,16 +97,15 @@ button{
   background:#141414;
   padding:8px;
   border-radius:8px;
-  min-height:40px;
 }
 
 .child{
   margin-top:6px;
   font-size:12px;
   color:#ddd;
+  border-left:2px solid #333;
+  padding-left:8px;
 }
-
-.child span{color:#888}
 
 /* POPUP */
 #popup{
@@ -138,7 +149,7 @@ input{
   font-size:11px;
   color:#7f7;
   border-top:1px solid #222;
-  max-height:140px;
+  max-height:160px;
   overflow:auto;
 }
 </style>
@@ -162,10 +173,10 @@ input{
 <!-- POPUP -->
 <div id="popup">
   <div class="box">
-    <div>Dispute (choose one)</div>
+    <div>Dispute Branch</div>
 
-    <input id="challenge" placeholder="Ask (challenge)">
-    <input id="counter" placeholder="Proclaim (counter)">
+    <input id="challenge" placeholder="Ask (optional)">
+    <input id="counter" placeholder="Proclaim (optional)">
 
     <div class="row">
       <button onclick="submitChallenge()">Submit Ask</button>
@@ -177,8 +188,8 @@ input{
 
 <script>
 
-let VERSION=20;
-document.getElementById("version").innerText=VERSION;
+let VERSION=21;
+document.getElementById("version").innerText="v"+VERSION;
 
 let users=["alice","bob","charlie"];
 let currentUser="alice";
@@ -187,19 +198,27 @@ let id=0;
 let items=[];
 let logs=[];
 
-/* track per-user disputes */
-let disputes = {}; 
-// key: statementId -> set(users who already disagreed)
-
 let active=null;
+
+/* reactions: { [statementId]: { user: "up"|"down" } } */
+let reactions={};
 
 /* LOG */
 function log(e,d){
-  logs.push({t:Date.now(),u:currentUser,e,d});
+  logs.push({
+    t:new Date().toISOString(),
+    user:currentUser,
+    event:e,
+    data:d
+  });
 }
 
 /* HELP */
 function find(i){return items.find(x=>x.id===i);}
+
+function isOwner(item){
+  return item.user===currentUser;
+}
 
 /* USERS */
 function renderUsers(){
@@ -215,14 +234,14 @@ function renderUsers(){
       currentUser=u;
       renderUsers();
       render();
-      log("switch",u); // FIX: immediate logging
+      log("switch",u);
     };
 
     el.appendChild(d);
   });
 }
 
-/* CREATE ROOT */
+/* CREATE */
 function createRoot(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
@@ -239,13 +258,27 @@ function createRoot(){
   log("create",t);
 }
 
-/* DISPUTE OPEN */
+/* REACTION */
+function react(id,type){
+  const item=find(id);
+  if(!item || isOwner(item)) return;
+
+  reactions[id] = reactions[id] || {};
+  reactions[id][currentUser] = type;
+
+  log(type,id);
+
+  if(type==="down"){
+    openDispute(id);
+  }
+
+  render();
+}
+
+/* DISPUTE POPUP */
 function openDispute(i){
   const item=find(i);
-  if(!item || item.user===currentUser) return;
-
-  if(!disputes[i]) disputes[i]=new Set();
-  if(disputes[i].has(currentUser)) return; // ONLY ONE DISAGREE PER USER
+  if(!item || isOwner(item)) return;
 
   active=i;
   document.getElementById("popup").classList.add("open");
@@ -254,13 +287,12 @@ function openDispute(i){
   document.getElementById("counter").value="";
 }
 
-/* CLOSE */
 function closePopup(){
   active=null;
   document.getElementById("popup").classList.remove("open");
 }
 
-/* SUBMIT BRANCH */
+/* BRANCH */
 function submitChallenge(){
   const v=document.getElementById("challenge").value.trim();
   if(!v) return;
@@ -270,16 +302,12 @@ function submitChallenge(){
     text:v,
     user:currentUser,
     parent:active,
-    type:"question",
-    lane:"left"
+    type:"question"
   });
 
-  if(!disputes[active]) disputes[active]=new Set();
-  disputes[active].add(currentUser);
-
+  log("branch_challenge",v);
   closePopup();
   render();
-  log("challenge",v);
 }
 
 function submitCounter(){
@@ -291,23 +319,12 @@ function submitCounter(){
     text:v,
     user:currentUser,
     parent:active,
-    type:"proclaim",
-    lane:"right"
+    type:"proclaim"
   });
 
-  if(!disputes[active]) disputes[active]=new Set();
-  disputes[active].add(currentUser);
-
+  log("branch_counter",v);
   closePopup();
   render();
-  log("counter",v);
-}
-
-/* AGREEMENT */
-function agree(i){
-  const item=find(i);
-  if(!item || item.user===currentUser) return;
-  log("agree",i);
 }
 
 /* RENDER */
@@ -320,16 +337,12 @@ function render(){
 
   roots.forEach(r=>{
 
+    const rReact = reactions[r.id] || {};
+    const my = rReact[currentUser];
+
     const children = items.filter(x=>x.parent===r.id);
 
-    const left = children.filter(c=>c.lane==="left" || c.type==="question");
-    const right = children.filter(c=>c.lane==="right" || c.type==="proclaim");
-
-    let leftHtml = left.map(c=>
-      `<div class="child">${c.text} <span>@${c.user}</span></div>`
-    ).join("");
-
-    let rightHtml = right.map(c=>
+    let childHtml = children.map(c=>
       `<div class="child">${c.text} <span>@${c.user}</span></div>`
     ).join("");
 
@@ -338,24 +351,20 @@ function render(){
         <div class="text">${r.text}</div>
         <div class="meta">@${r.user}</div>
 
-        ${r.user !== currentUser ? `
+        ${!isOwner(r) ? `
         <div class="actions">
-          <button onclick="agree(${r.id})">Agree</button>
-          <button onclick="openDispute(${r.id})">Disagree</button>
+          <span class="iconBtn" onclick="react(${r.id},'up')">👍</span>
+          <span class="iconBtn" onclick="react(${r.id},'down')">👎</span>
+          <span class="state">${my ? my : '—'}</span>
         </div>
         ` : ""}
 
         <div class="dispute">
-          <div class="lane">
-            <div>Ask</div>
-            ${leftHtml}
-          </div>
-
-          <div class="lane">
-            <div>Proclaim</div>
-            ${rightHtml}
-          </div>
+          <div class="lane"></div>
+          <div class="lane"></div>
         </div>
+
+        ${childHtml}
       </div>
     `;
   });

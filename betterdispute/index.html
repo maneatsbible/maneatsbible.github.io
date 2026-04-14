@@ -5,177 +5,181 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Better Dispute</title>
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
 <style>
 body{
+  margin:0;
+  font-family:system-ui, sans-serif;
   background:#0f0f0f;
   color:#eee;
-  font-size:14px;
-  transition:background 0.3s;
 }
 
-.container{ max-width:800px; }
-
 /* HEADER */
-.header{
+header{
   display:flex;
   justify-content:space-between;
-  align-items:center;
+  padding:10px;
+  border-bottom:1px solid #222;
 }
 
 .version{
   font-size:11px;
-  color:#888;
+  color:#777;
 }
 
 /* USER SWITCHER */
-.userbar{
+#users{
   display:flex;
   gap:6px;
-  margin:10px 0;
+  padding:8px;
   flex-wrap:wrap;
 }
 
 .user{
-  border:1px solid #444;
-  padding:3px 6px;
-  border-radius:6px;
+  padding:4px 8px;
+  border:1px solid #333;
+  border-radius:12px;
+  font-size:12px;
   cursor:pointer;
-  font-size:11px;
 }
 
 .active{
   background:#2a2a2a;
 }
 
-/* COMPOSER */
-.composer{
-  background:#111;
+/* FEED */
+#feed{
   padding:10px;
-  border-radius:8px;
-  margin-bottom:12px;
-  border:1px solid #333;
 }
 
-textarea{
-  width:100%;
-  height:100px;
-  background:#0b0b0b;
-  color:#eee;
-  border:1px solid #444;
-  padding:8px;
-  border-radius:6px;
-}
-
-/* STATEMENTS */
-.statement{
-  background:#262626;
-  padding:12px;
+.card{
+  background:#1a1a1a;
+  padding:10px;
   border-radius:10px;
-  margin-bottom:8px;
-  border:1px solid #3a3a3a;
+  margin-bottom:10px;
 }
 
-.statement .text{
-  font-size:15px;
+.text{
   font-weight:600;
-  color:#fff;
+  font-size:15px;
 }
 
 .meta{
   font-size:11px;
-  color:#aaa;
-  margin-top:4px;
+  color:#888;
+  margin-top:3px;
 }
 
-/* TWO COLUMN */
-.dispute{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
+.actions{
   margin-top:8px;
+  display:flex;
+  gap:6px;
 }
 
-.col{
-  background:#141414;
-  border-radius:8px;
-  padding:8px;
-  min-height:70px;
-}
-
-.child{
-  background:#1b1b1b;
-  padding:8px;
-  border-radius:8px;
-  margin-bottom:6px;
-}
-
-/* INPUTS */
-.inputBox{
-  width:100%;
-  background:#0b0b0b;
-  border:1px solid #444;
+button{
+  background:#222;
   color:#eee;
-  border-radius:6px;
-  padding:6px;
+  border:1px solid #333;
+  border-radius:8px;
+  padding:6px 8px;
   font-size:12px;
 }
 
-/* LOG */
-.log{
-  margin-top:20px;
-  background:#0a0a0a;
-  border-top:1px solid #333;
-  font-size:11px;
-  color:#9f9;
+/* COMPOSER */
+#composer{
+  width:100%;
+  height:80px;
+  background:#0b0b0b;
+  border:1px solid #333;
+  color:#eee;
   padding:8px;
-  max-height:180px;
+  margin:10px 0;
+}
+
+/* BROWSE PANEL */
+#browse{
+  display:none;
+  padding:10px;
+  border-top:1px solid #222;
+  background:#0c0c0c;
+}
+
+.small{
+  font-size:12px;
+  color:#aaa;
+}
+
+/* LOG */
+#log{
+  display:none;
+  padding:10px;
+  font-size:11px;
+  color:#7f7;
+  border-top:1px solid #222;
+  max-height:200px;
   overflow:auto;
 }
 
-/* USER THEMES (TEST VISUAL SHIFT) */
-.theme-alice{ background:#0f0f0f; }
-.theme-bob{ background:#111018; }
-.theme-charlie{ background:#101010; }
+/* TOP CONTROLS */
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  padding:8px 10px;
+}
+
+.toggle{
+  font-size:12px;
+  cursor:pointer;
+  color:#aaa;
+}
 </style>
 </head>
 
 <body>
 
-<div class="container py-3">
+<header>
+  <div>Better Dispute</div>
+  <div class="version">v3.0.0</div>
+</header>
 
-<div class="header">
-  <h5>Better Dispute</h5>
-  <div class="version">v2.2.0</div>
+<div id="users"></div>
+
+<div class="topbar">
+  <div class="toggle" onclick="toggleBrowse()">Browse</div>
+  <div class="toggle" onclick="toggleLog()">Log</div>
 </div>
 
-<div class="userbar" id="users"></div>
-
-<div class="composer">
-  <textarea id="composer" placeholder="Start a fire..."></textarea>
-  <button class="btn btn-primary btn-sm mt-2" onclick="createRoot()">Proclaim</button>
-</div>
+<textarea id="composer" placeholder="Start a fire..."></textarea>
+<button onclick="createRoot()" style="margin:0 10px 10px 10px;">Proclaim</button>
 
 <div id="feed"></div>
 
-<div class="log" id="log"></div>
+<div id="browse"></div>
 
-</div>
+<div id="log"></div>
 
 <script>
 
-const APP_VERSION="2.2.0";
-
 //////////////////////
-// USERS
+// STATE
 //////////////////////
 
 let users=["alice","bob","charlie"];
 let currentUser="alice";
 
-function applyTheme(){
-  document.body.className="theme-"+currentUser;
+let id=0;
+let items=[];
+
+const VERSION="3.0.0";
+
+//////////////////////
+// USER SWITCH UI STATE SHIFT
+//////////////////////
+
+function theme(){
+  document.body.style.background =
+    currentUser==="alice" ? "#0f0f0f" :
+    currentUser==="bob" ? "#101018" :
+    "#0e1115";
 }
 
 function renderUsers(){
@@ -189,118 +193,25 @@ function renderUsers(){
 
     d.onclick=()=>{
       currentUser=u;
-      applyTheme();
-      log("user_switch",{user:u});
-      renderUsers();
+      theme();
+      log("switch",{user:u});
+      render();
+      renderBrowse();
     };
 
     el.appendChild(d);
   });
-
-  applyTheme();
 }
 
 //////////////////////
-// DATA
+// CORE DATA
 //////////////////////
-
-let id=0;
-let items=[];
 
 function find(i){
   return items.find(x=>x.id===i);
 }
 
-//////////////////////
-// SEED DATA (TEST DISPUTES)
-//////////////////////
-
-function seed(){
-
-  const a=addSeed("Truth requires confrontation","proclaim","alice",null);
-  const b=addSeed("Is that always the case?","question","bob",a);
-  const c=addSeed("Only in contested claims","proclaim","charlie",a);
-
-  const d=addSeed("Faith overrides contradiction","proclaim","bob",null);
-  const e=addSeed("How do you define contradiction?","question","alice",d);
-  const f=addSeed("By consistency failure","proclaim","bob",d);
-}
-
-function addSeed(text,type,user,parent){
-
-  const item={id:id++,text,type,user,parent,children:[]};
-
-  items.push(item);
-
-  if(parent!==null){
-    const p=find(parent);
-    if(p) p.children.push(item.id);
-  }
-
-  return item.id;
-}
-
-//////////////////////
-// CREATE ROOT
-//////////////////////
-
-function createRoot(){
-
-  const text=document.getElementById("composer").value.trim();
-  if(!text) return;
-
-  items.push({
-    id:id++,
-    text,
-    type:"proclaim",
-    user:currentUser,
-    parent:null,
-    children:[]
-  });
-
-  document.getElementById("composer").value="";
-  log("proclaim",text);
-
-  render();
-}
-
-//////////////////////
-// ACTIONS
-//////////////////////
-
-function agree(id){
-  const item=find(id);
-  if(item.user===currentUser) return; // BLOCK SELF ACTION
-  log("agree",{id,user:currentUser});
-}
-
-function disagree(id){
-  const item=find(id);
-  if(item.user===currentUser) return; // BLOCK SELF ACTION
-  log("disagree",{id,user:currentUser});
-  render();
-}
-
-function submitLeft(id){
-  const el=document.getElementById("left-"+id);
-  const text=el.value.trim();
-  if(!text) return;
-
-  addChild(id,text,"question");
-  el.value="";
-}
-
-function submitRight(id){
-  const el=document.getElementById("right-"+id);
-  const text=el.value.trim();
-  if(!text) return;
-
-  addChild(id,text,"proclaim");
-  el.value="";
-}
-
-function addChild(parent,text,type){
-
+function create(text,type,parent=null){
   const item={
     id:id++,
     text,
@@ -312,38 +223,60 @@ function addChild(parent,text,type){
 
   items.push(item);
 
-  const p=find(parent);
-  if(p) p.children.push(item.id);
+  if(parent!==null){
+    const p=find(parent);
+    if(p) p.children.push(item.id);
+  }
 
-  log("create_child",{parent,text,type});
+  log("create",item);
   render();
+  renderBrowse();
+}
+
+function createRoot(){
+  const t=document.getElementById("composer").value.trim();
+  if(!t) return;
+
+  create(t,"proclaim",null);
+  document.getElementById("composer").value="";
 }
 
 //////////////////////
-// LOG
+// ACTION FILTERING (CORE UX ENGINE)
 //////////////////////
 
-function log(event,data){
+function actionable(item){
+  if(item.user===currentUser) return false;
+  return true;
+}
 
-  const el=document.getElementById("log");
+function unansweredQuestions(){
+  return items.filter(x=>x.type==="question" && x.user!==currentUser);
+}
 
-  const entry={
-    time:Date.now(),
-    version:APP_VERSION,
-    user:currentUser,
-    event,
-    data
-  };
-
-  const div=document.createElement("div");
-  div.innerText=JSON.stringify(entry);
-
-  el.appendChild(div);
-  el.scrollTop=el.scrollHeight;
+function topStatements(){
+  return items.filter(x=>x.parent===null && x.user!==currentUser);
 }
 
 //////////////////////
-// RENDER
+// ACTIONS
+//////////////////////
+
+function agree(id){
+  const i=find(id);
+  if(i.user===currentUser) return;
+  log("agree",{id});
+}
+
+function disagree(id){
+  const i=find(id);
+  if(i.user===currentUser) return;
+
+  create("Counter: "+i.text,"proclaim",id);
+}
+
+//////////////////////
+// MAIN FEED (ACTION QUEUE)
 //////////////////////
 
 function render(){
@@ -351,66 +284,74 @@ function render(){
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  items.filter(x=>x.parent===null)
-       .forEach(x=>renderItem(x,feed));
-}
+  const queue=[
+    ...unansweredQuestions(),
+    ...topStatements()
+  ];
 
-function renderItem(item,container){
+  queue.forEach(item=>{
+    const div=document.createElement("div");
+    div.className="card";
 
-  const div=document.createElement("div");
-
-  div.innerHTML=`
-    <div class="statement">
+    div.innerHTML=`
       <div class="text">${item.text}</div>
       <div class="meta">${item.type.toUpperCase()} · @${item.user}</div>
 
-      <button class="btn btn-sm btn-success" onclick="agree(${item.id})"
-        ${item.user===currentUser?'disabled':''}>Agree</button>
-
-      <button class="btn btn-sm btn-danger" onclick="disagree(${item.id})"
-        ${item.user===currentUser?'disabled':''}>Disagree</button>
-    </div>
-
-    <div class="dispute">
-      <div class="col">
-        <input class="inputBox" id="left-${item.id}" placeholder="Question (optional)">
-        <button class="btn btn-sm btn-primary mt-1" onclick="submitLeft(${item.id})">Submit</button>
+      <div class="actions">
+        <button onclick="agree(${item.id})">Agree</button>
+        <button onclick="disagree(${item.id})">Disagree</button>
       </div>
+    `;
 
-      <div class="col">
-        <input class="inputBox" id="right-${item.id}" placeholder="Proclamation (optional)">
-        <button class="btn btn-sm btn-primary mt-1" onclick="submitRight(${item.id})">Submit</button>
-      </div>
-    </div>
-  `;
+    feed.appendChild(div);
+  });
+}
 
-  container.appendChild(div);
+//////////////////////
+// BROWSE (FULL TREE)
+//////////////////////
 
-  item.children.map(find)
-    .filter(Boolean)
-    .forEach(c=>{
+function renderBrowse(){
+  const b=document.getElementById("browse");
+  b.innerHTML="";
 
-      const el=document.createElement("div");
-      el.className="child";
+  items.filter(x=>x.parent===null).forEach(root=>{
+    const d=document.createElement("div");
+    d.className="card small";
 
-      el.innerHTML=`
-        <b>${c.type.toUpperCase()}</b>
-        <div>${c.text}</div>
-        <div class="meta">@${c.user}</div>
+    d.innerText=`${root.type.toUpperCase()}: ${root.text} (${root.user})`;
 
-        <button class="btn btn-sm btn-success" onclick="agree(${c.id})"
-          ${c.user===currentUser?'disabled':''}>Agree</button>
+    b.appendChild(d);
+  });
+}
 
-        <button class="btn btn-sm btn-danger" onclick="disagree(${c.id})"
-          ${c.user===currentUser?'disabled':''}>Disagree</button>
-      `;
+function toggleBrowse(){
+  const b=document.getElementById("browse");
+  b.style.display = b.style.display==="block"?"none":"block";
+}
 
-      if(c.type==="question"){
-        container.querySelector(`#left-${item.id}`).parentElement.appendChild(el);
-      } else {
-        container.querySelector(`#right-${item.id}`).parentElement.appendChild(el);
-      }
-    });
+function toggleLog(){
+  const l=document.getElementById("log");
+  l.style.display = l.style.display==="block"?"none":"block";
+}
+
+//////////////////////
+// LOG
+//////////////////////
+
+function log(event,data){
+  const el=document.getElementById("log");
+
+  const div=document.createElement("div");
+  div.innerText=JSON.stringify({
+    time:Date.now(),
+    v:VERSION,
+    user:currentUser,
+    event,
+    data
+  });
+
+  el.appendChild(div);
 }
 
 //////////////////////
@@ -418,7 +359,13 @@ function renderItem(item,container){
 //////////////////////
 
 renderUsers();
-seed();
+theme();
+
+/* SEED DATA */
+create("Existence requires interpretation","proclaim",null);
+create("Is interpretation always subjective?","question",0);
+create("Only when context is incomplete","proclaim",1);
+
 render();
 
 </script>

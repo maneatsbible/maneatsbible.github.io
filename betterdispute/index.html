@@ -36,7 +36,18 @@ header{
   opacity:0.6;
 }
 
-.user.active{opacity:1;border-color:#fff}
+.user.active{
+  opacity:1;
+  border-color:#fff;
+}
+
+#composer{
+  width:100%;
+  height:70px;
+  background:#0b0b0b;
+  border:1px solid #333;
+  color:#eee;
+}
 
 #feed{padding:10px}
 
@@ -65,20 +76,11 @@ button{
   font-size:12px;
 }
 
-/* DISPUTE VIEW */
-.dispute{
-  display:none;
-  margin-top:10px;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-}
-
-.dispute.open{display:grid}
-
-.lane{
-  background:#141414;
-  padding:8px;
-  border-radius:8px;
+.child{
+  margin-left:10px;
+  border-left:2px solid #333;
+  padding-left:10px;
+  margin-top:8px;
 }
 
 /* POPUP */
@@ -111,27 +113,19 @@ input{
   border-radius:6px;
 }
 
-.actionsRow{
+.row{
   display:flex;
   gap:6px;
   margin-top:10px;
 }
 
-/* nested */
-.child{
-  margin-left:10px;
-  border-left:2px solid #333;
-  padding-left:10px;
-  margin-top:8px;
-}
-
-/* log */
+/* LOG */
 #log{
   padding:10px;
   font-size:11px;
   color:#7f7;
   border-top:1px solid #222;
-  max-height:160px;
+  max-height:140px;
   overflow:auto;
 }
 </style>
@@ -155,12 +149,12 @@ input{
 <!-- POPUP -->
 <div id="popup">
   <div class="box">
-    <div id="popupTitle"></div>
+    <div>Dispute</div>
 
-    <input id="askField" placeholder="Ask">
-    <input id="proclaimField" placeholder="Proclaim">
+    <input id="ask" placeholder="Ask">
+    <input id="proclaim" placeholder="Proclaim">
 
-    <div class="actionsRow">
+    <div class="row">
       <button onclick="submitAsk()">Submit Ask</button>
       <button onclick="submitProclaim()">Submit Proclaim</button>
       <button onclick="closePopup()">Close</button>
@@ -170,9 +164,10 @@ input{
 
 <script>
 
-let VERSION = 17;
+let VERSION = 18;
 document.getElementById("version").innerText = VERSION;
 
+/* STATE */
 let users=["alice","bob","charlie"];
 let currentUser="alice";
 
@@ -180,16 +175,17 @@ let id=0;
 let items=[];
 let logs=[];
 
-let activeTarget=null;
+let active=null;
 
 /* LOG */
-function log(e,data){
-  logs.push({t:Date.now(),u:currentUser,e,data});
+function log(e,d){
+  logs.push({t:Date.now(),u:currentUser,e,d});
 }
 
-/* HELPERS */
-function find(id){ return items.find(x=>x.id===id); }
+/* HELP */
+function find(i){ return items.find(x=>x.id===i); }
 
+/* STRICT SELF BLOCK */
 function isOwner(item){
   return item.user===currentUser;
 }
@@ -198,6 +194,7 @@ function isOwner(item){
 function renderUsers(){
   const el=document.getElementById("users");
   el.innerHTML="";
+
   users.forEach(u=>{
     const d=document.createElement("div");
     d.className="user"+(u===currentUser?" active":"");
@@ -206,61 +203,57 @@ function renderUsers(){
     d.onclick=()=>{
       currentUser=u;
       renderUsers();
-      render();
+      render(); // CRITICAL FIX
+      log("switch",u);
     };
 
     el.appendChild(d);
   });
 }
 
-/* CREATE */
+/* ROOT */
 function createRoot(){
-  const text=document.getElementById("composer").value.trim();
-  if(!text) return;
+  const t=document.getElementById("composer").value.trim();
+  if(!t) return;
 
   items.push({
     id:id++,
-    text,
+    text:t,
     user:currentUser,
-    parent:null,
-    open:false
+    parent:null
   });
 
   document.getElementById("composer").value="";
   render();
-  log("create",text);
+  log("create",t);
 }
 
-/* DISAGREE => OPEN POPUP */
-function openDispute(id){
-  const item=find(id);
+/* DISPUTE OPEN */
+function openDispute(i){
+  const item=find(i);
   if(!item || isOwner(item)) return;
 
-  activeTarget=id;
-
-  document.getElementById("askField").value="";
-  document.getElementById("proclaimField").value="";
-
+  active=i;
   document.getElementById("popup").classList.add("open");
-  log("dispute_open",id);
+  log("dispute",i);
 }
 
 function closePopup(){
-  activeTarget=null;
+  active=null;
   document.getElementById("popup").classList.remove("open");
 }
 
-/* SUBMIT */
+/* BRANCHING */
 function submitAsk(){
-  const v=document.getElementById("askField").value.trim();
+  const v=document.getElementById("ask").value.trim();
   if(!v) return;
 
   items.push({
     id:id++,
     text:v,
-    type:"question",
     user:currentUser,
-    parent:activeTarget
+    parent:active,
+    type:"question"
   });
 
   closePopup();
@@ -269,15 +262,15 @@ function submitAsk(){
 }
 
 function submitProclaim(){
-  const v=document.getElementById("proclaimField").value.trim();
+  const v=document.getElementById("proclaim").value.trim();
   if(!v) return;
 
   items.push({
     id:id++,
     text:v,
-    type:"proclaim",
     user:currentUser,
-    parent:activeTarget
+    parent:active,
+    type:"proclaim"
   });
 
   closePopup();
@@ -285,11 +278,11 @@ function submitProclaim(){
   log("proclaim",v);
 }
 
-/* AGREEMENT (HARD BLOCK SELF) */
-function agree(id){
-  const item=find(id);
+/* AGREE (HARD BLOCK SELF) */
+function agree(i){
+  const item=find(i);
   if(!item || isOwner(item)) return;
-  log("agree",id);
+  log("agree",i);
 }
 
 /* RENDER */
@@ -300,11 +293,11 @@ function render(){
 
   const roots = items.filter(x=>x.parent===null);
 
-  roots.forEach(item=>{
+  roots.forEach(r=>{
 
-    const blocked = isOwner(item); // CRITICAL FIX
+    const blocked = isOwner(r);
 
-    const children = items.filter(x=>x.parent===item.id);
+    const children = items.filter(x=>x.parent===r.id);
 
     let childHtml = children.map(c=>
       `<div class="child">${c.text} <span style="color:#888">@${c.user}</span></div>`
@@ -312,12 +305,12 @@ function render(){
 
     feed.innerHTML += `
       <div class="card">
-        <div class="text">${item.text}</div>
-        <div class="meta">@${item.user}</div>
+        <div class="text">${r.text}</div>
+        <div class="meta">@${r.user}</div>
 
         <div class="actions">
-          <button onclick="agree(${item.id})" ${blocked?'disabled':''}>Agree</button>
-          <button onclick="openDispute(${item.id})" ${blocked?'disabled':''}>Disagree</button>
+          <button onclick="agree(${r.id})" ${blocked?'disabled':''}>Agree</button>
+          <button onclick="openDispute(${r.id})" ${blocked?'disabled':''}>Disagree</button>
         </div>
 
         ${childHtml}
@@ -333,6 +326,10 @@ function render(){
     logEl.appendChild(d);
   });
 }
+
+/* TEST DATA */
+items.push({id:id++,text:"All claims can be challenged",user:"alice",parent:null});
+items.push({id:id++,text:"Some claims resist challenge",user:"bob",parent:null});
 
 /* INIT */
 renderUsers();

@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Better Dispute</title>
 
 <style>
@@ -43,7 +43,7 @@ header{
 
 #composer{
   width:100%;
-  height:80px;
+  height:70px;
   background:#0b0b0b;
   border:1px solid #333;
   color:#eee;
@@ -77,15 +77,13 @@ button{
 }
 
 .dispute{
+  margin-top:10px;
   display:none;
   grid-template-columns:1fr 1fr;
   gap:10px;
-  margin-top:10px;
 }
 
-.dispute.open{
-  display:grid;
-}
+.dispute.open{display:grid}
 
 .col{
   background:#141414;
@@ -102,6 +100,24 @@ button{
   padding:6px;
   font-size:12px;
   border-radius:6px;
+}
+
+/* embedded child disputes */
+.child{
+  margin-left:10px;
+  border-left:2px solid #333;
+  padding-left:10px;
+  margin-top:10px;
+}
+
+/* LOG */
+#log{
+  padding:10px;
+  font-size:11px;
+  color:#7f7;
+  border-top:1px solid #222;
+  max-height:160px;
+  overflow:auto;
 }
 </style>
 </head>
@@ -120,60 +136,51 @@ button{
 
 <div id="feed"></div>
 
+<div id="log"></div>
+
 <script>
 
-const VERSION="12.0.0";
+const VERSION="13.0.0";
 document.getElementById("version").innerText="v"+VERSION;
 
-/* ======================
-   STATE
-====================== */
-
+/* STATE */
 let users=["alice","bob","charlie"];
 let currentUser="alice";
 
 let id=0;
 let items=[];
+let logs=[];
 
-/* ======================
-   HELPERS (SINGLE SOURCE OF TRUTH)
-====================== */
-
-function find(id){
-  return items.find(x=>x.id===id);
+/* LOG */
+function log(e,data){
+  logs.push({t:Date.now(),u:currentUser,e,data});
 }
+
+/* HELPERS */
+function find(id){ return items.find(x=>x.id===id); }
 
 function canInteract(item){
   return item.user !== currentUser;
 }
 
-/* ======================
-   USERS (FIXED: ALWAYS TRIGGERS FULL RENDER)
-====================== */
-
+/* USERS */
 function renderUsers(){
   const el=document.getElementById("users");
   el.innerHTML="";
-
   users.forEach(u=>{
     const d=document.createElement("div");
     d.className="user"+(u===currentUser?" active":"");
     d.textContent=u;
-
     d.onclick=()=>{
       currentUser=u;
       renderUsers();
-      render(); // CRITICAL: full recompute
+      render();
     };
-
     el.appendChild(d);
   });
 }
 
-/* ======================
-   CREATE ROOT
-====================== */
-
+/* CREATE ROOT */
 function createRoot(){
   const text=document.getElementById("composer").value.trim();
   if(!text) return;
@@ -184,31 +191,26 @@ function createRoot(){
     type:"proclaim",
     user:currentUser,
     parent:null,
-    disputeOpen:false
+    open:true
   });
 
   document.getElementById("composer").value="";
+  log("create",{text});
   render();
 }
 
-/* ======================
-   DISPUTE EXPANSION (STATE ONLY)
-====================== */
-
-function toggleDispute(statementId){
-  const item=find(statementId);
+/* DISPUTE TOGGLE */
+function toggleDispute(id){
+  const item=find(id);
   if(!item || !canInteract(item)) return;
 
-  item.disputeOpen = true;
+  item.open = !item.open;
+  log("toggle",{id});
   render();
 }
 
-/* ======================
-   CHILD BRANCHING (FIXED CORE BUG)
-====================== */
-
+/* CHILD */
 function addChild(parentId,text,type){
-
   const parent=find(parentId);
   if(!parent || !canInteract(parent)) return;
 
@@ -218,91 +220,94 @@ function addChild(parentId,text,type){
     type,
     user:currentUser,
     parent:parentId,
-    disputeOpen:false
+    open:true
   });
+
+  log("child",{parentId,text,type});
 }
 
-/* ======================
-   SUBMIT (ALWAYS RE-RENDERS)
-====================== */
-
-function submitLeft(parentId){
-  const v=document.getElementById("l-"+parentId).value.trim();
+/* SUBMIT */
+function submitLeft(id){
+  const v=document.getElementById("l-"+id).value.trim();
   if(!v) return;
-
-  addChild(parentId,v,"question");
+  addChild(id,v,"question");
   render();
 }
 
-function submitRight(parentId){
-  const v=document.getElementById("r-"+parentId).value.trim();
+function submitRight(id){
+  const v=document.getElementById("r-"+id).value.trim();
   if(!v) return;
-
-  addChild(parentId,v,"proclaim");
+  addChild(id,v,"proclaim");
   render();
 }
 
-/* ======================
-   AGREEMENT (SELF-BLOCKED)
-====================== */
-
+/* AGREEMENT (STRICT SELF BLOCK) */
 function agree(id){
   const item=find(id);
-  if(!item || !canInteract(item)) return;
+  if(!item) return;
+  if(item.user===currentUser) return;
+  log("agree",{id});
 }
 
-/* ======================
-   RENDER (PURE STATE DERIVED UI)
-====================== */
+/* RENDER TREE */
+function renderNode(item){
 
+  const disabled = (item.user === currentUser);
+
+  let html=`
+    <div class="card">
+      <div class="text">${item.text}</div>
+      <div class="meta">@${item.user}</div>
+
+      <div class="actions">
+        <button onclick="agree(${item.id})" ${disabled?'disabled':''}>Agree</button>
+        <button onclick="toggleDispute(${item.id})" ${disabled?'disabled':''}>Disagree</button>
+      </div>
+
+      <div class="dispute ${item.open?'open':''}">
+        <div class="col">
+          <div>Challenge</div>
+          <input class="input" id="l-${item.id}" placeholder="Ask / challenge...">
+          <button onclick="submitLeft(${item.id})">Submit</button>
+        </div>
+
+        <div class="col">
+          <div>Counter</div>
+          <input class="input" id="r-${item.id}" placeholder="Proclaim counter...">
+          <button onclick="submitRight(${item.id})">Submit</button>
+        </div>
+      </div>
+  `;
+
+  const children = items.filter(x=>x.parent===item.id);
+  children.forEach(c=>{
+    html += `<div class="child">${renderNode(c)}</div>`;
+  });
+
+  return html + `</div>`;
+}
+
+/* MAIN RENDER */
 function render(){
 
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  const roots = items.filter(x=>x.parent===null);
+  items.filter(x=>x.parent===null)
+       .forEach(root=>{
+          feed.innerHTML += renderNode(root);
+       });
 
-  roots.forEach(item=>{
-
-    const disabled = !canInteract(item);
-
-    const div=document.createElement("div");
-
-    div.innerHTML=`
-      <div class="card">
-        <div class="text">${item.text}</div>
-        <div class="meta">@${item.user}</div>
-
-        <div class="actions">
-          <button onclick="agree(${item.id})" ${disabled?'disabled':''}>Agree</button>
-          <button onclick="toggleDispute(${item.id})" ${disabled?'disabled':''}>Disagree</button>
-        </div>
-
-        <div class="dispute ${item.disputeOpen?'open':''}">
-          <div class="col">
-            <div>Challenge</div>
-            <input class="input" id="l-${item.id}" placeholder="Ask / challenge...">
-            <button onclick="submitLeft(${item.id})">Submit</button>
-          </div>
-
-          <div class="col">
-            <div>Counter</div>
-            <input class="input" id="r-${item.id}" placeholder="Proclaim counter...">
-            <button onclick="submitRight(${item.id})">Submit</button>
-          </div>
-        </div>
-
-      </div>
-    `;
-
-    feed.appendChild(div);
+  const logEl=document.getElementById("log");
+  logEl.innerHTML="";
+  logs.forEach(l=>{
+    const d=document.createElement("div");
+    d.textContent=JSON.stringify(l);
+    logEl.appendChild(d);
   });
 }
 
-/* ======================
-   INIT
-====================== */
-
+/* INIT */
 renderUsers();
 render();
 
@@ -313,8 +318,10 @@ items.push({
   type:"proclaim",
   user:"alice",
   parent:null,
-  disputeOpen:false
+  open:true
 });
+
+render();
 
 </script>
 

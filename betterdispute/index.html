@@ -19,10 +19,7 @@ header{
   padding:10px;
 }
 
-.version{
-  font-size:12px;
-  color:#777;
-}
+.version{font-size:12px;color:#777}
 
 #users{
   display:flex;
@@ -67,47 +64,28 @@ header{
 .actions{
   margin-top:8px;
   display:flex;
-  gap:8px;
+  gap:10px;
   align-items:center;
 }
 
-.iconBtn{
+.icon{
+  font-size:20px;
   cursor:pointer;
-  font-size:18px;
+  opacity:0.25;
   user-select:none;
-  opacity:0.7;
+  transition:0.15s;
 }
 
-.iconBtn:hover{opacity:1}
+.icon:hover{opacity:0.6}
+
+.icon.active{opacity:1}
 
 .state{
   font-size:11px;
   color:#777;
-  margin-left:6px;
 }
 
-.dispute{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:10px;
-}
-
-.lane{
-  background:#141414;
-  padding:8px;
-  border-radius:8px;
-}
-
-.child{
-  margin-top:6px;
-  font-size:12px;
-  color:#ddd;
-  border-left:2px solid #333;
-  padding-left:8px;
-}
-
-/* POPUP */
+/* DISPUTE POPUP */
 #popup{
   display:none;
   position:fixed;
@@ -127,6 +105,11 @@ header{
   border-radius:10px;
 }
 
+.title{
+  font-weight:600;
+  margin-bottom:10px;
+}
+
 input{
   width:100%;
   margin-top:8px;
@@ -139,7 +122,7 @@ input{
 
 .row{
   display:flex;
-  gap:6px;
+  justify-content:space-between;
   margin-top:10px;
 }
 
@@ -173,22 +156,21 @@ input{
 <!-- POPUP -->
 <div id="popup">
   <div class="box">
-    <div>Dispute Branch</div>
+    <div class="title">Dispute</div>
 
     <input id="challenge" placeholder="Ask (optional)">
     <input id="counter" placeholder="Proclaim (optional)">
 
     <div class="row">
-      <button onclick="submitChallenge()">Submit Ask</button>
-      <button onclick="submitCounter()">Submit Proclaim</button>
-      <button onclick="closePopup()">Close</button>
+      <span class="icon" onclick="submitDispute()">✔</span>
+      <span class="icon" onclick="closePopup()">✖</span>
     </div>
   </div>
 </div>
 
 <script>
 
-let VERSION=21;
+let VERSION=22;
 document.getElementById("version").innerText="v"+VERSION;
 
 let users=["alice","bob","charlie"];
@@ -200,16 +182,16 @@ let logs=[];
 
 let active=null;
 
-/* reactions: { [statementId]: { user: "up"|"down" } } */
-let reactions={};
+/* per-user single disagree rule */
+let disagreed={}; // statementId -> Set(users)
 
 /* LOG */
 function log(e,d){
   logs.push({
     t:new Date().toISOString(),
-    user:currentUser,
-    event:e,
-    data:d
+    u:currentUser,
+    e,
+    d
   });
 }
 
@@ -258,27 +240,26 @@ function createRoot(){
   log("create",t);
 }
 
-/* REACTION */
-function react(id,type){
-  const item=find(id);
+/* REACT */
+function react(i,type){
+  const item=find(i);
   if(!item || isOwner(item)) return;
 
-  reactions[id] = reactions[id] || {};
-  reactions[id][currentUser] = type;
-
-  log(type,id);
-
   if(type==="down"){
-    openDispute(id);
+    openDispute(i);
+    return;
   }
 
-  render();
+  log("agree",i);
 }
 
-/* DISPUTE POPUP */
+/* OPEN DISPUTE */
 function openDispute(i){
   const item=find(i);
   if(!item || isOwner(item)) return;
+
+  if(!disagreed[i]) disagreed[i]=new Set();
+  if(disagreed[i].has(currentUser)) return;
 
   active=i;
   document.getElementById("popup").classList.add("open");
@@ -287,42 +268,45 @@ function openDispute(i){
   document.getElementById("counter").value="";
 }
 
+/* CLOSE */
 function closePopup(){
   active=null;
   document.getElementById("popup").classList.remove("open");
 }
 
-/* BRANCH */
-function submitChallenge(){
-  const v=document.getElementById("challenge").value.trim();
-  if(!v) return;
+/* SINGLE SUBMIT */
+function submitDispute(){
 
-  items.push({
-    id:id++,
-    text:v,
-    user:currentUser,
-    parent:active,
-    type:"question"
-  });
+  const c=document.getElementById("challenge").value.trim();
+  const p=document.getElementById("counter").value.trim();
 
-  log("branch_challenge",v);
-  closePopup();
-  render();
-}
+  if(!c && !p) return;
 
-function submitCounter(){
-  const v=document.getElementById("counter").value.trim();
-  if(!v) return;
+  if(c){
+    items.push({
+      id:id++,
+      text:c,
+      user:currentUser,
+      parent:active,
+      type:"question"
+    });
+  }
 
-  items.push({
-    id:id++,
-    text:v,
-    user:currentUser,
-    parent:active,
-    type:"proclaim"
-  });
+  if(p){
+    items.push({
+      id:id++,
+      text:p,
+      user:currentUser,
+      parent:active,
+      type:"proclaim"
+    });
+  }
 
-  log("branch_counter",v);
+  if(!disagreed[active]) disagreed[active]=new Set();
+  disagreed[active].add(currentUser);
+
+  log("dispute",active);
+
   closePopup();
   render();
 }
@@ -337,32 +321,27 @@ function render(){
 
   roots.forEach(r=>{
 
-    const rReact = reactions[r.id] || {};
-    const my = rReact[currentUser];
-
     const children = items.filter(x=>x.parent===r.id);
 
     let childHtml = children.map(c=>
-      `<div class="child">${c.text} <span>@${c.user}</span></div>`
+      `<div style="margin-left:10px;border-left:2px solid #333;padding-left:8px;margin-top:6px;">
+        ${c.text} <span style="color:#777">@${c.user}</span>
+      </div>`
     ).join("");
+
+    const showControls = r.user !== currentUser;
 
     feed.innerHTML += `
       <div class="card">
         <div class="text">${r.text}</div>
         <div class="meta">@${r.user}</div>
 
-        ${!isOwner(r) ? `
+        ${showControls ? `
         <div class="actions">
-          <span class="iconBtn" onclick="react(${r.id},'up')">👍</span>
-          <span class="iconBtn" onclick="react(${r.id},'down')">👎</span>
-          <span class="state">${my ? my : '—'}</span>
+          <span class="icon" onclick="react(${r.id},'up')">👍</span>
+          <span class="icon" onclick="react(${r.id},'down')">👎</span>
         </div>
         ` : ""}
-
-        <div class="dispute">
-          <div class="lane"></div>
-          <div class="lane"></div>
-        </div>
 
         ${childHtml}
       </div>

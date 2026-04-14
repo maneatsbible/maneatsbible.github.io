@@ -103,16 +103,6 @@ button{
   font-size:12px;
   border-radius:6px;
 }
-
-/* LOG */
-#log{
-  padding:10px;
-  font-size:11px;
-  color:#7f7;
-  border-top:1px solid #222;
-  max-height:200px;
-  overflow:auto;
-}
 </style>
 </head>
 
@@ -130,15 +120,13 @@ button{
 
 <div id="feed"></div>
 
-<div id="log"></div>
-
 <script>
 
-const VERSION="11.0.0";
+const VERSION="12.0.0";
 document.getElementById("version").innerText="v"+VERSION;
 
 /* ======================
-   STATE (ONLY SOURCE OF TRUTH)
+   STATE
 ====================== */
 
 let users=["alice","bob","charlie"];
@@ -147,35 +135,8 @@ let currentUser="alice";
 let id=0;
 let items=[];
 
-let logs=[];
-
 /* ======================
-   LOGGING (FIXED: STORED STATE)
-====================== */
-
-function log(event,data){
-  logs.push({
-    time:Date.now(),
-    version:VERSION,
-    user:currentUser,
-    event,
-    data
-  });
-  renderLog();
-}
-
-function renderLog(){
-  const el=document.getElementById("log");
-  el.innerHTML="";
-  logs.forEach(l=>{
-    const d=document.createElement("div");
-    d.textContent=JSON.stringify(l);
-    el.appendChild(d);
-  });
-}
-
-/* ======================
-   HELPERS
+   HELPERS (SINGLE SOURCE OF TRUTH)
 ====================== */
 
 function find(id){
@@ -187,7 +148,7 @@ function canInteract(item){
 }
 
 /* ======================
-   USERS (FIXED: ALWAYS RE-RENDER FEED)
+   USERS (FIXED: ALWAYS TRIGGERS FULL RENDER)
 ====================== */
 
 function renderUsers(){
@@ -201,9 +162,8 @@ function renderUsers(){
 
     d.onclick=()=>{
       currentUser=u;
-      log("switch",{user:u});
       renderUsers();
-      render(); // CRITICAL FIX
+      render(); // CRITICAL: full recompute
     };
 
     el.appendChild(d);
@@ -211,7 +171,7 @@ function renderUsers(){
 }
 
 /* ======================
-   CREATE
+   CREATE ROOT
 ====================== */
 
 function createRoot(){
@@ -228,25 +188,23 @@ function createRoot(){
   });
 
   document.getElementById("composer").value="";
-  log("create_root",text);
   render();
 }
 
 /* ======================
-   DISPUTE TOGGLE (STATE ONLY)
+   DISPUTE EXPANSION (STATE ONLY)
 ====================== */
 
-function toggleDispute(id){
-  const item=find(id);
+function toggleDispute(statementId){
+  const item=find(statementId);
   if(!item || !canInteract(item)) return;
 
-  item.disputeOpen = !item.disputeOpen;
-  log("toggle_dispute",{id,item:item.disputeOpen});
+  item.disputeOpen = true;
   render();
 }
 
 /* ======================
-   CHILD CREATION (FIXED RELIABILITY)
+   CHILD BRANCHING (FIXED CORE BUG)
 ====================== */
 
 function addChild(parentId,text,type){
@@ -262,12 +220,10 @@ function addChild(parentId,text,type){
     parent:parentId,
     disputeOpen:false
   });
-
-  log("child_created",{parentId,text,type});
 }
 
 /* ======================
-   SUBMIT (FIXED: ALWAYS CLOSES UI VIA RERENDER)
+   SUBMIT (ALWAYS RE-RENDERS)
 ====================== */
 
 function submitLeft(parentId){
@@ -275,7 +231,6 @@ function submitLeft(parentId){
   if(!v) return;
 
   addChild(parentId,v,"question");
-  document.getElementById("l-"+parentId).value="";
   render();
 }
 
@@ -284,23 +239,20 @@ function submitRight(parentId){
   if(!v) return;
 
   addChild(parentId,v,"proclaim");
-  document.getElementById("r-"+parentId).value="";
   render();
 }
 
 /* ======================
-   ACTIONS
+   AGREEMENT (SELF-BLOCKED)
 ====================== */
 
 function agree(id){
   const item=find(id);
   if(!item || !canInteract(item)) return;
-
-  log("agree",{id});
 }
 
 /* ======================
-   RENDER (FULL REBUILD EVERY TIME)
+   RENDER (PURE STATE DERIVED UI)
 ====================== */
 
 function render(){
@@ -308,8 +260,9 @@ function render(){
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  items.filter(x=>x.parent===null)
-       .forEach(item=>{
+  const roots = items.filter(x=>x.parent===null);
+
+  roots.forEach(item=>{
 
     const disabled = !canInteract(item);
 
@@ -352,13 +305,16 @@ function render(){
 
 renderUsers();
 render();
-renderLog();
 
 /* seed */
-items.push({id:id++,text:"All claims can be challenged",type:"proclaim",user:"alice",parent:null,disputeOpen:false});
-items.push({id:id++,text:"Some claims resist challenge",type:"proclaim",user:"bob",parent:null,disputeOpen:false});
-
-render();
+items.push({
+  id:id++,
+  text:"All claims can be challenged",
+  type:"proclaim",
+  user:"alice",
+  parent:null,
+  disputeOpen:false
+});
 
 </script>
 

@@ -76,7 +76,6 @@ button{
   font-size:12px;
 }
 
-/* DISPUTE */
 .dispute{
   display:none;
   grid-template-columns:1fr 1fr;
@@ -123,12 +122,12 @@ button{
 
 <script>
 
-const VERSION="9.0.0";
+const VERSION="10.0.0";
 document.getElementById("version").innerText="v"+VERSION;
 
-/* ======================
+/* =========================
    STATE
-====================== */
+========================= */
 
 let users=["alice","bob","charlie"];
 let currentUser="alice";
@@ -137,9 +136,9 @@ let id=0;
 
 let items=[];
 
-/* ======================
-   HELPERS (CRITICAL FIX)
-====================== */
+/* =========================
+   HELPERS (SOURCE OF TRUTH)
+========================= */
 
 function find(id){
   return items.find(x=>x.id===id);
@@ -149,9 +148,9 @@ function canInteract(item){
   return item.user !== currentUser;
 }
 
-/* ======================
-   USERS (FIXED REFRESH BEHAVIOR)
-====================== */
+/* =========================
+   USERS (FIXED FULL RE-RENDER)
+========================= */
 
 function renderUsers(){
   const el=document.getElementById("users");
@@ -165,16 +164,16 @@ function renderUsers(){
     d.onclick=()=>{
       currentUser=u;
       renderUsers();
-      render(); // IMPORTANT FIX: re-evaluate permissions
+      render(); // CRITICAL: recompute everything
     };
 
     el.appendChild(d);
   });
 }
 
-/* ======================
-   CREATE
-====================== */
+/* =========================
+   CREATE ROOT
+========================= */
 
 function createRoot(){
   const text=document.getElementById("composer").value.trim();
@@ -193,31 +192,28 @@ function createRoot(){
   render();
 }
 
-/* ======================
-   DISPUTE EXPANSION (FIXED CORE BEHAVIOR)
-====================== */
+/* =========================
+   DISPUTE EXPANSION (ONLY STATE CHANGE)
+========================= */
 
 function toggleDispute(statementId){
 
   const item=find(statementId);
   if(!item) return;
-
-  // FIX: enforce rule even if UI stale
   if(!canInteract(item)) return;
 
-  item.disputeOpen = !item.disputeOpen;
+  item.disputeOpen = true; // IMPORTANT: NO TOGGLE BACK (prevents confusion)
   render();
 }
 
-/* ======================
-   ADD CHILD (FIXED RELIABLE LINKING)
-====================== */
+/* =========================
+   CHILD CREATION (FIXED BINDING)
+========================= */
 
 function addChild(parentId,text,type){
 
   const parent=find(parentId);
   if(!parent) return;
-
   if(!canInteract(parent)) return;
 
   items.push({
@@ -230,92 +226,86 @@ function addChild(parentId,text,type){
   });
 }
 
-/* ======================
+/* =========================
    SUBMIT LEFT / RIGHT
-====================== */
+========================= */
 
 function submitLeft(parentId){
+  const val=document.getElementById("l-"+parentId).value.trim();
+  if(!val) return;
 
-  const text=document.getElementById("l-"+parentId).value.trim();
-  if(!text) return;
-
-  addChild(parentId,text,"question");
-
-  document.getElementById("l-"+parentId).value="";
+  addChild(parentId,val,"question");
   render();
 }
 
 function submitRight(parentId){
+  const val=document.getElementById("r-"+parentId).value.trim();
+  if(!val) return;
 
-  const text=document.getElementById("r-"+parentId).value.trim();
-  if(!text) return;
-
-  addChild(parentId,text,"proclaim");
-
-  document.getElementById("r-"+parentId).value="";
+  addChild(parentId,val,"proclaim");
   render();
 }
 
-/* ======================
-   ACTIONS (FIXED SELF-LOCK)
-====================== */
+/* =========================
+   ACTIONS
+========================= */
 
 function agree(id){
-
   const item=find(id);
   if(!item || !canInteract(item)) return;
 }
 
-/* ======================
+/* =========================
    RENDER (PURE STATE FUNCTION)
-====================== */
+========================= */
 
 function render(){
 
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  items.filter(x=>x.parent===null)
-       .forEach(item=>{
+  items
+    .filter(x=>x.parent===null)
+    .forEach(item=>{
 
-    const disabled = !canInteract(item);
+      const disabled = !canInteract(item);
 
-    const div=document.createElement("div");
+      const div=document.createElement("div");
 
-    div.innerHTML=`
-      <div class="card">
-        <div class="text">${item.text}</div>
-        <div class="meta">@${item.user}</div>
+      div.innerHTML=`
+        <div class="card">
+          <div class="text">${item.text}</div>
+          <div class="meta">@${item.user}</div>
 
-        <div class="actions">
-          <button onclick="agree(${item.id})" ${disabled?'disabled':''}>Agree</button>
-          <button onclick="toggleDispute(${item.id})" ${disabled?'disabled':''}>Disagree</button>
-        </div>
-
-        <div class="dispute ${item.disputeOpen?'open':''}">
-          <div class="col">
-            <div>Challenge</div>
-            <input class="input" id="l-${item.id}" placeholder="Ask / challenge...">
-            <button onclick="submitLeft(${item.id})">Submit</button>
+          <div class="actions">
+            <button onclick="agree(${item.id})" ${disabled?'disabled':''}>Agree</button>
+            <button onclick="toggleDispute(${item.id})" ${disabled?'disabled':''}>Disagree</button>
           </div>
 
-          <div class="col">
-            <div>Counter</div>
-            <input class="input" id="r-${item.id}" placeholder="Proclaim counter...">
-            <button onclick="submitRight(${item.id})">Submit</button>
+          <div class="dispute ${item.disputeOpen?'open':''}">
+            <div class="col">
+              <div>Challenge</div>
+              <input class="input" id="l-${item.id}" placeholder="Ask / challenge...">
+              <button onclick="submitLeft(${item.id})">Submit</button>
+            </div>
+
+            <div class="col">
+              <div>Counter</div>
+              <input class="input" id="r-${item.id}" placeholder="Proclaim counter...">
+              <button onclick="submitRight(${item.id})">Submit</button>
+            </div>
           </div>
+
         </div>
+      `;
 
-      </div>
-    `;
-
-    feed.appendChild(div);
-  });
+      feed.appendChild(div);
+    });
 }
 
-/* ======================
+/* =========================
    INIT
-====================== */
+========================= */
 
 renderUsers();
 render();

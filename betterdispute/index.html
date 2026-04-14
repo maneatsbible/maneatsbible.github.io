@@ -8,6 +8,7 @@
 <style>
 body{margin:0;font-family:system-ui;background:#0f0f0f;color:#eee}
 header{display:flex;justify-content:space-between;padding:10px}
+
 #users{display:flex;gap:6px;padding:8px}
 .user{padding:4px 8px;border:1px solid #333;border-radius:999px;cursor:pointer;opacity:.6}
 .user.active{opacity:1;border-color:#fff}
@@ -19,16 +20,11 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 .meta{font-size:11px;color:#888}
 
 .actions{margin-top:6px}
-.icon{font-size:20px;cursor:pointer;margin-right:10px}
+.icon{font-size:18px;cursor:pointer;margin-right:8px}
 .icon.active{opacity:1}
 .icon.dim{opacity:.25}
 
-.answerBtn{
-  font-size:12px;
-  color:#4caf50;
-  cursor:pointer;
-  margin-top:4px;
-}
+.node{margin-top:8px;border-left:2px solid #333;padding-left:6px}
 
 .dispute{
   display:grid;
@@ -39,9 +35,26 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 
 .lane{background:#141414;padding:8px;border-radius:8px}
 
-.node{margin-top:8px;border-left:2px solid #333;padding-left:6px}
+.answer{
+  margin-top:6px;
+  padding-left:10px;
+  border-left:2px solid #4caf50;
+}
+
+.answerBtn{
+  font-size:12px;
+  color:#4caf50;
+  cursor:pointer;
+}
 
 .turn{font-size:11px;color:#aaa;margin-top:4px}
+
+.controls{
+  font-size:12px;
+  margin-top:4px;
+  display:flex;
+  gap:8px;
+}
 
 /* popup */
 #popup{
@@ -72,7 +85,7 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 
 <header>
   <div>Better Dispute</div>
-  <div>v30</div>
+  <div>v32</div>
 </header>
 
 <div id="users"></div>
@@ -85,7 +98,7 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 
 <div id="popup">
   <div class="box">
-    <div id="modeTitle">Dispute</div>
+    <div id="modeTitle">Respond</div>
     <textarea id="ask" placeholder="Ask"></textarea>
     <textarea id="proclaim" placeholder="Proclaim / Answer"></textarea>
     <div class="row">
@@ -107,6 +120,10 @@ let reactions={};
 
 let active=null;
 let answerMode=false;
+let pendingSide="right";
+
+let collapsed={};
+let focusId=null;
 
 /* log */
 function log(e,d){
@@ -116,7 +133,7 @@ function log(e,d){
 /* helpers */
 function find(i){return items.find(x=>x.id===i);}
 
-/* unanswered detection */
+/* owes answer */
 function owesAnswer(user){
   for(let n of items){
     if(n.type==="question"){
@@ -148,17 +165,15 @@ function createRoot(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
 
-  items.push({id:id++,text:t,user:currentUser,parent:null,type:"proclaim",duel:null});
+  items.push({id:id++,text:t,user:currentUser,parent:null,type:"proclaim",side:"left"});
   document.getElementById("composer").value="";
   render();
-  log("create",t);
 }
 
-/* reactions */
+/* react */
 function react(i,type){
 
-  const owed = owesAnswer(currentUser);
-  if(owed){ log("blocked_due_to_answer"); return; }
+  if(owesAnswer(currentUser)) return;
 
   const node=find(i);
   if(!node || node.user===currentUser) return;
@@ -166,10 +181,9 @@ function react(i,type){
   reactions[i]=reactions[i]||{};
   reactions[i][currentUser]=type;
 
-  if(type==="down") openDispute(i,false);
+  pendingSide = (type==="up")?"left":"right";
 
-  render();
-  log(type,i);
+  openDispute(i,false);
 }
 
 /* open */
@@ -178,9 +192,8 @@ function openDispute(i,isAnswer){
   answerMode=isAnswer;
 
   document.getElementById("popup").classList.add("open");
-  document.getElementById("modeTitle").innerText = isAnswer ? "Answer" : "Dispute";
-
-  document.getElementById("ask").style.display = isAnswer ? "none" : "block";
+  document.getElementById("modeTitle").innerText = isAnswer?"Answer":"Respond";
+  document.getElementById("ask").style.display = isAnswer?"none":"block";
 }
 
 /* cancel */
@@ -200,33 +213,44 @@ function submit(){
   if(!parent){ cancel(); return; }
 
   let duel = parent.duel || {a:parent.user,b:currentUser,turn:currentUser};
-
   if(duel.turn!==currentUser){ cancel(); return; }
 
   const opponent = currentUser===duel.a ? duel.b : duel.a;
 
-  function push(text,type){
+  function push(text,type,parentId){
     items.push({
       id:id++,
       text,
       user:currentUser,
-      parent:active,
+      parent:parentId,
       type,
+      side:pendingSide,
       duel:{a:duel.a,b:duel.b,turn:opponent}
     });
   }
 
   if(answerMode){
     if(!pro){ cancel(); return; }
-    push(pro,"answer");
+    push(pro,"answer",active);
   }else{
-    if(ask) push(ask,"question");
-    if(pro) push(pro,"proclaim");
+    if(ask) push(ask,"question",active);
+    if(pro) push(pro,"proclaim",active);
   }
 
   cancel();
   render();
-  log("submit",active);
+}
+
+/* toggle collapse */
+function toggle(id){
+  collapsed[id]=!collapsed[id];
+  render();
+}
+
+/* focus */
+function focus(id){
+  focusId = (focusId===id)?null:id;
+  render();
 }
 
 /* render */
@@ -239,29 +263,42 @@ function render(){
 
     const children = items.filter(x=>x.parent===node.id);
 
-    const left = children.filter(c=>c.type==="question");
-    const right = children.filter(c=>c.type!=="question");
+    const left = children.filter(c=>c.side==="left" && c.type!=="answer");
+    const right = children.filter(c=>c.side==="right" && c.type!=="answer");
+    const answers = children.filter(c=>c.type==="answer");
 
     const my = reactions[node.id]?.[currentUser];
 
-    const owed = owesAnswer(currentUser);
+    if(collapsed[node.id]){
+      return `<div class="node">[+] ${node.text}</div>`;
+    }
 
     return `
       <div class="node">
-        <div>${node.text} <span class="meta">@${node.user}</span></div>
+        <div>
+          ${node.text} <span class="meta">@${node.user}</span>
+        </div>
+
+        <div class="controls">
+          <span onclick="toggle(${node.id})">🗂</span>
+          <span onclick="focus(${node.id})">🎯</span>
+        </div>
 
         ${node.user!==currentUser ? `
         <div class="actions">
           <span class="icon ${my==='up'?'active':my?'dim':''}" onclick="react(${node.id},'up')">👍</span>
           <span class="icon ${my==='down'?'active':my?'dim':''}" onclick="react(${node.id},'down')">👎</span>
-        </div>
-        `:""}
+        </div>`:""}
 
         ${node.type==="question" && node.duel && node.duel.turn===currentUser ? `
           <div class="answerBtn" onclick="openDispute(${node.id},true)">Answer</div>
         `:""}
 
         ${node.duel ? `<div class="turn">turn: ${node.duel.turn}</div>`:""}
+
+        ${answers.map(a=>`
+          <div class="answer">${a.text} <span class="meta">@${a.user}</span></div>
+        `).join("")}
 
         <div class="dispute">
           <div class="lane">${left.map(renderNode).join("")}</div>
@@ -271,9 +308,16 @@ function render(){
     `;
   }
 
-  items.filter(x=>x.parent===null).forEach(root=>{
-    feed.innerHTML += `<div class="card">${renderNode(root)}</div>`;
-  });
+  let roots = items.filter(x=>x.parent===null);
+
+  if(focusId){
+    const node=find(focusId);
+    feed.innerHTML = `<div class="card">${renderNode(node)}</div>`;
+  }else{
+    roots.forEach(r=>{
+      feed.innerHTML += `<div class="card">${renderNode(r)}</div>`;
+    });
+  }
 
   const logEl=document.getElementById("log");
   logEl.innerHTML="";
@@ -284,17 +328,18 @@ function render(){
   });
 }
 
-/* INIT */
+/* init */
 renderUsers();
 
-/* TEST DATA */
-items.push({id:id++,text:"Truth claims should be examined",user:"alice",parent:null,type:"proclaim"});
+/* test */
+items.push({id:id++,text:"Truth claims should be examined",user:"alice",parent:null,type:"proclaim",side:"left"});
 items.push({
   id:id++,
   text:"What makes a claim examinable?",
   user:"bob",
   parent:0,
   type:"question",
+  side:"right",
   duel:{a:"alice",b:"bob",turn:"alice"}
 });
 

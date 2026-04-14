@@ -3,18 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v35</title>
+<title>Better Dispute v35.1</title>
 
 <style>
 body{margin:0;font-family:system-ui;background:#0f0f0f;color:#eee}
 
-header{display:flex;justify-content:space-between;padding:10px}
+header{
+  display:flex;
+  justify-content:space-between;
+  padding:10px;
+  align-items:center;
+}
+
+button{cursor:pointer}
 
 #users{display:flex;gap:6px;padding:8px}
 .user{padding:4px 8px;border:1px solid #333;border-radius:999px;cursor:pointer;opacity:.6}
 .user.active{opacity:1;border-color:#fff}
 
-textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #333;padding:8px}
+textarea{
+  width:100%;
+  height:90px;
+  background:#0b0b0b;
+  color:#eee;
+  border:1px solid #333;
+  padding:8px;
+}
 
 .rootItem{
   margin:10px;
@@ -49,6 +63,7 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
   padding:10px;
   margin-bottom:8px;
   border-radius:8px;
+  position:relative;
 }
 
 .meta{font-size:11px;color:#888}
@@ -57,6 +72,32 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 .icon{font-size:18px;cursor:pointer;margin-right:8px}
 .icon.dim{opacity:.3}
 .icon.active{opacity:1}
+
+/* chat */
+.chatBtn{
+  font-size:11px;
+  color:#888;
+  cursor:pointer;
+  margin-top:6px;
+}
+
+.chatBox{
+  display:none;
+  margin-top:6px;
+  padding:6px;
+  background:#101010;
+  border:1px solid #333;
+}
+
+.chatBox.open{display:block}
+
+.smallInput{
+  width:100%;
+  background:#0b0b0b;
+  color:#eee;
+  border:1px solid #333;
+  margin-top:4px;
+}
 
 /* log */
 #log{
@@ -73,18 +114,22 @@ textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #
 <body>
 
 <header>
-  <div>Better Dispute</div>
-  <div>v35</div>
+  <div>
+    <button onclick="home()">🏠 Home</button>
+    Better Dispute v35.1
+  </div>
 </header>
 
 <div id="users"></div>
 
-<textarea id="composer" placeholder="Start a fire..."></textarea>
-<button onclick="create()">Proclaim</button>
+<!-- composer (hidden in drill mode) -->
+<div id="composerWrap">
+  <textarea id="composer" placeholder="Start a fire..."></textarea>
+  <button onclick="create()">Proclaim</button>
+</div>
 
 <div id="nav"></div>
 <div id="view"></div>
-
 <div id="log"></div>
 
 <script>
@@ -96,26 +141,20 @@ let id=0;
 let items=[];
 
 /* state */
-let state={};
+let stack=[]; // drill path
 
+let reactions={};   // key=user|node
+let chat={};        // node -> messages
 let logs=[];
 
 function log(e,d){
   logs.push({t:Date.now(),u:currentUser,e,d});
 }
 
-/* per-user state */
-function getState(){
-  if(!state[currentUser]){
-    state[currentUser]={
-      stack:{}
-    };
-  }
-  return state[currentUser];
-}
-
 /* helpers */
 function find(i){return items.find(x=>x.id===i);}
+
+function key(u,id){return u+"|"+id;}
 
 /* users */
 function renderUsers(){
@@ -134,7 +173,13 @@ function renderUsers(){
   });
 }
 
-/* create root */
+/* home */
+function home(){
+  stack=[];
+  render();
+}
+
+/* create */
 function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
@@ -144,7 +189,8 @@ function create(){
     text:t,
     user:currentUser,
     parent:null,
-    side:null
+    side:null,
+    resolved:false
   });
 
   document.getElementById("composer").value="";
@@ -152,40 +198,53 @@ function create(){
   log("create",t);
 }
 
-/* navigation stack (global view stack) */
-let stack=[];
-
+/* navigation */
 function enter(id){
   stack.push(id);
-  log("enter",id);
   render();
 }
 
 function back(){
   stack.pop();
-  log("back","");
   render();
 }
 
-/* react */
-let reactions={};
-
+/* reactions (LOCKED: no flipping) */
 function react(id,type){
   const n=find(id);
   if(!n || n.user===currentUser) return;
 
-  reactions[currentUser+"|"+id]=type;
+  const k=key(currentUser,id);
+
+  if(reactions[k]) return; // cannot change twice
+
+  reactions[k]=type;
   log(type,id);
   render();
 }
 
-/* render dispute (NO nesting UI allowed) */
-function renderDispute(node){
+/* chat */
+function toggleChat(id){
+  const el=document.getElementById("chat_"+id);
+  el.classList.toggle("open");
+}
 
-  const children = items.filter(x=>x.parent===node.id);
+function sendChat(id){
+  const input=document.getElementById("c_"+id);
+  const v=input.value.trim();
+  if(!v) return;
 
-  const left = children.filter(c=>c.side==="left");
-  const right = children.filter(c=>c.side==="right");
+  chat[id]=chat[id]||[];
+  chat[id].push({u:currentUser,m:v});
+
+  input.value="";
+  render();
+}
+
+/* render node (NO nesting UI) */
+function renderNode(node){
+
+  const r = reactions[key(currentUser,node.id)];
 
   return `
     <div class="card">
@@ -194,17 +253,55 @@ function renderDispute(node){
 
       ${node.user!==currentUser ? `
         <div class="actions">
-          <span class="icon ${reactions[currentUser+"|"+node.id]==='up'?'active':'dim'}"
-                onclick="react(${node.id},'up')">👍</span>
-
-          <span class="icon ${reactions[currentUser+"|"+node.id]==='down'?'active':'dim'}"
-                onclick="react(${node.id},'down')">👎</span>
+          <span class="icon ${r==='up'?'active':'dim'}" onclick="react(${node.id},'up')">👍</span>
+          <span class="icon ${r==='down'?'active':'dim'}" onclick="react(${node.id},'down')">👎</span>
         </div>
       `:""}
+
+      <div class="chatBtn" onclick="toggleChat(${node.id})">💬 chat</div>
+
+      <div class="chatBox" id="chat_${node.id}">
+        ${(chat[node.id]||[]).map(c=>`<div><b>${c.u}</b>: ${c.m}</div>`).join("")}
+        <input id="c_${node.id}" class="smallInput">
+        <button onclick="sendChat(${node.id})">send</button>
+      </div>
 
       <div style="margin-top:6px;color:#4caf50;cursor:pointer;font-size:12px"
            onclick="enter(${node.id})">
         open dispute →
+      </div>
+
+    </div>
+  `;
+}
+
+/* render dispute view */
+function renderDispute(node){
+
+  const children = items.filter(x=>x.parent===node.id);
+
+  const left = children.filter(c=>c.side==="left");
+  const right = children.filter(c=>c.side==="right");
+
+  return `
+    <div>
+
+      <!-- TOP: disputed statement -->
+      <div class="card" style="border:1px solid #333">
+        <div>${node.text} <span class="meta">@${node.user}</span></div>
+      </div>
+
+      <!-- 2 lanes -->
+      <div class="dispute">
+
+        <div class="lane">
+          ${left.map(renderNode).join("")}
+        </div>
+
+        <div class="lane">
+          ${right.map(renderNode).join("")}
+        </div>
+
       </div>
 
     </div>
@@ -216,11 +313,14 @@ function render(){
 
   const view=document.getElementById("view");
   const nav=document.getElementById("nav");
+  const comp=document.getElementById("composerWrap");
 
   view.innerHTML="";
   nav.innerHTML="";
 
-  /* ROOT VIEW */
+  /* hide composer in drill mode */
+  comp.style.display = stack.length ? "none" : "block";
+
   if(stack.length===0){
 
     items.filter(x=>x.parent===null).forEach(n=>{
@@ -235,26 +335,11 @@ function render(){
 
     const current = find(stack[stack.length-1]);
 
-    nav.innerHTML = `<div class="nav" onclick="back()">⬅ back</div>`;
-
-    const children = items.filter(x=>x.parent===current.id);
-
-    const left = children.filter(c=>c.side==="left");
-    const right = children.filter(c=>c.side==="right");
-
-    view.innerHTML = `
-      <div class="dispute">
-
-        <div class="lane">
-          ${left.map(renderDispute).join("")}
-        </div>
-
-        <div class="lane">
-          ${right.map(renderDispute).join("")}
-        </div>
-
-      </div>
+    nav.innerHTML = `
+      <div class="nav" onclick="back()">⬅ back</div>
     `;
+
+    view.innerHTML = renderDispute(current);
   }
 
   /* log */
@@ -263,15 +348,16 @@ function render(){
     .map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* seed test data (rich branching) */
+/* seed test data (expanded disputes) */
 
-items.push({id:id++,text:"Reality is structured",user:"alice",parent:null,side:null});
-items.push({id:id++,text:"Structure depends on observer",user:"bob",parent:0,side:"right"});
-items.push({id:id++,text:"Observer depends on language",user:"charlie",parent:1,side:"left"});
-items.push({id:id++,text:"Language is structured by reality",user:"dana",parent:2,side:"right"});
-items.push({id:id++,text:"Therefore reality is circular",user:"bob",parent:3,side:"left"});
-items.push({id:id++,text:"Circular systems still require grounding",user:"alice",parent:4,side:"right"});
-items.push({id:id++,text:"Grounding is assumed, not proven",user:"charlie",parent:5,side:"left"});
+items.push({id:id++,text:"Truth depends on structure",user:"alice",parent:null});
+items.push({id:id++,text:"Structure depends on perception",user:"bob",parent:0,side:"right"});
+items.push({id:id++,text:"Perception is language-bound",user:"charlie",parent:1,side:"left"});
+items.push({id:id++,text:"Language is social constraint",user:"dana",parent:2,side:"right"});
+items.push({id:id++,text:"Constraints shape truth",user:"bob",parent:3,side:"left"});
+items.push({id:id++,text:"Truth resists constraint",user:"alice",parent:4,side:"right"});
+items.push({id:id++,text:"Resistance implies structure",user:"charlie",parent:5,side:"left"});
+items.push({id:id++,text:"Structure implies hierarchy",user:"dana",parent:6,side:"right"});
 
 renderUsers();
 render();

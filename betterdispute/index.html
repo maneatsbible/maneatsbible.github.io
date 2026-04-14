@@ -149,14 +149,14 @@ input{
 <!-- POPUP -->
 <div id="popup">
   <div class="box">
-    <div>Dispute</div>
+    <div id="title"></div>
 
-    <input id="ask" placeholder="Ask">
-    <input id="proclaim" placeholder="Proclaim">
+    <input id="challengeInput" placeholder="Ask (challenge)">
+    <input id="counterInput" placeholder="Proclaim (counter)">
 
     <div class="row">
-      <button onclick="submitAsk()">Submit Ask</button>
-      <button onclick="submitProclaim()">Submit Proclaim</button>
+      <button onclick="submitChallenge()">Submit Challenge</button>
+      <button onclick="submitCounter()">Submit Counter</button>
       <button onclick="closePopup()">Close</button>
     </div>
   </div>
@@ -164,10 +164,9 @@ input{
 
 <script>
 
-let VERSION = 18;
-document.getElementById("version").innerText = VERSION;
+let VERSION=19;
+document.getElementById("version").innerText=VERSION;
 
-/* STATE */
 let users=["alice","bob","charlie"];
 let currentUser="alice";
 
@@ -183,9 +182,8 @@ function log(e,d){
 }
 
 /* HELP */
-function find(i){ return items.find(x=>x.id===i); }
+function find(i){return items.find(x=>x.id===i);}
 
-/* STRICT SELF BLOCK */
 function isOwner(item){
   return item.user===currentUser;
 }
@@ -194,7 +192,6 @@ function isOwner(item){
 function renderUsers(){
   const el=document.getElementById("users");
   el.innerHTML="";
-
   users.forEach(u=>{
     const d=document.createElement("div");
     d.className="user"+(u===currentUser?" active":"");
@@ -203,7 +200,7 @@ function renderUsers(){
     d.onclick=()=>{
       currentUser=u;
       renderUsers();
-      render(); // CRITICAL FIX
+      render();
       log("switch",u);
     };
 
@@ -211,7 +208,7 @@ function renderUsers(){
   });
 }
 
-/* ROOT */
+/* CREATE */
 function createRoot(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
@@ -228,24 +225,27 @@ function createRoot(){
   log("create",t);
 }
 
-/* DISPUTE OPEN */
+/* OPEN DISPUTE */
 function openDispute(i){
   const item=find(i);
   if(!item || isOwner(item)) return;
 
   active=i;
   document.getElementById("popup").classList.add("open");
-  log("dispute",i);
+
+  document.getElementById("challengeInput").value="";
+  document.getElementById("counterInput").value="";
 }
 
+/* CLOSE */
 function closePopup(){
   active=null;
   document.getElementById("popup").classList.remove("open");
 }
 
-/* BRANCHING */
-function submitAsk(){
-  const v=document.getElementById("ask").value.trim();
+/* SUBMIT CHILDREN */
+function submitChallenge(){
+  const v=document.getElementById("challengeInput").value.trim();
   if(!v) return;
 
   items.push({
@@ -258,11 +258,11 @@ function submitAsk(){
 
   closePopup();
   render();
-  log("ask",v);
+  log("challenge",v);
 }
 
-function submitProclaim(){
-  const v=document.getElementById("proclaim").value.trim();
+function submitCounter(){
+  const v=document.getElementById("counterInput").value.trim();
   if(!v) return;
 
   items.push({
@@ -275,10 +275,10 @@ function submitProclaim(){
 
   closePopup();
   render();
-  log("proclaim",v);
+  log("counter",v);
 }
 
-/* AGREE (HARD BLOCK SELF) */
+/* AGREE (NOT SHOWN FOR OWN ITEMS) */
 function agree(i){
   const item=find(i);
   if(!item || isOwner(item)) return;
@@ -291,11 +291,10 @@ function render(){
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  const roots = items.filter(x=>x.parent===null);
+  items.filter(x=>x.parent===null)
+  .forEach(r=>{
 
-  roots.forEach(r=>{
-
-    const blocked = isOwner(r);
+    const hideActions = isOwner(r); // HARD RULE
 
     const children = items.filter(x=>x.parent===r.id);
 
@@ -308,10 +307,12 @@ function render(){
         <div class="text">${r.text}</div>
         <div class="meta">@${r.user}</div>
 
+        ${!hideActions ? `
         <div class="actions">
-          <button onclick="agree(${r.id})" ${blocked?'disabled':''}>Agree</button>
-          <button onclick="openDispute(${r.id})" ${blocked?'disabled':''}>Disagree</button>
+          <button onclick="agree(${r.id})">Agree</button>
+          <button onclick="openDispute(${r.id})">Disagree</button>
         </div>
+        ` : ""}
 
         ${childHtml}
       </div>

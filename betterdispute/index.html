@@ -36,17 +36,16 @@ header{
   opacity:0.6;
 }
 
-.user.active{
-  opacity:1;
-  border-color:#fff;
-}
+.user.active{opacity:1;border-color:#fff}
 
 #composer{
   width:100%;
-  height:70px;
+  height:80px;
   background:#0b0b0b;
   border:1px solid #333;
   color:#eee;
+  font-size:14px;
+  padding:8px;
 }
 
 #feed{padding:10px}
@@ -71,21 +70,18 @@ header{
 .icon{
   font-size:20px;
   cursor:pointer;
-  opacity:0.25;
   user-select:none;
+  opacity:0.9; /* BOTH BRIGHT DEFAULT */
   transition:0.15s;
 }
 
-.icon:hover{opacity:0.6}
-
-.icon.active{opacity:1}
-
-.state{
-  font-size:11px;
-  color:#777;
+.icon.dim{
+  opacity:0.25;
 }
 
-/* DISPUTE POPUP */
+.icon:hover{opacity:1}
+
+/* POPUP */
 #popup{
   display:none;
   position:fixed;
@@ -110,20 +106,28 @@ header{
   margin-bottom:10px;
 }
 
-input{
+textarea.input{
   width:100%;
-  margin-top:8px;
+  height:80px;
   background:#0b0b0b;
   border:1px solid #333;
   color:#eee;
+  font-size:14px;
   padding:8px;
   border-radius:6px;
+  margin-top:8px;
 }
 
 .row{
   display:flex;
   justify-content:space-between;
   margin-top:10px;
+}
+
+.iconBtn{
+  font-size:20px;
+  cursor:pointer;
+  opacity:1; /* ALWAYS FULL BRIGHT */
 }
 
 /* LOG */
@@ -158,19 +162,19 @@ input{
   <div class="box">
     <div class="title">Dispute</div>
 
-    <input id="challenge" placeholder="Ask (optional)">
-    <input id="counter" placeholder="Proclaim (optional)">
+    <textarea id="challenge" class="input" placeholder="Ask (optional)"></textarea>
+    <textarea id="counter" class="input" placeholder="Proclaim (optional)"></textarea>
 
     <div class="row">
-      <span class="icon" onclick="submitDispute()">✔</span>
-      <span class="icon" onclick="closePopup()">✖</span>
+      <span class="iconBtn" onclick="submitDispute()">✔</span>
+      <span class="iconBtn" onclick="closePopup()">✖</span>
     </div>
   </div>
 </div>
 
 <script>
 
-let VERSION=22;
+let VERSION=23;
 document.getElementById("version").innerText="v"+VERSION;
 
 let users=["alice","bob","charlie"];
@@ -180,19 +184,13 @@ let id=0;
 let items=[];
 let logs=[];
 
+let reactions={};     // {id:{user:"up"|"down"}}
 let active=null;
-
-/* per-user single disagree rule */
-let disagreed={}; // statementId -> Set(users)
+let disagreed={};
 
 /* LOG */
 function log(e,d){
-  logs.push({
-    t:new Date().toISOString(),
-    u:currentUser,
-    e,
-    d
-  });
+  logs.push({t:new Date().toISOString(),u:currentUser,e,d});
 }
 
 /* HELP */
@@ -240,17 +238,18 @@ function createRoot(){
   log("create",t);
 }
 
-/* REACT */
+/* REACTION */
 function react(i,type){
   const item=find(i);
   if(!item || isOwner(item)) return;
 
-  if(type==="down"){
-    openDispute(i);
-    return;
-  }
+  reactions[i]=reactions[i]||{};
+  reactions[i][currentUser]=type;
 
-  log("agree",i);
+  if(type==="down") openDispute(i);
+
+  render();
+  log(type,i);
 }
 
 /* OPEN DISPUTE */
@@ -268,13 +267,12 @@ function openDispute(i){
   document.getElementById("counter").value="";
 }
 
-/* CLOSE */
 function closePopup(){
   active=null;
   document.getElementById("popup").classList.remove("open");
 }
 
-/* SINGLE SUBMIT */
+/* SUBMIT */
 function submitDispute(){
 
   const c=document.getElementById("challenge").value.trim();
@@ -317,9 +315,10 @@ function render(){
   const feed=document.getElementById("feed");
   feed.innerHTML="";
 
-  const roots = items.filter(x=>x.parent===null);
+  items.filter(x=>x.parent===null).forEach(r=>{
 
-  roots.forEach(r=>{
+    const rState = reactions[r.id] || {};
+    const my = rState[currentUser];
 
     const children = items.filter(x=>x.parent===r.id);
 
@@ -329,17 +328,15 @@ function render(){
       </div>`
     ).join("");
 
-    const showControls = r.user !== currentUser;
-
     feed.innerHTML += `
       <div class="card">
         <div class="text">${r.text}</div>
         <div class="meta">@${r.user}</div>
 
-        ${showControls ? `
+        ${r.user!==currentUser ? `
         <div class="actions">
-          <span class="icon" onclick="react(${r.id},'up')">👍</span>
-          <span class="icon" onclick="react(${r.id},'down')">👎</span>
+          <span class="icon ${my==='up'?'':'dim'}" onclick="react(${r.id},'up')">👍</span>
+          <span class="icon ${my==='down'?'':'dim'}" onclick="react(${r.id},'down')">👎</span>
         </div>
         ` : ""}
 

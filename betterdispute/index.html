@@ -3,25 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v35</title>
+<title>Better Dispute v33 (Restored)</title>
 
 <style>
 body{margin:0;font-family:system-ui;background:#0f0f0f;color:#eee}
+
 header{display:flex;justify-content:space-between;padding:10px}
 
 #users{display:flex;gap:6px;padding:8px}
 .user{padding:4px 8px;border:1px solid #333;border-radius:999px;cursor:pointer;opacity:.6}
 .user.active{opacity:1;border-color:#fff}
 
-textarea{width:100%;height:80px;background:#0b0b0b;color:#eee;border:1px solid #333;padding:8px}
+textarea{width:100%;height:90px;background:#0b0b0b;color:#eee;border:1px solid #333;padding:8px}
 
 .card{background:#1a1a1a;margin:10px;padding:10px;border-radius:10px}
 
 .meta{font-size:11px;color:#888}
 
 .actions{margin-top:6px}
-.icon{font-size:18px;cursor:pointer;margin-right:8px}
-.icon.dim{opacity:.3}
+.icon{font-size:20px;cursor:pointer;margin-right:10px}
+.icon.dim{opacity:.25}
 .icon.active{opacity:1}
 
 .dispute{
@@ -33,6 +34,15 @@ textarea{width:100%;height:80px;background:#0b0b0b;color:#eee;border:1px solid #
 
 .lane{background:#141414;padding:8px;border-radius:8px}
 
+.branch{
+  margin-top:8px;
+  padding:6px;
+  background:#101010;
+  border:1px solid #333;
+  border-radius:6px;
+  cursor:pointer;
+}
+
 .answer{
   margin-top:6px;
   padding-left:10px;
@@ -41,36 +51,18 @@ textarea{width:100%;height:80px;background:#0b0b0b;color:#eee;border:1px solid #
 
 .turn{font-size:11px;color:#aaa;margin-top:4px}
 
-.resolve{
-  font-size:11px;
+.nav{
+  padding:10px;
+  cursor:pointer;
   color:#4caf50;
-  cursor:pointer;
-  margin-top:6px;
 }
 
-.chatToggle{
-  font-size:11px;
-  color:#888;
-  cursor:pointer;
-  margin-top:6px;
-}
-
-.chatbox{
-  display:none;
-  margin-top:6px;
-  padding:6px;
-  background:#101010;
-  border:1px solid #333;
-}
-
-.chatbox.open{display:block}
-
-.log{
+#log{
   border-top:1px solid #222;
   padding:10px;
   font-size:11px;
   color:#7f7;
-  max-height:140px;
+  max-height:160px;
   overflow:auto;
 }
 </style>
@@ -80,17 +72,17 @@ textarea{width:100%;height:80px;background:#0b0b0b;color:#eee;border:1px solid #
 
 <header>
   <div>Better Dispute</div>
-  <div>v35</div>
+  <div>v33 (restored)</div>
 </header>
 
 <div id="users"></div>
 
 <textarea id="composer" placeholder="Start a fire..."></textarea>
-<button onclick="create()">Proclaim</button>
+<button onclick="createRoot()">Proclaim</button>
 
+<div id="nav"></div>
 <div id="feed"></div>
-
-<div class="log" id="log"></div>
+<div id="log"></div>
 
 <script>
 
@@ -100,21 +92,41 @@ let currentUser="alice";
 let id=0;
 let items=[];
 
-/* flat state maps (no nesting in render path) */
-let reactions={};   // key: user|node -> up/down
-let resolved={};    // key: node -> true
-let chats={};       // node -> [msg]
+/* per-user isolated state */
+let state={};
 
-let logData=[];
+function getState(){
+  if(!state[currentUser]){
+    state[currentUser]={
+      reactions:{},
+      navStack:[],
+      logs:[]
+    };
+  }
+  return state[currentUser];
+}
 
 /* logging */
 function log(e,d){
-  logData.push({t:Date.now(),u:currentUser,e,d});
+  getState().logs.push({t:new Date().toISOString(),u:currentUser,e,d});
 }
 
 /* helpers */
-function key(u,id){return u+"|"+id;}
 function find(i){return items.find(x=>x.id===i);}
+
+/* unanswered detection */
+function owesAnswer(user){
+  for(let n of items){
+    if(n.type==="question"){
+      const children = items.filter(x=>x.parent===n.id);
+      const answered = children.some(c=>c.type==="answer");
+      if(!answered && n.duel && n.duel.turn===user){
+        return n;
+      }
+    }
+  }
+  return null;
+}
 
 /* users */
 function renderUsers(){
@@ -133,8 +145,8 @@ function renderUsers(){
   });
 }
 
-/* create */
-function create(){
+/* root */
+function createRoot(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
 
@@ -143,7 +155,9 @@ function create(){
     text:t,
     user:currentUser,
     parent:null,
-    side:"left"
+    type:"proclaim",
+    side:"left",
+    duel:null
   });
 
   document.getElementById("composer").value="";
@@ -152,119 +166,143 @@ function create(){
 }
 
 /* react */
-function react(id,dir){
-  const n=find(id);
-  if(!n || n.user===currentUser) return;
+function react(i,type){
 
-  if(resolved[id]) return;
+  if(owesAnswer(currentUser)) return;
 
-  const k=key(currentUser,id);
+  const node=find(i);
+  if(!node || node.user===currentUser) return;
 
-  if(reactions[k]){
-    if(reactions[k]===dir) return;
-    if(reactions[k]!==dir) return; // no flip-flop allowed
-  }
+  let s=getState();
+  s.reactions[i]=type;
 
-  reactions[k]=dir;
-  log(dir,id);
+  if(type==="down") openDispute(i);
+}
+
+/* open dispute */
+let active=null;
+
+function openDispute(i){
+  active=i;
   render();
 }
 
-/* resolve */
-function resolve(id){
-  resolved[id]=true;
-  log("resolve",id);
+/* submit simple branch */
+function submitBranch(text,type,parentId,side){
+
+  items.push({
+    id:id++,
+    text,
+    user:currentUser,
+    parent:parentId,
+    type,
+    side,
+    duel:null
+  });
+
+  render();
+  log("submit",text);
+}
+
+/* navigation */
+function enter(id){
+  getState().navStack.push(id);
   render();
 }
 
-/* chat */
-function toggleChat(id){
-  const box=document.getElementById("chat-"+id);
-  box.classList.toggle("open");
-}
-
-function sendChat(id){
-  const input=document.getElementById("c-"+id);
-  const v=input.value.trim();
-  if(!v) return;
-
-  chats[id]=chats[id]||[];
-  chats[id].push({u:currentUser,m:v});
-
-  input.value="";
+function back(){
+  getState().navStack.pop();
   render();
-}
-
-/* render node */
-function renderNode(node){
-
-  const children = items.filter(x=>x.parent===node.id);
-
-  const left = children.filter(c=>c.side==="left");
-  const right = children.filter(c=>c.side==="right");
-
-  const myUp = reactions[key(currentUser,node.id)]==="up";
-  const myDown = reactions[key(currentUser,node.id)]==="down";
-
-  return `
-  <div class="card">
-
-    <div>${node.text} <span class="meta">@${node.user}</span></div>
-
-    <div class="actions">
-      <span class="icon ${myUp?'active':'dim'}" onclick="react(${node.id},'up')">👍</span>
-      <span class="icon ${myDown?'active':'dim'}" onclick="react(${node.id},'down')">👎</span>
-    </div>
-
-    ${resolved[node.id]?`<div class="resolve">resolved ✓</div>`:`<div class="resolve" onclick="resolve(${node.id})">resolve</div>`}
-
-    <div class="chatToggle" onclick="toggleChat(${node.id})">💬 chat</div>
-
-    <div class="chatbox" id="chat-${node.id}">
-      ${(chats[node.id]||[]).map(c=>`<div><b>${c.u}</b>: ${c.m}</div>`).join("")}
-      <input id="c-${node.id}" style="width:100%;margin-top:6px;background:#0b0b0b;color:#eee;border:1px solid #333">
-      <button onclick="sendChat(${node.id})">send</button>
-    </div>
-
-    <div class="dispute">
-
-      <div class="lane">
-        ${left.map(renderNode).join("")}
-      </div>
-
-      <div class="lane">
-        ${right.map(renderNode).join("")}
-      </div>
-
-    </div>
-
-  </div>
-  `;
 }
 
 /* render */
 function render(){
-  const feed=document.getElementById("feed");
-  feed.innerHTML="";
 
-  items.filter(x=>x.parent===null).forEach(n=>{
-    feed.innerHTML += renderNode(n);
+  const feed=document.getElementById("feed");
+  const nav=document.getElementById("nav");
+
+  feed.innerHTML="";
+  nav.innerHTML="";
+
+  let s=getState();
+
+  if(s.navStack.length){
+    nav.innerHTML=`<div class="nav" onclick="back()">⬅ back</div>`;
+  }
+
+  let roots = s.navStack.length
+    ? [find(s.navStack[s.navStack.length-1])]
+    : items.filter(x=>x.parent===null);
+
+  function renderNode(node){
+
+    const children = items.filter(x=>x.parent===node.id);
+
+    const left = children.filter(c=>c.side==="left");
+    const right = children.filter(c=>c.side==="right");
+
+    const my = s.reactions[node.id];
+
+    return `
+      <div class="card">
+
+        <div>${node.text} <span class="meta">@${node.user}</span></div>
+
+        ${node.user!==currentUser ? `
+        <div class="actions">
+          <span class="icon ${my==='up'?'active':my?'dim':''}" onclick="react(${node.id},'up')">👍</span>
+          <span class="icon ${my==='down'?'active':my?'dim':''}" onclick="react(${node.id},'down')">👎</span>
+        </div>`:""}
+
+        ${node.type==="question" && node.duel && node.duel.turn===currentUser ? `
+          <div onclick="submitBranch('answer','answer',${node.id},'left')" style="color:#4caf50;cursor:pointer;font-size:12px">answer</div>
+        `:""}
+
+        ${node.duel?`<div class="turn">turn: ${node.duel.turn}</div>`:""}
+
+        <div class="dispute">
+
+          <div class="lane">
+            ${left.map(renderNode).join("")}
+          </div>
+
+          <div class="lane">
+            ${right.map(renderNode).join("")}
+          </div>
+
+        </div>
+
+        ${children.filter(c=>c.type!=="answer").map(c=>`
+          <div class="branch" onclick="enter(${c.id})">
+            ${c.text} →
+          </div>
+        `).join("")}
+
+      </div>
+    `;
+  }
+
+  roots.forEach(r=>{
+    feed.innerHTML += renderNode(r);
   });
 
-  const l=document.getElementById("log");
-  l.innerHTML=logData.slice(-200).reverse().map(x=>JSON.stringify(x)).join("<br>");
+  const logEl=document.getElementById("log");
+  logEl.innerHTML="";
+  s.logs.slice(-200).forEach(l=>{
+    const d=document.createElement("div");
+    d.textContent=JSON.stringify(l);
+    logEl.appendChild(d);
+  });
 }
 
 /* init */
 renderUsers();
 
-/* test data (expanded + branching) */
-items.push({id:id++,text:"Truth is structured",user:"alice",parent:null,side:"left"});
-items.push({id:id++,text:"Truth is contextual",user:"bob",parent:0,side:"right"});
-items.push({id:id++,text:"Structure implies hierarchy",user:"charlie",parent:0,side:"right"});
-items.push({id:id++,text:"Context depends on structure",user:"alice",parent:2,side:"left"});
-items.push({id:id++,text:"Then structure is unstable",user:"bob",parent:3,side:"right"});
-items.push({id:id++,text:"Instability can still be mapped",user:"charlie",parent:4,side:"left"});
+/* test data */
+items.push({id:id++,text:"Truth claims should be examined",user:"alice",parent:null,type:"proclaim",side:"left"});
+items.push({id:id++,text:"What defines truth?",user:"bob",parent:0,type:"question",side:"right",duel:{a:"alice",b:"bob",turn:"alice"}});
+items.push({id:id++,text:"Truth is correspondence",user:"charlie",parent:1,type:"proclaim",side:"left"});
+items.push({id:id++,text:"Correspondence assumes realism",user:"bob",parent:2,type:"proclaim",side:"right"});
 
 render();
 

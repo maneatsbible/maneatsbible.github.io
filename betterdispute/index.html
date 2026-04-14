@@ -21,7 +21,6 @@ header{
 
 .version{font-size:11px;color:#777}
 
-/* USERS */
 #users{
   display:flex;
   gap:6px;
@@ -42,7 +41,14 @@ header{
   border-color:#fff;
 }
 
-/* FEED */
+#composer{
+  width:100%;
+  height:80px;
+  background:#0b0b0b;
+  border:1px solid #333;
+  color:#eee;
+}
+
 #feed{padding:10px;}
 
 .card{
@@ -55,7 +61,11 @@ header{
 .text{font-weight:600}
 .meta{font-size:11px;color:#888;margin-top:4px}
 
-.actions{display:flex;gap:6px;margin-top:8px}
+.actions{
+  margin-top:8px;
+  display:flex;
+  gap:6px;
+}
 
 button{
   background:#222;
@@ -66,12 +76,11 @@ button{
   font-size:12px;
 }
 
-/* DISPUTE STATE */
 .dispute{
   display:none;
-  margin-top:10px;
   grid-template-columns:1fr 1fr;
   gap:10px;
+  margin-top:10px;
 }
 
 .dispute.open{
@@ -113,40 +122,31 @@ button{
 
 <script>
 
-const VERSION="7.0.0";
+const VERSION="8.0.0";
 
-/* ======================
-   STATE MODEL (FIXED)
-====================== */
+document.getElementById("version").innerText="v"+VERSION;
+
+/* =====================
+   STATE
+===================== */
 
 let users=["alice","bob","charlie"];
 let currentUser="alice";
 
 let id=0;
-
 let items=[];
 
-/* ======================
-   VERSION
-====================== */
-
-document.getElementById("version").innerText="v"+VERSION;
-
-/* ======================
-   LOGIC HELPERS (CRITICAL FIX)
-====================== */
-
-function find(id){
-  return items.find(x=>x.id===id);
-}
+/* =====================
+   LOGIC GUARD (FIXED)
+===================== */
 
 function canInteract(item){
   return item.user !== currentUser;
 }
 
-/* ======================
+/* =====================
    USERS
-====================== */
+===================== */
 
 function renderUsers(){
   const el=document.getElementById("users");
@@ -167,17 +167,17 @@ function renderUsers(){
   });
 }
 
-/* ======================
+/* =====================
    CREATE ROOT
-====================== */
+===================== */
 
 function createRoot(){
-  const t=document.getElementById("composer").value.trim();
-  if(!t) return;
+  const text=document.getElementById("composer").value.trim();
+  if(!text) return;
 
   items.push({
     id:id++,
-    text:t,
+    text,
     type:"proclaim",
     user:currentUser,
     parent:null,
@@ -188,77 +188,78 @@ function createRoot(){
   render();
 }
 
-/* ======================
-   DISPUTE EXPANSION (FIXED CORE)
-====================== */
+/* =====================
+   DISPUTE TOGGLE (FIXED ONLY VISIBILITY)
+===================== */
 
-function toggleDispute(id){
+function toggleDispute(statementId){
 
-  const item=find(id);
+  const item=items.find(x=>x.id===statementId);
   if(!item || !canInteract(item)) return;
 
   item.disputeOpen = !item.disputeOpen;
   render();
 }
 
-/* ======================
-   SUBMIT LEFT / RIGHT (FIXED BINDING)
-====================== */
+/* =====================
+   SAFE CHILD CREATION (FIXED PARENT BUG)
+===================== */
 
-function submitLeft(id){
+function addChild(parentId,text,type){
 
-  const item=find(id);
-  if(!item || !canInteract(item)) return;
-
-  const el=document.getElementById("l-"+id);
-  const t=el.value.trim();
-  if(!t) return;
+  const parent=items.find(x=>x.id===parentId);
+  if(!parent || !canInteract(parent)) return;
 
   items.push({
     id:id++,
-    text:t,
-    type:"question",
+    text,
+    type,
     user:currentUser,
-    parent:id-1
+    parent:parentId,
+    disputeOpen:false
   });
+}
 
-  el.value="";
+/* =====================
+   SUBMIT LEFT / RIGHT (FIXED)
+===================== */
+
+function submitLeft(parentId){
+
+  const input=document.getElementById("l-"+parentId);
+  const text=input.value.trim();
+  if(!text) return;
+
+  addChild(parentId,text,"question");
+
+  input.value="";
   render();
 }
 
-function submitRight(id){
+function submitRight(parentId){
 
-  const item=find(id);
-  if(!item || !canInteract(item)) return;
+  const input=document.getElementById("r-"+parentId);
+  const text=input.value.trim();
+  if(!text) return;
 
-  const el=document.getElementById("r-"+id);
-  const t=el.value.trim();
-  if(!t) return;
+  addChild(parentId,text,"proclaim");
 
-  items.push({
-    id:id++,
-    text:t,
-    type:"proclaim",
-    user:currentUser,
-    parent:id-1
-  });
-
-  el.value="";
+  input.value="";
   render();
 }
 
-/* ======================
-   ACTIONS (FIXED GUARD)
-====================== */
+/* =====================
+   ACTIONS
+===================== */
 
-function agree(id){
-  const item=find(id);
+function agree(itemId){
+  const item=items.find(x=>x.id===itemId);
   if(!item || !canInteract(item)) return;
 }
 
-/* ======================
-   RENDER (STATE DRIVEN)
-====================== */
+/* =====================
+   RENDER (UNCHANGED STRUCTURE)
+===================== */
 
 function render(){
 
@@ -293,6 +294,7 @@ function render(){
             <button onclick="submitRight(${item.id})">Submit</button>
           </div>
         </div>
+
       </div>
     `;
 
@@ -300,16 +302,16 @@ function render(){
   });
 }
 
-/* ======================
+/* =====================
    INIT
-====================== */
+===================== */
 
 renderUsers();
 render();
 
 /* seed */
 items.push({id:id++,text:"All claims can be challenged",type:"proclaim",user:"alice",parent:null,disputeOpen:false});
-items.push({id:id++,text:"But should all claims be challenged?",type:"question",user:"bob",parent:null,disputeOpen:false});
+items.push({id:id++,text:"Some claims resist challenge",type:"proclaim",user:"bob",parent:null,disputeOpen:false});
 
 render();
 

@@ -18,7 +18,20 @@ body{
   max-width:780px;
 }
 
-/* ENTRY */
+/* HEADER */
+.header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:10px;
+}
+
+.version{
+  font-size:11px;
+  color:#888;
+}
+
+/* COMPOSER */
 .composer{
   background:#111;
   padding:10px;
@@ -37,12 +50,12 @@ textarea{
   border-radius:6px;
 }
 
-/* STATEMENT (PRIMARY) */
+/* STATEMENTS */
 .statement{
   background:#262626;
   padding:12px;
   border-radius:10px;
-  margin-bottom:6px;
+  margin-bottom:8px;
   border:1px solid #3a3a3a;
 }
 
@@ -63,23 +76,21 @@ button{
   margin-right:4px;
 }
 
-/* 🔥 GLOBAL TWO-COLUMN GRID (KEY FIX) */
-.dispute-grid{
+/* TWO COLUMN DISPUTE EXPANSION */
+.dispute{
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:10px;
-  margin-bottom:14px;
+  margin-top:8px;
 }
 
-/* left/right lanes */
-.lane{
+.col{
   background:#141414;
-  border-radius:8px;
   padding:8px;
-  min-height:30px;
+  border-radius:8px;
+  min-height:70px;
 }
 
-/* child statements */
 .child{
   background:#1b1b1b;
   padding:8px;
@@ -87,46 +98,17 @@ button{
   margin-bottom:6px;
 }
 
-/* DEBUG (NO REPEAT BUG) */
-.debug{
-  display:none;
-  position:fixed;
-  bottom:0;
-  left:0;
-  right:0;
-  height:160px;
+/* LOG (ALWAYS AT BOTTOM) */
+.log{
+  position:relative;
+  margin-top:20px;
   background:#0a0a0a;
   border-top:1px solid #333;
-  overflow:auto;
   font-size:11px;
   color:#9f9;
-  padding:6px;
-}
-
-.userbar{
-  display:flex;
-  gap:6px;
-  margin-bottom:8px;
-  flex-wrap:wrap;
-}
-
-.user{
-  border:1px solid #444;
-  padding:3px 6px;
-  border-radius:6px;
-  cursor:pointer;
-  font-size:11px;
-}
-
-.active{
-  background:#2a2a2a;
-}
-
-.debug-toggle{
-  position:fixed;
-  bottom:170px;
-  right:10px;
-  font-size:11px;
+  padding:8px;
+  max-height:220px;
+  overflow:auto;
 }
 </style>
 </head>
@@ -135,10 +117,12 @@ button{
 
 <div class="container py-3">
 
-<h5 class="text-center">Better Dispute</h5>
+<div class="header">
+  <h5>Better Dispute</h5>
+  <div class="version">v2.0.0</div>
+</div>
 
-<div class="userbar" id="users"></div>
-
+<!-- ENTRY -->
 <div class="composer">
   <textarea id="composer" placeholder="Start a Proclamation..."></textarea>
   <button class="btn btn-primary btn-sm mt-2" onclick="submitProclamation()">Proclaim</button>
@@ -146,25 +130,22 @@ button{
 
 <div id="feed"></div>
 
+<!-- LOG ALWAYS AT BOTTOM -->
+<div class="log" id="log"></div>
+
 </div>
 
-<button class="btn btn-dark debug-toggle" onclick="toggleDebug()">Debug</button>
+<!-- DISPUTE MODAL (2-COLUMN EXPANSION INPUTS) -->
+<div id="modal" style="display:none; position:fixed; top:15%; left:50%; transform:translateX(-50%);
+background:#222; padding:12px; border-radius:8px; width:95%; max-width:420px; z-index:999;">
 
-<div class="debug" id="debug"></div>
+<div><b>Dispute Statement</b></div>
 
-<!-- MODAL -->
-<div id="modal" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%);
-background:#222; padding:12px; border-radius:8px; width:90%; max-width:320px; z-index:999;">
+<div class="mt-2"><b>Left (Question / Challenge)</b></div>
+<textarea id="leftInput" class="form-control mb-2" placeholder="Optional question..."></textarea>
 
-<div><b>Create Dispute Statement</b></div>
-
-<select id="mode" class="form-control mb-2">
-  <option value="proclaim">Proclamation</option>
-  <option value="question">Question</option>
-  <option value="answer">Answer</option>
-</select>
-
-<textarea id="text" class="form-control mb-2"></textarea>
+<div><b>Right (Proclamation / Counter Claim)</b></div>
+<textarea id="rightInput" class="form-control mb-2" placeholder="Optional counter-proclamation..."></textarea>
 
 <button class="btn btn-success btn-sm" onclick="submitDispute()">Submit</button>
 <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
@@ -177,15 +158,15 @@ background:#222; padding:12px; border-radius:8px; width:90%; max-width:320px; z-
 // VERSION
 //////////////////////
 
-const APP_VERSION="1.0.4";
+const APP_VERSION="2.0.0";
 
 //////////////////////
-// DEBUG (FIXED — NO DUPLICATION BUG)
+// LOG (NO DUPLICATION, ALWAYS VISIBLE)
 //////////////////////
 
 function log(event,data){
 
-  const el=document.getElementById("debug");
+  const el=document.getElementById("log");
 
   const entry={
     time:Date.now(),
@@ -202,36 +183,12 @@ function log(event,data){
   el.scrollTop=el.scrollHeight;
 }
 
-function toggleDebug(){
-  const d=document.getElementById("debug");
-  d.style.display = (d.style.display==="block") ? "none" : "block";
-}
-
 //////////////////////
-// USERS
+// USERS (TEST MODE)
 //////////////////////
 
 let users=["alice","bob","charlie"];
 let currentUser="alice";
-
-function renderUsers(){
-  const el=document.getElementById("users");
-  el.innerHTML="";
-
-  users.forEach(u=>{
-    const d=document.createElement("div");
-    d.className="user"+(u===currentUser?" active":"");
-    d.innerText=u;
-
-    d.onclick=()=>{
-      currentUser=u;
-      log("user_switch",{user:u});
-      renderUsers();
-    };
-
-    el.appendChild(d);
-  });
-}
 
 //////////////////////
 // DATA
@@ -267,7 +224,6 @@ function create(text,type,parent=null){
   }
 
   log("create",item);
-
   render();
 }
 
@@ -283,46 +239,50 @@ function submitProclamation(){
   create(text,"proclaim",null);
 
   document.getElementById("composer").value="";
-  log("proclaim_create",{text});
+  log("proclaim",text);
 }
 
 //////////////////////
-// ACTIONS
+// DISAGREE = EXPAND TWO-COLUMN INPUT
 //////////////////////
 
 let active=null;
 
 function disagree(id){
   active=id;
+
+  document.getElementById("leftInput").value="";
+  document.getElementById("rightInput").value="";
+
   document.getElementById("modal").style.display="block";
+
   log("disagree_open",{id});
 }
 
 function closeModal(){
   document.getElementById("modal").style.display="none";
-  document.getElementById("text").value="";
 }
 
 function submitDispute(){
 
-  const mode=document.getElementById("mode").value;
-  const text=document.getElementById("text").value.trim();
+  const left=document.getElementById("leftInput").value.trim();
+  const right=document.getElementById("rightInput").value.trim();
 
-  if(!text) return;
+  if(left){
+    create(left,"question",active);
+  }
 
-  create(text,mode,active);
+  if(right){
+    create(right,"proclaim",active);
+  }
 
-  log("fork",{from:active,mode,text});
+  log("dispute_submit",{active,left,right});
 
   closeModal();
 }
 
-function agree(id){
-  log("agree",{id,user:currentUser});
-}
-
 //////////////////////
-// RENDER (TRUE TWO-COLUMN STREAM)
+// RENDER
 //////////////////////
 
 function render(){
@@ -336,24 +296,23 @@ function render(){
 
 function renderItem(item,container){
 
-  const wrap=document.createElement("div");
+  const div=document.createElement("div");
 
-  wrap.innerHTML=`
+  div.innerHTML=`
     <div class="statement">
       <div class="text">${item.text}</div>
       <div class="meta">${item.type.toUpperCase()} · @${item.user}</div>
 
-      <button class="btn btn-sm btn-success" onclick="agree(${item.id})">Agree</button>
-      <button class="btn btn-sm btn-danger" onclick="disagree(${item.id})">Disagree</button>
+      <button class="btn btn-sm btn-success" onclick="disagree(${item.id})">Disagree</button>
     </div>
 
-    <div class="dispute-grid" id="grid-${item.id}">
-      <div class="lane" id="left-${item.id}"></div>
-      <div class="lane" id="right-${item.id}"></div>
+    <div class="dispute" id="d-${item.id}">
+      <div class="col" id="left-${item.id}"></div>
+      <div class="col" id="right-${item.id}"></div>
     </div>
   `;
 
-  container.appendChild(wrap);
+  container.appendChild(div);
 
   const left=document.getElementById(`left-${item.id}`);
   const right=document.getElementById(`right-${item.id}`);
@@ -366,14 +325,12 @@ function renderItem(item,container){
       el.className="child";
 
       el.innerHTML=`
-        <div><b>${c.type.toUpperCase()}</b></div>
+        <b>${c.type.toUpperCase()}</b>
         <div>${c.text}</div>
         <div class="meta">@${c.user}</div>
-
-        <button class="btn btn-sm btn-danger" onclick="disagree(${c.id})">Disagree</button>
       `;
 
-      if(c.type==="proclaim") left.appendChild(el);
+      if(c.type==="question") left.appendChild(el);
       else right.appendChild(el);
     });
 }
@@ -382,7 +339,6 @@ function renderItem(item,container){
 // INIT
 //////////////////////
 
-renderUsers();
 render();
 
 </script>

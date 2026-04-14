@@ -8,15 +8,17 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
-body {
+body{
   background:#0f0f0f;
   color:#eee;
   font-size:14px;
 }
 
-.container { max-width:650px; }
+.container{
+  max-width:650px;
+}
 
-.card {
+.card{
   background:#1b1b1b;
   border:none;
   margin-bottom:10px;
@@ -24,23 +26,23 @@ body {
   border-radius:8px;
 }
 
-.meta {
+.meta{
   font-size:11px;
   color:#aaa;
 }
 
-button {
+button{
   font-size:11px !important;
   margin-right:4px;
 }
 
-.thread {
+.thread{
   margin-left:12px;
   border-left:2px solid #333;
   padding-left:10px;
 }
 
-.chat {
+.chat{
   font-size:11px;
   color:#bbb;
   border-left:2px dashed #555;
@@ -48,23 +50,26 @@ button {
   padding-left:6px;
 }
 
-.userbar {
-  display:flex;
-  flex-wrap:wrap;
-  gap:5px;
-  margin-bottom:10px;
+.modal{
+  display:none;
+  position:fixed;
+  top:20%;
+  left:50%;
+  transform:translateX(-50%);
+  background:#222;
+  padding:12px;
+  border-radius:8px;
+  width:90%;
+  max-width:320px;
+  z-index:999;
 }
 
-.userpill {
-  padding:3px 6px;
+textarea{
+  width:100%;
+  height:80px;
+  background:#111;
+  color:#eee;
   border:1px solid #444;
-  border-radius:5px;
-  cursor:pointer;
-  font-size:11px;
-}
-
-.active {
-  background:#2a2a2a;
 }
 </style>
 </head>
@@ -75,21 +80,18 @@ button {
 
 <h5 class="text-center">Better Dispute</h5>
 
-<div class="userbar" id="users"></div>
-
 <div id="feed"></div>
 
 </div>
 
 <!-- DISPUTE MODAL -->
-<div id="modal" class="modal" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%);
-background:#222; padding:12px; border-radius:8px; width:90%; max-width:320px; z-index:999;">
+<div id="modal" class="modal">
 
-<div><b>Start Dispute</b></div>
+<div><b>Dispute this statement</b></div>
 
 <select id="mode" class="form-control mb-2">
-  <option value="proclaim">Proclaim</option>
-  <option value="question">Question</option>
+  <option value="proclaim">Proclamation (counter claim)</option>
+  <option value="question">Question (challenge)</option>
 </select>
 
 <textarea id="text" class="form-control mb-2"></textarea>
@@ -102,146 +104,98 @@ background:#222; padding:12px; border-radius:8px; width:90%; max-width:320px; z-
 <script>
 
 //////////////////////
-// MULTI USER (RESTORED)
+// USER (simple prototype)
 //////////////////////
 
-let users = ["alice","bob","charlie"];
-let currentUser = "alice";
-
-function renderUsers(){
-  let el=document.getElementById("users");
-  el.innerHTML="";
-
-  users.forEach(u=>{
-    let d=document.createElement("div");
-    d.className="userpill"+(u===currentUser?" active":"");
-    d.innerText=u;
-    d.onclick=()=>{
-      currentUser=u;
-      renderUsers();
-    };
-    el.appendChild(d);
-  });
-}
-
-//////////////////////
-// SYNC ACROSS TABS
-//////////////////////
-
-const channel = new BroadcastChannel("better_dispute");
-
-channel.onmessage = (e)=>{
-  if(e.data?.type==="sync"){
-    items = e.data.items;
-    users = e.data.users;
-    renderUsers();
-    render();
-  }
-};
-
-function sync(){
-  channel.postMessage({
-    type:"sync",
-    items,
-    users
-  });
-}
+let user = "user" + Math.floor(Math.random()*1000);
 
 //////////////////////
 // DATA MODEL
 //////////////////////
 
-let id=0;
+let id = 0;
 
-let items=[
+let items = [
   {
     id:id++,
-    text:"Root dispute",
+    text:"Start a Proclamation to begin a dispute",
     type:"proclaim",
     user:"system",
     parent:null,
+    children:[],
     agrees:[],
-    disagrees:[],
-    chat:[],
-    children:[]
+    chat:[]
   }
 ];
 
-function find(i){ return items.find(x=>x.id===i); }
+let activeTarget = null;
+
+function find(i){
+  return items.find(x=>x.id===i);
+}
 
 //////////////////////
-// CORE
+// CREATE (RULE ENFORCED)
 //////////////////////
 
 function create(text,type,parent=null){
 
-  let n={
+  // RULE: ONLY ROOT IS PROCLAMATION ENTRY
+  if(parent===null && type!=="proclaim"){
+    alert("Only Proclamations can start disputes");
+    return;
+  }
+
+  let item = {
     id:id++,
     text,
     type,
-    user:currentUser,
+    user,
     parent,
+    children:[],
     agrees:[],
-    disagrees:[],
-    chat:[],
-    children:[]
+    chat:[]
   };
 
-  items.push(n);
+  items.push(item);
 
   if(parent!==null){
     let p=find(parent);
-    if(p) p.children.push(n.id);
+    if(p) p.children.push(item.id);
   }
 
-  sync();
-}
-
-//////////////////////
-// SIDE CHAT (RESTORED)
-//////////////////////
-
-function chat(id){
-  let n=find(id);
-  let t=prompt("Chat:");
-  if(!t) return;
-
-  n.chat.push({
-    user:currentUser,
-    text:t,
-    time:Date.now()
-  });
-
-  sync();
   render();
 }
 
 //////////////////////
-// VOTES
+// PROCLAMATION ENTRY
+//////////////////////
+
+function newProclamation(){
+  let t = prompt("Proclamation:");
+  if(!t) return;
+  create(t,"proclaim",null);
+}
+
+//////////////////////
+// AGREE
 //////////////////////
 
 function agree(id){
-  let n=find(id);
+  let x=find(id);
+  if(!x) return;
 
-  n.disagrees=n.disagrees.filter(u=>u!==currentUser);
-  if(!n.agrees.includes(currentUser)) n.agrees.push(currentUser);
+  if(!x.agrees.includes(user)) x.agrees.push(user);
 
-  sync();
   render();
 }
 
+//////////////////////
+// DISAGREE = FORK
+//////////////////////
+
 function disagree(id){
-  active=id;
-  openModal(id);
-}
-
-//////////////////////
-// DISPUTE FORK (RESTORED PROPERLY)
-//////////////////////
-
-let active=null;
-
-function openModal(){
+  activeTarget=id;
   document.getElementById("modal").style.display="block";
 }
 
@@ -257,33 +211,28 @@ function submitDispute(){
 
   if(!text) return;
 
-  create(text,mode,active);
+  create(text,mode,activeTarget);
 
   closeModal();
 }
 
 //////////////////////
-// ACTIONS
+// SIDE CHAT
 //////////////////////
 
-function interact(id){
+function chat(id){
 
-  let mode=prompt("1 Proclaim\n2 Question\n3 Answer");
+  let x=find(id);
+  let t=prompt("Chat:");
+  if(!t) return;
 
-  if(mode==="1"){
-    let t=prompt("Proclaim:");
-    if(t) create(t,"proclaim",id);
-  }
+  x.chat.push({
+    user,
+    text:t,
+    time:Date.now()
+  });
 
-  if(mode==="2"){
-    let t=prompt("Question:");
-    if(t) create(t,"question",id);
-  }
-
-  if(mode==="3"){
-    let t=prompt("Answer:");
-    if(t) create(t,"answer",id);
-  }
+  render();
 }
 
 //////////////////////
@@ -302,15 +251,14 @@ function render(){
 function renderItem(item,container,depth){
 
   let div=document.createElement("div");
-
   div.className="card";
-  div.style.marginLeft=depth*10+"px";
+  div.style.marginLeft = depth*10+"px";
 
   div.innerHTML=`
     <b>${item.type.toUpperCase()}</b>: ${item.text}
     <div class="meta">@${item.user}</div>
 
-    <button class="btn btn-sm btn-outline-light" onclick="interact(${item.id})">Interact</button>
+    <button class="btn btn-sm btn-primary" onclick="newProclamation()">Proclaim</button>
     <button class="btn btn-sm btn-success" onclick="agree(${item.id})">Agree</button>
     <button class="btn btn-sm btn-danger" onclick="disagree(${item.id})">Disagree</button>
     <button class="btn btn-sm btn-outline-info" onclick="chat(${item.id})">Chat</button>
@@ -334,7 +282,6 @@ function renderItem(item,container,depth){
 // INIT
 //////////////////////
 
-renderUsers();
 render();
 
 </script>

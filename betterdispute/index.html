@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Better Dispute v8.2</title>
+<title>Better Dispute v10</title>
 
 <style>
 body {
@@ -13,36 +13,24 @@ body {
   color: #fff;
 }
 
-/* HEADER FIXED INTO SINGLE BAR */
+/* HEADER */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-
   padding: 10px 12px;
   border-bottom: 1px solid #222;
-  background: #0f0f10;
 }
 
 .left {
   display: flex;
-  align-items: center;
   gap: 10px;
+  align-items: center;
 }
 
-.home {
-  font-size: 18px;
-  cursor: pointer;
-}
+.home { font-size: 18px; cursor: pointer; }
 
-.title {
-  font-weight: 600;
-}
-
-.right {
-  font-size: 11px;
-  opacity: 0.6;
-}
+.right { font-size: 11px; opacity: 0.6; }
 
 .userBar {
   display: flex;
@@ -50,10 +38,9 @@ body {
   padding: 8px 12px;
 }
 
-.userBar button.active {
-  background: #3a6df0;
-}
+.userBar button.active { background: #3a6df0; }
 
+/* LAYOUT */
 .container {
   max-width: 600px;
   margin: 0 auto;
@@ -88,7 +75,7 @@ button {
 
 button.primary { background: #3a6df0; }
 
-/* HOME SUMMARY */
+/* SUMMARY */
 .summary {
   margin-top: 8px;
   padding: 8px;
@@ -98,26 +85,27 @@ button.primary { background: #3a6df0; }
   cursor: pointer;
 }
 
-/* DISPUTE BLOCK */
-.block {
-  margin-top: 8px;
-  padding: 10px;
+/* COMPOSE (RESTORED HOME ONLY) */
+.compose {
   background: #141416;
   border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 12px;
 }
 
-.turn {
-  padding: 8px;
-  border-radius: 8px;
-  margin-bottom: 6px;
+textarea {
+  width: 100%;
+  min-height: 70px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: 1px solid #2a2a2d;
+  padding: 10px;
+
+  background: #1a1a1c;
+  color: #fff;
 }
 
-.question { background: #2c2c2f; }
-.answer { background: #1f3a2c; }
-
-.hidden { display: none; }
-
-/* INPUT (ONLY WHEN ACTIVE TURN) */
+/* INPUT BAR (ONLY ACTIVE IN DRILL) */
 .inputBar {
   position: fixed;
   bottom: 0;
@@ -128,18 +116,7 @@ button.primary { background: #3a6df0; }
   border-top: 1px solid #222;
 }
 
-textarea {
-  width: 100%;
-  min-height: 80px;
-  font-size: 16px;
-  border-radius: 10px;
-  border: 1px solid #2a2a2d;
-  padding: 10px;
-  resize: none;
-
-  background: #1a1a1c;
-  color: #fff;
-}
+.hidden { display: none; }
 </style>
 </head>
 
@@ -148,9 +125,9 @@ textarea {
 <div class="header">
   <div class="left">
     <div class="home" onclick="goHome()">⚖️</div>
-    <div class="title">Better Dispute</div>
+    <div><b>Better Dispute</b></div>
   </div>
-  <div class="right">v8.2</div>
+  <div class="right">v10</div>
 </div>
 
 <div class="userBar">
@@ -186,6 +163,9 @@ posts[0].chains.push({
   active_user: "bob"
 });
 
+let activePost = null;
+let activeChain = null;
+
 // SWITCH USER
 function switchUser(u) {
   currentUser = u;
@@ -200,10 +180,29 @@ function switchUser(u) {
 
 // HOME
 function goHome() {
+  activePost = null;
+  activeChain = null;
+  document.getElementById("inputBar").classList.add("hidden");
   renderFeed();
 }
 
-// CHALLENGE (FIXED: always creates new 1v1 chain)
+/* CREATE POST (RESTORED COMPOSE) */
+function createPost() {
+  const ta = document.getElementById("composeInput");
+  if (!ta.value.trim()) return;
+
+  posts.unshift({
+    id: Date.now(),
+    user: currentUser,
+    text: ta.value.trim(),
+    chains: []
+  });
+
+  ta.value = "";
+  renderFeed();
+}
+
+// CHALLENGE (STABLE)
 function challenge(postId) {
   const post = posts.find(p => p.id === postId);
   if (!post || post.user === currentUser) return;
@@ -217,14 +216,46 @@ function challenge(postId) {
     active_user: currentUser
   });
 
+  openThread(post, post.chains[post.chains.length - 1]);
+}
+
+// DRILL FIXED
+function openThread(post, chain = null) {
+  activePost = post;
+  activeChain = chain;
+
   renderFeed();
+  updateInputVisibility();
+}
+
+// INPUT VISIBILITY RULE (FIXED)
+function updateInputVisibility() {
+  const bar = document.getElementById("inputBar");
+
+  if (
+    activeChain &&
+    activeChain.active_user === currentUser
+  ) {
+    bar.classList.remove("hidden");
+    document.getElementById("input").placeholder =
+      activeChain.turn_state === "question"
+        ? "Ask a question..."
+        : "Answer directly...";
+  } else {
+    bar.classList.add("hidden");
+  }
 }
 
 // FEED
 function renderFeed() {
   const feed = document.getElementById("feed");
 
-  let html = "";
+  let html = `
+    <div class="compose">
+      <textarea id="composeInput" placeholder="Start a fire..."></textarea>
+      <button class="primary" onclick="createPost()">Post</button>
+    </div>
+  `;
 
   posts.forEach(post => {
     const self = post.user === currentUser;
@@ -233,69 +264,52 @@ function renderFeed() {
       <div class="card">
         <div class="message">${post.text}</div>
         <div class="meta">@${post.user}</div>
+
+        <div class="actions">
+          ${self ? "" : `<button class="primary" onclick="challenge(${post.id})">Challenge</button>`}
+        </div>
     `;
 
-    // SUMMARY (STACKED, SCALABLE)
     post.chains.forEach(chain => {
       html += `
-        <div class="summary" onclick="openChain(${post.id}, ${chain.id})">
+        <div class="summary" onclick="openThread(post, posts.find(p=>p.id===${post.id}).chains.find(c=>c.id===${chain.id}))">
           ${chain.turns.map(t => `${t.type === "question" ? "Q" : "A"}: ${t.text}`).join(" → ") || "New dispute"}
         </div>
       `;
     });
 
-    html += `
-      <div class="actions">
-        ${self ? "" : `<button class="primary" onclick="challenge(${post.id})">Challenge</button>`}
-      </div>
-    </div>
-    `;
+    html += `</div>`;
   });
 
   feed.innerHTML = html;
 }
 
-// OPEN CHAIN
-function openChain(postId, chainId) {
-  const post = posts.find(p => p.id === postId);
-  const chain = post.chains.find(c => c.id === chainId);
+// INPUT SUBMIT (ENTER)
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  if (!activeChain) return;
+  if (activeChain.active_user !== currentUser) return;
 
   const input = document.getElementById("input");
-  const bar = document.getElementById("inputBar");
+  if (!input.value.trim()) return;
 
-  renderFeed(); // keep simple (no full view split in this version)
+  activeChain.turns.push({
+    type: activeChain.turn_state,
+    user: currentUser,
+    text: input.value.trim()
+  });
 
-  // INPUT RULE (CRITICAL FIX)
-  if (chain.active_user === currentUser) {
-    bar.classList.remove("hidden");
-    input.placeholder = chain.turn_state === "question"
-      ? "Ask a question..."
-      : "Answer directly...";
-  } else {
-    bar.classList.add("hidden");
-  }
+  activeChain.turn_state =
+    activeChain.turn_state === "question" ? "answer" : "question";
 
-  input.onkeydown = (e) => {
-    if (e.key !== "Enter") return;
-    if (!input.value.trim()) return;
-    if (chain.active_user !== currentUser) return;
+  activeChain.active_user =
+    currentUser === activeChain.a ? activeChain.b : activeChain.a;
 
-    chain.turns.push({
-      type: chain.turn_state,
-      user: currentUser,
-      text: input.value.trim()
-    });
+  input.value = "";
 
-    chain.turn_state =
-      chain.turn_state === "question" ? "answer" : "question";
-
-    chain.active_user =
-      currentUser === chain.a ? chain.b : chain.a;
-
-    input.value = "";
-    openChain(postId, chainId);
-  };
-}
+  updateInputVisibility();
+  renderFeed();
+});
 
 // INIT
 switchUser(currentUser);

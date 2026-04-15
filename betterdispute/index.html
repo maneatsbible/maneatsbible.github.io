@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Better Dispute v16</title>
+<title>Better Dispute v17</title>
 
 <style>
 body {
@@ -13,7 +13,7 @@ body {
   color: #fff;
 }
 
-/* HEADER */
+/* HEADER (UNCHANGED) */
 .header {
   display: flex;
   justify-content: space-between;
@@ -21,21 +21,9 @@ body {
   border-bottom: 1px solid #222;
 }
 
-.left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.home {
+.home, .back {
   cursor: pointer;
-  font-size: 18px;
-}
-
-.back {
-  cursor: pointer;
-  font-size: 14px;
-  opacity: 0.8;
+  font-size: 16px;
 }
 
 .right {
@@ -43,7 +31,7 @@ body {
   opacity: 0.6;
 }
 
-/* USER BAR */
+/* USER */
 .userBar {
   display: flex;
   gap: 6px;
@@ -52,8 +40,8 @@ body {
 
 .userBar button {
   background: #2a2a2d;
-  color: #ccc;
   border: 1px solid #333;
+  color: #ccc;
   padding: 6px 10px;
   border-radius: 6px;
 }
@@ -73,28 +61,29 @@ body {
 /* COMPOSE */
 .compose {
   background: #141416;
-  border-radius: 10px;
   padding: 10px;
-  margin-bottom: 12px;
+  border-radius: 10px;
+  margin-bottom: 10px;
 }
 
 textarea {
   width: 100%;
   min-height: 70px;
   font-size: 16px;
-  border-radius: 10px;
-  border: 1px solid #2a2a2d;
-  padding: 10px;
   background: #1a1a1c;
   color: #fff;
+  border: 1px solid #2a2a2d;
+  border-radius: 10px;
+  padding: 10px;
 }
 
 /* CARDS */
 .card {
   background: #1a1a1c;
-  border-radius: 10px;
   padding: 10px;
+  border-radius: 10px;
   margin-bottom: 10px;
+  cursor: pointer;
 }
 
 .meta {
@@ -105,21 +94,19 @@ textarea {
 
 /* TURN */
 .turn {
-  background: #141416;
-  border-radius: 8px;
   padding: 10px;
+  border-radius: 8px;
   margin-bottom: 6px;
 }
 
 .q { background: #2c2c2f; }
 .a { background: #1f3a2c; }
 
-/* NESTED VISUAL ONLY */
+/* NESTED */
 .nested {
   margin-left: 14px;
   border-left: 2px solid #333;
   padding-left: 10px;
-  margin-top: 6px;
 }
 
 /* INPUT */
@@ -128,9 +115,9 @@ textarea {
   bottom: 0;
   left: 0;
   right: 0;
+  padding: 10px;
   background: #0f0f10;
   border-top: 1px solid #222;
-  padding: 10px;
 }
 
 .hidden { display: none; }
@@ -140,12 +127,12 @@ textarea {
 <body>
 
 <div class="header">
-  <div class="left">
+  <div style="display:flex;gap:10px;align-items:center;">
     <div class="home" onclick="goHome()">⚖️</div>
     <div class="back hidden" id="backBtn" onclick="goBack()">←</div>
     <div><b>Better Dispute</b></div>
   </div>
-  <div class="right">v16</div>
+  <div class="right">v17</div>
 </div>
 
 <div class="userBar">
@@ -162,88 +149,77 @@ textarea {
 </div>
 
 <script>
+
+/* ---------------- STATE ---------------- */
+
 let currentUser = "bob";
 let mode = "home";
 
-let activePost = null;
-let activeChain = null;
+let activePostId = null;
+let activeChainId = null;
 
-/* ------------------ TEST DATA ------------------ */
-let posts = [
-  {
-    id: 1,
-    user: "alice",
-    text: "Faith alone is sufficient for salvation.",
-    chains: [
-      {
-        id: 101,
-        a: "alice",
-        b: "bob",
-        active_user: "bob",
-        turn_state: "question",
-        turns: [
-          {
-            type: "question",
-            user: "bob",
-            text: "Where is that stated?",
-            nested: [
-              {
-                id: 201,
-                a: "bob",
-                b: "alice",
-                active_user: "alice",
-                turn_state: "question",
-                turns: [
-                  {
-                    type: "question",
-                    user: "alice",
-                    text: "What do you mean by 'faith'?",
-                    nested: []
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            type: "answer",
-            user: "alice",
-            text: "Ephesians 2:8-9.",
-            nested: []
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 2,
-    user: "charlie",
-    text: "AI will replace most jobs in 20 years.",
-    chains: [
-      {
-        id: 301,
-        a: "charlie",
-        b: "alice",
-        active_user: "alice",
-        turn_state: "question",
-        turns: [
-          {
-            type: "question",
-            user: "alice",
-            text: "Which jobs specifically?",
-            nested: []
-          }
-        ]
-      }
-    ]
-  }
-];
+/* ---------------- REGISTRY (FIX) ---------------- */
 
-/* ------------------ STATE ------------------ */
-function currentChain() {
-  return activeChain;
+const postsById = new Map();
+const chainsById = new Map();
+const turnsById = new Map();
+
+/* ---------------- TEST DATA (RICH) ---------------- */
+
+function createTurn(type, user, text) {
+  const id = Date.now() + Math.random();
+  const t = { id, type, user, text, nested: [] };
+  turnsById.set(id, t);
+  return t;
 }
 
-/* ------------------ NAV ------------------ */
+function createChain(a, b, seedTurns = []) {
+  const id = Date.now() + Math.random();
+  const c = {
+    id,
+    a,
+    b,
+    turns: seedTurns,
+    active_user: b,
+    turn_state: "question"
+  };
+  chainsById.set(id, c);
+  return c;
+}
+
+function createPost(user, text) {
+  const id = Date.now() + Math.random();
+  const p = { id, user, text, chains: [] };
+  postsById.set(id, p);
+  return p;
+}
+
+/* USERS */
+const alice = "alice";
+const bob = "bob";
+const charlie = "charlie";
+
+/* POSTS */
+const p1 = createPost(alice, "Faith alone is sufficient for salvation.");
+const p2 = createPost(charlie, "AI will replace most jobs.");
+const p3 = createPost(bob, "Truth requires questioning authority.");
+
+/* CHAINS */
+const c1 = createChain(alice, bob, [
+  createTurn("question", bob, "Where is that stated?"),
+  createTurn("answer", alice, "Ephesians 2:8-9."),
+]);
+
+const c2 = createChain(charlie, alice, [
+  createTurn("question", alice, "Which jobs specifically?"),
+  createTurn("answer", charlie, "Most knowledge work."),
+]);
+
+p1.chains.push(c1);
+p2.chains.push(c2);
+
+/* ---------------- NAV ---------------- */
+
 function switchUser(u) {
   currentUser = u;
 
@@ -257,143 +233,129 @@ function switchUser(u) {
 
 function goHome() {
   mode = "home";
-  activePost = null;
-  activeChain = null;
-  hideInput();
-  render();
-}
-
-function goBack() {
-  if (activeChain?.parent) {
-    activeChain = activeChain.parent;
-  } else {
-    mode = "home";
-    activeChain = null;
-    activePost = null;
-  }
+  activePostId = null;
+  activeChainId = null;
   render();
   updateInput();
 }
 
-/* ------------------ CHALLENGE ------------------ */
-function challenge(postOrChain) {
-  const chain = {
-    id: Date.now(),
-    a: currentUser,
-    b: "opponent",
-    active_user: currentUser,
-    turn_state: "question",
-    turns: [],
-    parent: postOrChain
-  };
-
-  if (postOrChain.turns) {
-    postOrChain.turns.push({
-      type: "question",
-      user: currentUser,
-      text: "Challenge opened",
-      nested: [chain]
-    });
-  } else {
-    postOrChain.chains.push(chain);
-  }
-
-  openDispute(postOrChain, chain);
+function goBack() {
+  goHome();
 }
 
-/* ------------------ OPEN ------------------ */
-function openDispute(post, chain) {
+/* ---------------- RESOLVE ---------------- */
+
+function getActiveChain() {
+  return chainsById.get(activeChainId) || null;
+}
+
+function getActivePost() {
+  return postsById.get(activePostId) || null;
+}
+
+/* ---------------- DRILL ---------------- */
+
+function openChain(postId, chainId) {
   mode = "dispute";
-  activePost = post;
-  activeChain = chain;
+  activePostId = postId;
+  activeChainId = chainId;
   render();
+  updateInput();
 }
 
-/* ------------------ INPUT ------------------ */
+/* ---------------- CHALLENGE ---------------- */
+
+function challenge(turn) {
+  const chain = getActiveChain();
+  if (!chain) return;
+
+  const nested = createChain(currentUser, "other", []);
+
+  turn.nested.push(nested);
+
+  openChain(activePostId, nested.id);
+}
+
+/* ---------------- INPUT ---------------- */
+
 document.getElementById("input").addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
-  if (!activeChain) return;
-  if (activeChain.active_user !== currentUser) return;
+
+  const chain = getActiveChain();
+  if (!chain || chain.active_user !== currentUser) return;
 
   const val = e.target.value.trim();
   if (!val) return;
 
-  activeChain.turns.push({
-    type: activeChain.turn_state,
-    user: currentUser,
-    text: val,
-    nested: []
-  });
+  const turn = createTurn(chain.turn_state, currentUser, val);
+  chain.turns.push(turn);
 
-  activeChain.turn_state =
-    activeChain.turn_state === "question" ? "answer" : "question";
+  chain.turn_state =
+    chain.turn_state === "question" ? "answer" : "question";
 
-  activeChain.active_user =
-    currentUser === activeChain.a ? activeChain.b : activeChain.a;
+  chain.active_user =
+    currentUser === chain.a ? chain.b : chain.a;
 
   e.target.value = "";
   render();
+  updateInput();
 });
 
-/* ------------------ RENDER HOME ------------------ */
+/* ---------------- RENDER HOME ---------------- */
+
 function renderHome() {
-  const home = document.getElementById("home");
-
-  let html = "";
-
-  posts.forEach(post => {
-    html += `
-      <div class="card">
-        <b>${post.text}</b>
-        <div class="meta">@${post.user}</div>
-        <button onclick="challenge(posts.find(p=>p.id===${post.id}))">Challenge</button>
-    `;
-
-    post.chains.forEach(chain => {
-      html += `
-        <div class="card" onclick="openDispute(posts.find(p=>p.id===${post.id}), posts.find(p=>p.id===${post.id}).chains.find(c=>c.id===${chain.id}))">
-          ${chain.turns.map(t => (t.type === "question" ? "Q" : "A") + ": " + t.text).slice(-2).join(" → ") || "New dispute"}
-        </div>
-      `;
-    });
-
-    html += `</div>`;
-  });
-
-  home.innerHTML = html;
-}
-
-/* ------------------ RENDER DISPUTE ------------------ */
-function renderDispute() {
-  const el = document.getElementById("dispute");
-
-  if (mode !== "dispute" || !activeChain) {
-    el.innerHTML = "";
-    return;
-  }
+  const el = document.getElementById("home");
 
   let html = `
-    <div class="card">
-      <b>${activePost.text}</b>
-      <div class="meta">@${activePost.user}</div>
-      <button onclick="challenge(activeChain)">Challenge</button>
+    <div class="compose">
+      <textarea id="composeBox" placeholder="Start a fire..."></textarea>
+      <button onclick="createPost()">Post</button>
     </div>
   `;
 
-  activeChain.turns.forEach(t => {
+  postsById.forEach(post => {
+    html += `
+      <div class="card" onclick="openChain('${post.id}','${post.chains[0]?.id || ""}')">
+        <b>${post.text}</b>
+        <div class="meta">@${post.user}</div>
+      </div>
+    `;
+  });
+
+  el.innerHTML = html;
+}
+
+function createPost() {
+  const box = document.getElementById("composeBox");
+  if (!box.value.trim()) return;
+
+  const p = createPost(currentUser, box.value.trim());
+  box.value = "";
+  render();
+}
+
+/* ---------------- RENDER DISPUTE ---------------- */
+
+function renderChain(chain) {
+  let html = "";
+
+  chain.turns.forEach(t => {
     html += `
       <div class="turn ${t.type === "question" ? "q" : "a"}">
-        ${t.text}
+        <div onclick="challenge(getTurn('${t.id}'))">
+          ${t.text}
+        </div>
         <div class="meta">@${t.user}</div>
       </div>
     `;
 
-    if (t.nested?.length) {
+    if (t.nested.length) {
       html += `<div class="nested">`;
       t.nested.forEach(n => {
         html += `
-          <div class="card" onclick="openDispute(activePost, ${JSON.stringify(n)})">
-            ${n.turns?.[0]?.text || "Nested dispute"}
+          <div class="card"
+               onclick="openChain('${activePostId}','${n.id}')">
+            ${n.turns[0]?.text || "Nested dispute"}
           </div>
         `;
       });
@@ -401,25 +363,58 @@ function renderDispute() {
     }
   });
 
+  return html;
+}
+
+function getTurn(id) {
+  for (let c of chainsById.values()) {
+    for (let t of c.turns) {
+      if (String(t.id) === String(id)) return t;
+    }
+  }
+  return null;
+}
+
+function renderDispute() {
+  const el = document.getElementById("dispute");
+
+  if (mode !== "dispute") {
+    el.innerHTML = "";
+    return;
+  }
+
+  const post = getActivePost();
+  const chain = getActiveChain();
+
+  if (!post || !chain) return;
+
+  let html = `
+    <div class="card">
+      <b>${post.text}</b>
+      <div class="meta">@${post.user}</div>
+    </div>
+  `;
+
+  html += renderChain(chain);
+
   el.innerHTML = html;
 }
 
-/* ------------------ INPUT RULE ------------------ */
+/* ---------------- INPUT RULE ---------------- */
+
 function updateInput() {
   const bar = document.getElementById("inputBar");
+  const chain = getActiveChain();
 
-  if (
-    mode === "dispute" &&
-    activeChain &&
-    activeChain.active_user === currentUser
-  ) {
+  if (mode === "dispute" && chain && chain.active_user === currentUser) {
     bar.classList.remove("hidden");
   } else {
     bar.classList.add("hidden");
   }
 }
 
-/* ------------------ RENDER ------------------ */
+/* ---------------- MAIN RENDER ---------------- */
+
 function render() {
   document.getElementById("home").style.display = mode === "home" ? "block" : "none";
   document.getElementById("dispute").style.display = mode === "dispute" ? "block" : "none";
@@ -435,6 +430,7 @@ function render() {
 /* INIT */
 switchUser(currentUser);
 render();
+
 </script>
 
 </body>

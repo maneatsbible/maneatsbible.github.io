@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v45</title>
+<title>Better Dispute v46</title>
 
 <style>
 body{
@@ -13,26 +13,15 @@ body{
   color:#eee;
 }
 
-/* HEADER */
 header{
   display:flex;
   justify-content:space-between;
   padding:10px;
-  align-items:center;
   border-bottom:1px solid #222;
+  align-items:center;
 }
 
 #title{font-weight:600}
-
-/* HOME BUTTON (RESTORED) */
-#homeBtn{
-  background:#1c1c1c;
-  border:1px solid #333;
-  color:#aaa;
-  padding:6px 10px;
-  border-radius:8px;
-  cursor:pointer;
-}
 
 /* USERS */
 #users{display:flex;gap:6px;padding:8px}
@@ -45,7 +34,7 @@ header{
 }
 .user.active{opacity:1;border-color:#fff}
 
-/* COMPOSER */
+/* INPUT */
 #composerWrap{padding:10px}
 
 textarea{
@@ -106,7 +95,7 @@ textarea{
   margin-bottom:10px;
 }
 
-/* LINEAGE */
+/* LINEAGE (NO LABEL NOW) */
 #lineage{
   padding:6px 10px;
   font-size:11px;
@@ -129,8 +118,7 @@ textarea{
 <body>
 
 <header>
-  <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v45</div>
+  <div id="title">Better Dispute v46</div>
 </header>
 
 <div id="users"></div>
@@ -338,9 +326,7 @@ function node(n){
       </div>
 
       ${n.type==="question" ? `
-        <button onclick="event.stopPropagation();answer(${n.id})">
-          Answer
-        </button>
+        <button onclick="event.stopPropagation();answer(${n.id})">Answer</button>
       `:""}
 
       ${show ? `
@@ -372,12 +358,17 @@ function renderDispute(root){
   const left=children.filter(x=>x.side==="left");
   const right=children.filter(x=>x.side==="right");
 
+  /* REMOVE ROOT FROM LINEAGE (as requested) */
+  const lineageNodes = chain.slice(0, -1);
+
   return `
     <div>
 
-      <div id="lineage">
-        lineage: ${chain.map(c=>c.text).join(" ➜ ")}
-      </div>
+      ${
+        lineageNodes.length > 0
+        ? `<div id="lineage">${lineageNodes.map(c=>c.text).join(" ➜ ")}</div>`
+        : ""
+      }
 
       <div class="card">
         ${root.text} <span class="meta">@${root.user}</span>
@@ -406,7 +397,6 @@ function render(){
       .forEach(n=>view.innerHTML+=node(n));
   } else {
     const cur=find(stack[stack.length-1]);
-
     nav.innerHTML=`<button id="backBtn" onclick="back()">⬅ back</button>`;
     view.innerHTML=renderDispute(cur);
   }
@@ -415,19 +405,19 @@ function render(){
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (CLEAN + CONSISTENT) ---------------- */
+/* ---------------- TEST DATA (CLEAN 3 USER CONSENSUS DISPUTE) ---------------- */
 
-items.push({id:id++,text:"Truth is independent of consensus",user:"alice",parent:null});
+items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null});
 items.push({id:id++,text:"Meaning is shaped by agreement",user:"bob",parent:null});
 items.push({id:id++,text:"Reality constrains interpretation",user:"charlie",parent:null});
 
 /* DISPUTE */
-items.push({id:id++,text:"Consensus determines truth",user:"bob",parent:0,side:"left",type:"question"});
-items.push({id:id++,text:"Truth exists regardless of consensus",user:"charlie",parent:0,side:"right",type:"statement"});
+items.push({id:id++,text:"Consensus defines truth",user:"bob",parent:0,side:"left",type:"question"});
+items.push({id:id++,text:"Truth is independent of consensus",user:"charlie",parent:0,side:"right",type:"statement"});
 
 /* BRANCH */
-items.push({id:id++,text:"But how do we verify without agreement?",user:"alice",parent:3,side:"left",type:"question"});
-items.push({id:id++,text:"Through consistent external constraints",user:"bob",parent:4,side:"right",type:"statement"});
+items.push({id:id++,text:"Then what anchors meaning?",user:"alice",parent:3,side:"left",type:"question"});
+items.push({id:id++,text:"External reality and consistency",user:"bob",parent:4,side:"right",type:"statement"});
 
 renderUsers();
 render();

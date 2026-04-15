@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v35.3</title>
+<title>Better Dispute v35.4</title>
 
 <style>
 body{margin:0;font-family:system-ui;background:#0f0f0f;color:#eee}
@@ -12,7 +12,6 @@ header{
   display:flex;
   justify-content:space-between;
   padding:10px;
-  align-items:center;
 }
 
 .homeBtn{
@@ -64,6 +63,7 @@ textarea{
   margin-bottom:8px;
   border-radius:8px;
   cursor:pointer;
+  position:relative;
 }
 
 .meta{font-size:11px;color:#888}
@@ -73,18 +73,38 @@ textarea{
 .icon.dim{opacity:.3}
 .icon.active{opacity:1}
 
-/* vertical chain (non-fork disputes) */
-.thread{
-  margin:10px;
-  padding-left:10px;
-  border-left:2px solid #333;
+/* popup */
+#popup{
+  display:none;
+  position:fixed;
+  top:20%;
+  left:50%;
+  transform:translateX(-50%);
+  background:#111;
+  border:1px solid #333;
+  padding:10px;
+  width:300px;
+  z-index:10;
 }
 
-#nav{
-  padding:10px;
-  color:#4caf50;
-  cursor:pointer;
+#popup textarea{
+  height:70px;
 }
+
+/* sidebar chat */
+#sidebar{
+  position:fixed;
+  right:0;
+  top:0;
+  width:240px;
+  height:100%;
+  background:#0c0c0c;
+  border-left:1px solid #333;
+  padding:10px;
+  display:none;
+}
+
+.chatMsg{font-size:12px;margin-bottom:4px}
 
 #log{
   border-top:1px solid #222;
@@ -101,12 +121,11 @@ textarea{
 
 <header>
   <button class="homeBtn" onclick="home()">🏠 Home</button>
-  <div>Better Dispute v35.3</div>
+  <div>Better Dispute v35.4</div>
 </header>
 
 <div id="users"></div>
 
-<!-- only visible on HOME -->
 <div id="composerWrap">
   <textarea id="composer" placeholder="Start a fire..."></textarea>
   <button onclick="create()">Proclaim</button>
@@ -114,6 +133,17 @@ textarea{
 
 <div id="nav"></div>
 <div id="view"></div>
+
+<div id="popup">
+  <div>Dispute</div>
+  <textarea id="counter" placeholder="Counter (optional)"></textarea>
+  <textarea id="challenge" placeholder="Challenge (optional)"></textarea>
+  <button onclick="submitDispute()">✓</button>
+  <button onclick="closePopup()">✕</button>
+</div>
+
+<div id="sidebar"></div>
+
 <div id="log"></div>
 
 <script>
@@ -123,21 +153,20 @@ let currentUser="alice";
 
 let id=0;
 let items=[];
-
 let stack=[];
 let reactions={};
 let logs=[];
+let activeDisputeNode=null;
+let chat={};
 
-/* ---------------- LOG ---------------- */
 function log(e,d){
   logs.push({t:Date.now(),u:currentUser,e,d});
 }
 
-/* ---------------- HELPERS ---------------- */
 function find(i){return items.find(x=>x.id===i);}
 function key(u,id){return u+"|"+id;}
 
-/* ---------------- USERS ---------------- */
+/* users */
 function renderUsers(){
   const el=document.getElementById("users");
   el.innerHTML="";
@@ -145,54 +174,33 @@ function renderUsers(){
     const d=document.createElement("div");
     d.className="user"+(u===currentUser?" active":"");
     d.textContent=u;
-    d.onclick=()=>{
-      currentUser=u;
-      renderUsers();
-      render();
-    };
+    d.onclick=()=>{currentUser=u;renderUsers();render();};
     el.appendChild(d);
   });
 }
 
-/* ---------------- HOME ---------------- */
+/* home */
 function home(){
   stack=[];
   render();
 }
 
-/* ---------------- CREATE ---------------- */
+/* create */
 function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
 
-  items.push({
-    id:id++,
-    text:t,
-    user:currentUser,
-    parent:null,
-    side:null,
-    type:"proclaim"
-  });
-
+  items.push({id:id++,text:t,user:currentUser,parent:null,side:null});
   document.getElementById("composer").value="";
   log("create",t);
   render();
 }
 
-/* ---------------- NAV ---------------- */
-function enter(id){
-  stack.push(id);
-  log("enter",id);
-  render();
-}
+/* nav */
+function enter(i){stack.push(i);render();}
+function back(){stack.pop();render();}
 
-function back(){
-  stack.pop();
-  log("back","");
-  render();
-}
-
-/* ---------------- REACTIONS (LOCKED) ---------------- */
+/* reactions (FIXED: always show for non-owner) */
 function react(id,type){
   const n=find(id);
   if(!n || n.user===currentUser) return;
@@ -205,13 +213,69 @@ function react(id,type){
   render();
 }
 
-/* ---------------- NODE RENDER ---------------- */
+/* popup */
+function openDispute(id){
+  activeDisputeNode=id;
+  document.getElementById("popup").style.display="block";
+}
+
+function closePopup(){
+  activeDisputeNode=null;
+  document.getElementById("popup").style.display="none";
+}
+
+function submitDispute(){
+  const c=document.getElementById("counter").value.trim();
+  const q=document.getElementById("challenge").value.trim();
+
+  if(c){
+    items.push({id:id++,text:c,user:currentUser,parent:activeDisputeNode,side:"right"});
+  }
+  if(q){
+    items.push({id:id++,text:q,user:currentUser,parent:activeDisputeNode,side:"left"});
+  }
+
+  document.getElementById("counter").value="";
+  document.getElementById("challenge").value="";
+  closePopup();
+
+  log("dispute",activeDisputeNode);
+  render();
+}
+
+/* sidebar */
+function toggleChat(id){
+  const s=document.getElementById("sidebar");
+  s.style.display="block";
+
+  chat[id]=chat[id]||[];
+  renderSidebar(id);
+}
+
+function renderSidebar(id){
+  const s=document.getElementById("sidebar");
+  const msgs=chat[id]||[];
+
+  s.innerHTML=`
+    <div>Chat</div>
+    ${msgs.map(m=>`<div class="chatMsg"><b>${m.u}</b>: ${m.m}</div>`).join("")}
+    <input id="chatIn">
+    <button onclick="sendChat(${id})">send</button>
+  `;
+}
+
+function sendChat(id){
+  const v=document.getElementById("chatIn").value.trim();
+  if(!v) return;
+
+  chat[id].push({u:currentUser,m:v});
+  renderSidebar(id);
+}
+
+/* node */
 function renderNode(node,showActions){
 
-  const r = reactions[key(currentUser,node.id)];
-  const children = items.filter(x=>x.parent===node.id);
-  const answers = children.filter(c=>c.type==="answer");
-  const hasFork = children.some(c=>c.side==="left"||c.side==="right");
+  const r=reactions[key(currentUser,node.id)];
 
   return `
     <div class="card" onclick="enter(${node.id})">
@@ -219,137 +283,106 @@ function renderNode(node,showActions){
       <div>${node.text} <span class="meta">@${node.user}</span></div>
 
       ${node.user!==currentUser && showActions ? `
-        <div class="actions">
+        <div>
           <span class="icon ${r==='up'?'active':'dim'}"
                 onclick="event.stopPropagation();react(${node.id},'up')">👍</span>
+
           <span class="icon ${r==='down'?'active':'dim'}"
                 onclick="event.stopPropagation();react(${node.id},'down')">👎</span>
-        </div>
-      ` : ""}
 
-      <!-- answers always under questions -->
-      ${answers.length ? `
-        <div style="margin-top:6px;padding-left:10px;border-left:2px solid #4caf50">
-          ${answers.map(a=>`
-            <div>↳ ${a.text} <span class="meta">@${a.user}</span></div>
-          `).join("")}
+          <span class="icon" onclick="event.stopPropagation();openDispute(${node.id})">⚖</span>
+          <span class="icon" onclick="event.stopPropagation();toggleChat(${node.id})">💬</span>
         </div>
-      ` : ""}
+      `:""}
 
     </div>
   `;
 }
 
-/* ---------------- DISPUTE VIEW ---------------- */
+/* dispute view */
 function renderDispute(node){
 
-  const children = items.filter(x=>x.parent===node.id);
-  const forked = children.some(c=>c.side==="left"||c.side==="right");
+  const children=items.filter(x=>x.parent===node.id);
+  const forked=children.some(c=>c.side);
 
-  /* vertical thread (no fork) */
+  const header=`<div class="card" style="border:1px solid #333">
+    ${node.text} <span class="meta">@${node.user}</span>
+  </div>`;
+
   if(!forked){
     return `
       <div>
-
-        <div class="card" style="border:1px solid #333">
-          ${node.text} <span class="meta">@${node.user}</span>
-        </div>
-
-        <div class="thread">
-          ${children.map(c=>renderNode(c,true)).join("")}
-        </div>
-
+        ${header}
+        <div>${children.map(c=>renderNode(c,true)).join("")}</div>
       </div>
     `;
   }
 
-  /* 2-lane dispute */
-  const left = children.filter(c=>c.side==="left");
-  const right = children.filter(c=>c.side==="right");
+  const left=children.filter(c=>c.side==="left");
+  const right=children.filter(c=>c.side==="right");
 
   return `
     <div>
-
-      <div class="card" style="border:1px solid #333">
-        ${node.text} <span class="meta">@${node.user}</span>
-      </div>
-
+      ${header}
       <div class="dispute">
-
-        <div class="lane">
-          ${left.map(c=>renderNode(c,true)).join("")}
-        </div>
-
-        <div class="lane">
-          ${right.map(c=>renderNode(c,true)).join("")}
-        </div>
-
+        <div class="lane">${left.map(c=>renderNode(c,true)).join("")}</div>
+        <div class="lane">${right.map(c=>renderNode(c,true)).join("")}</div>
       </div>
-
     </div>
   `;
 }
 
-/* ---------------- MAIN RENDER ---------------- */
+/* render */
 function render(){
 
   const view=document.getElementById("view");
   const nav=document.getElementById("nav");
   const comp=document.getElementById("composerWrap");
 
+  comp.style.display = stack.length ? "none" : "block";
+
   view.innerHTML="";
   nav.innerHTML="";
 
-  /* hide composer in drill mode */
-  comp.style.display = stack.length ? "none" : "block";
-
   if(stack.length===0){
-
     items.filter(x=>x.parent===null).forEach(n=>{
-      view.innerHTML += renderNode(n,true);
+      view.innerHTML+=renderNode(n,true);
     });
-
   } else {
-
-    const current = find(stack[stack.length-1]);
-
-    nav.innerHTML = `<div onclick="back()">⬅ back</div>`;
-
-    view.innerHTML = renderDispute(current);
+    const cur=find(stack[stack.length-1]);
+    nav.innerHTML=`<button onclick="back()">⬅ back</button>`;
+    view.innerHTML=renderDispute(cur);
   }
 
-  const logEl=document.getElementById("log");
-  logEl.innerHTML = logs.slice(-200).reverse()
-    .map(l=>JSON.stringify(l)).join("<br>");
+  document.getElementById("log").innerHTML =
+    logs.slice(-200).reverse().map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- SEED TEST DATA ---------------- */
+/* ===== FIXED TEST DATA ===== */
 
-/* top-level proclamations */
-items.push({id:id++,text:"Truth exists independent of perception",user:"alice",parent:null});
-items.push({id:id++,text:"Reality is socially constructed",user:"bob",parent:null});
-items.push({id:id++,text:"Logic is not universal",user:"charlie",parent:null});
-items.push({id:id++,text:"Some truths are undiscoverable",user:"dana",parent:null});
-items.push({id:id++,text:"Knowledge is contextual",user:"eve",parent:null});
+/* roots (many valid independent proclamations) */
+items.push({id:id++,text:"Truth exists independently of belief",user:"alice",parent:null});
+items.push({id:id++,text:"Reality is socially mediated",user:"bob",parent:null});
+items.push({id:id++,text:"Logic is context-dependent",user:"charlie",parent:null});
+items.push({id:id++,text:"Knowledge evolves over time",user:"dana",parent:null});
+items.push({id:id++,text:"Some questions are unanswerable",user:"eve",parent:null});
+items.push({id:id++,text:"Meaning is constructed",user:"bob",parent:null});
 
-/* questions + answers */
-items.push({id:id++,text:"What validates truth?",user:"alice",parent:0,side:"right",type:"question"});
-items.push({id:id++,text:"Consistency within a system",user:"bob",parent:5,side:"left",type:"answer"});
-items.push({id:id++,text:"Which system though?",user:"charlie",parent:6,side:"right"});
+/* VALID QUESTION (NOT OWNED BY ALICE NOW FIXED) */
+items.push({id:id++,text:"What grounds truth?",user:"bob",parent:0,side:"left"});
 
-/* disputes */
+/* ANSWER UNDER QUESTION */
+items.push({id:id++,text:"Shared observation framework",user:"charlie",parent:6,side:null});
+
+/* DISPUTE BRANCH */
 items.push({id:id++,text:"Truth depends on consensus",user:"bob",parent:1,side:"right"});
 items.push({id:id++,text:"Consensus can be wrong",user:"alice",parent:8,side:"left"});
-items.push({id:id++,text:"Wrong consensus still functions",user:"charlie",parent:9,side:"right"});
+items.push({id:id++,text:"Wrong consensus persists socially",user:"charlie",parent:9,side:"right"});
 
 /* deeper chain */
-items.push({id:id++,text:"Function does not imply truth",user:"dana",parent:10,side:"left"});
-items.push({id:id++,text:"Truth may be emergent",user:"eve",parent:11,side:"right"});
+items.push({id:id++,text:"Persistence ≠ truth",user:"dana",parent:10,side:"left"});
 
-/* more unchallenged roots */
-items.push({id:id++,text:"Meaning is derived, not fixed",user:"alice",parent:null});
-items.push({id:id++,text:"Disagreement sharpens reasoning",user:"bob",parent:null});
-items.push({id:id++,text:"Not all questions resolve",user:"charlie",parent:null});
+/* unchallenged roots remain intentionally large */
 
 renderUsers();
 render();

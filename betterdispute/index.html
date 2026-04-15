@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v61</title>
+<title>Better Dispute v62</title>
 
 <style>
 body{
@@ -192,13 +192,12 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v61</div>
+  <div id="title">Better Dispute v62</div>
 </header>
 
 <div id="users"></div>
 
 <div id="composerWrap">
-  <!-- FIXED PLACEHOLDER -->
   <textarea id="composer" placeholder="Start a fire..."></textarea>
   <button onclick="create()">Proclaim</button>
 </div>
@@ -308,18 +307,29 @@ function create(){
   render();
 }
 
-/* ---------------- DISPUTE ---------------- */
+/* ---------------- DISPUTE (FIXED FORKING) ---------------- */
 function submitDispute(){
 
   const target=stack[stack.length-1];
   const parentNode=find(target);
   if(!parentNode) return;
 
-  // FIX: allow disputes between ANY users (no self-dispute restriction here)
-  // This was incorrectly blocking valid nested disputes.
-
   const q=document.getElementById("challenge").value.trim();
   const c=document.getElementById("counter").value.trim();
+
+  /* ✅ FIX: CREATE FORK NODE ALWAYS */
+  const forkId=id++;
+
+  items.push({
+    id:forkId,
+    text:parentNode.text,
+    user:parentNode.user,
+    parent:parentNode.id,
+    type:"dispute_root",
+    lane:"fork"
+  });
+
+  log("fork",forkId);
 
   if(q){
     const qid=id++;
@@ -327,7 +337,7 @@ function submitDispute(){
       id:qid,
       text:q,
       user:currentUser,
-      parent:target,
+      parent:forkId,
       type:"question",
       lane:"left"
     });
@@ -339,7 +349,7 @@ function submitDispute(){
       id:id++,
       text:c,
       user:currentUser,
-      parent:target,
+      parent:forkId,
       type:"proclaim",
       lane:"right"
     });
@@ -363,7 +373,6 @@ function setReaction(id,type){
   if(!reactions[id]) reactions[id]={};
 
   const prev=reactions[id][currentUser];
-
   if(prev==="disagree") return;
 
   if(type==="agree"){

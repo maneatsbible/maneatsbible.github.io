@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v55</title>
+<title>Better Dispute v56</title>
 
 <style>
 body{
@@ -80,6 +80,34 @@ textarea{
   border-radius:8px;
 }
 
+/* VOTE */
+.voteRow{
+  margin-top:6px;
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+.voteBtn{
+  background:#111;
+  border:1px solid #333;
+  color:#aaa;
+  padding:4px 6px;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:12px;
+}
+
+.voteBtn.activeUp{
+  color:#7CFF7C;
+  border-color:#7CFF7C;
+}
+
+.voteBtn.activeDown{
+  color:#FF7C7C;
+  border-color:#FF7C7C;
+}
+
 /* NAV */
 #nav{padding:0 10px}
 
@@ -109,7 +137,7 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v55</div>
+  <div id="title">Better Dispute v56</div>
 </header>
 
 <div id="users"></div>
@@ -143,6 +171,8 @@ let items=[];
 let stack=[];
 let logs=[];
 let openQuestions={};
+let votes={}; 
+// {itemId: {user: "up"|"down"}}
 
 /* ---------------- LOG ---------------- */
 function log(e,d){
@@ -266,9 +296,8 @@ function answer(qid){
   const q=find(qid);
   if(!q) return;
 
-  /* FIX: derive answer existence from actual data */
   const hasAnswer = items.some(x => x.parent === qid && x.type === "answer");
-  if(hasAnswer) return; // hides action completely if already answered
+  if(hasAnswer) return;
 
   const expected=openQuestions[qid];
   if(currentUser!==expected){
@@ -293,6 +322,18 @@ function answer(qid){
 
   log("answer",qid);
   render();
+}
+
+/* ---------------- VOTES ---------------- */
+function vote(itemId, dir){
+  if(!votes[itemId]) votes[itemId]={};
+  votes[itemId][currentUser]=dir;
+  log("vote",itemId+" "+dir);
+  render();
+}
+
+function getVote(itemId){
+  return votes[itemId]?.[currentUser];
 }
 
 /* ---------------- BUILD LANES ---------------- */
@@ -335,11 +376,14 @@ function renderNode(n){
   if(n.type==="answer") icon="✓";
 
   const hasAnswer = n.type==="question"
-    ? items.some(x => x.parent === n.id && x.type === "answer")
+    ? items.some(x=>x.parent===n.id && x.type==="answer")
     : false;
+
+  const v = getVote(n.id);
 
   return `
     <div class="card">
+
       <div>
         <span class="icon">${icon}</span>
         ${n.text}
@@ -353,6 +397,12 @@ function renderNode(n){
           ? `<button onclick="answer(${n.id})">Answer</button>`
           : ""
       }
+
+      <div class="voteRow">
+        <button class="voteBtn ${v==='up'?'activeUp':''}" onclick="vote(${n.id},'up')">↑</button>
+        <button class="voteBtn ${v==='down'?'activeDown':''}" onclick="vote(${n.id},'down')">↓</button>
+      </div>
+
     </div>
   `;
 }
@@ -394,6 +444,12 @@ function render(){
           <span class="icon">!</span>
           ${r.text}
           <span class="meta">@${r.user}</span>
+
+          <div class="voteRow">
+            <button class="voteBtn ${getVote(r.id)==='up'?'activeUp':''}" onclick="event.stopPropagation();vote(${r.id},'up')">↑</button>
+            <button class="voteBtn ${getVote(r.id)==='down'?'activeDown':''}" onclick="event.stopPropagation();vote(${r.id},'down')">↓</button>
+          </div>
+
         </div>
       `;
     });
@@ -410,25 +466,22 @@ function render(){
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (CLEAN + CONSISTENT) ---------------- */
+/* ---------------- TEST DATA ---------------- */
 
-/* Top level */
 items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null,type:"proclaim"});
 
 /* Bob challenges Alice */
 items.push({id:id++,text:"Does truth require agreement?",user:"bob",parent:0,type:"question",lane:"left",participants:["alice","bob"]});
 openQuestions[1]="alice";
-
 items.push({id:id++,text:"No, truth stands regardless",user:"alice",parent:1,type:"answer",lane:"left",participants:["alice","bob"]});
 
-/* Bob counter lane */
+/* Bob counter */
 items.push({id:id++,text:"Truth depends on shared understanding",user:"bob",parent:0,type:"proclaim",lane:"right",participants:["alice","bob"]});
 
-/* Alice challenges Bob */
+/* Alice challenge Bob */
 items.push({id:id++,text:"Can shared understanding be wrong?",user:"alice",parent:3,type:"question",lane:"left",participants:["alice","bob"]});
 openQuestions[4]="bob";
-
-items.push({id:id++,text:"Yes, consensus can still be mistaken",user:"bob",parent:4,type:"answer",lane:"left",participants:["alice","bob"]});
+items.push({id:id++,text:"Yes, consensus can be mistaken",user:"bob",parent:4,type:"answer",lane:"left",participants:["alice","bob"]});
 
 renderUsers();
 render();

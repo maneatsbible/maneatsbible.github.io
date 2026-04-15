@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v35.9</title>
+<title>Better Dispute v36.0</title>
 
 <style>
 body{
@@ -59,11 +59,17 @@ textarea{
 .icon.dim{opacity:.3}
 .icon.active{opacity:1}
 
-.dispute{
-  display:grid;
-  grid-template-columns:1fr 1fr;
+.disputeVertical{
+  display:flex;
+  flex-direction:column;
   gap:10px;
   margin:10px;
+}
+
+.laneTitle{
+  font-size:11px;
+  color:#777;
+  margin:4px 0;
 }
 
 .lane{
@@ -72,7 +78,9 @@ textarea{
   border-radius:8px;
 }
 
-#nav{padding:10px}
+#nav{
+  padding:10px;
+}
 
 #log{
   border-top:1px solid #222;
@@ -135,7 +143,7 @@ textarea{
     cursor:pointer;
   ">⚖️</button>
 
-  <div>Better Dispute v35.9</div>
+  <div>Better Dispute v36.0</div>
 </header>
 
 <div id="users"></div>
@@ -171,8 +179,6 @@ let items=[];
 let stack=[];
 let reactions={};
 let logs=[];
-
-/* pending dispute intent (IMPORTANT FIX) */
 let pendingDispute=null;
 
 function log(e,d){
@@ -218,7 +224,7 @@ function create(){
   render();
 }
 
-/* REACT (FIXED: no commit on down) */
+/* REACT (DEFER DOWN UNTIL SUBMIT) */
 function react(id,type){
 
   const n=find(id);
@@ -228,32 +234,27 @@ function react(id,type){
   if(reactions[k]) return;
 
   if(type==="down"){
-    pendingDispute={id,type};
+    pendingDispute={id};
     openDispute(id);
-    return; // ❗ NO COMMIT HERE
+    return;
   }
 
-  reactions[k]=type;
-  log(type,id);
+  reactions[k]="up";
+  log("up",id);
   render();
 }
 
 /* DISPUTE */
-let activeDisputeNode=null;
-
 function openDispute(id){
-  activeDisputeNode=id;
   document.getElementById("popup").style.display="block";
 }
 
-/* FIX: cancel discards everything */
 function closePopup(){
   pendingDispute=null;
-  activeDisputeNode=null;
   document.getElementById("popup").style.display="none";
 }
 
-/* FIX: submit is ONLY commit point */
+/* SUBMIT DISPUTE */
 function submitDispute(){
 
   if(!pendingDispute) return;
@@ -269,23 +270,10 @@ function submitDispute(){
   const q=document.getElementById("challenge").value.trim();
 
   if(c){
-    items.push({
-      id:id++,
-      text:c,
-      user:currentUser,
-      parent:target,
-      side:"right"
-    });
+    items.push({id:id++,text:c,user:currentUser,parent:target,side:"right"});
   }
-
   if(q){
-    items.push({
-      id:id++,
-      text:q,
-      user:currentUser,
-      parent:target,
-      side:"left"
-    });
+    items.push({id:id++,text:q,user:currentUser,parent:target,side:"left"});
   }
 
   document.getElementById("counter").value="";
@@ -294,41 +282,9 @@ function submitDispute(){
   log("dispute",target);
 
   pendingDispute=null;
-  activeDisputeNode=null;
+  closePopup();
 
   render();
-}
-
-/* SIDEBAR */
-function openSidebar(id){
-  document.getElementById("sidebar").style.display="block";
-  document.getElementById("overlay").style.display="block";
-  renderSidebar(id);
-}
-
-function closeSidebar(){
-  document.getElementById("sidebar").style.display="none";
-  document.getElementById("overlay").style.display="none";
-}
-
-let chat={};
-
-function renderSidebar(id){
-  chat[id]=chat[id]||[];
-
-  document.getElementById("sidebar").innerHTML=`
-    <div>Chat</div>
-    ${chat[id].map(m=>`<div class="chatMsg"><b>${m.u}</b>: ${m.m}</div>`).join("")}
-    <input id="chatIn">
-    <button onclick="sendChat(${id})">send</button>
-  `;
-}
-
-function sendChat(id){
-  const v=document.getElementById("chatIn").value.trim();
-  if(!v) return;
-  chat[id].push({u:currentUser,m:v});
-  renderSidebar(id);
 }
 
 /* NODE */
@@ -339,59 +295,56 @@ function renderNode(node){
 
   return `
     <div class="card" onclick="enter(${node.id})">
-
       <div>${node.text} <span class="meta">@${node.user}</span></div>
 
       ${show ? `
         <div class="actions">
-
           <span class="icon ${r==='up'?'active':'dim'}"
-                onclick="event.stopPropagation();react(${node.id},'up')">👍</span>
+            onclick="event.stopPropagation();react(${node.id},'up')">👍</span>
 
           <span class="icon ${r==='down'?'active':'dim'}"
-                onclick="event.stopPropagation();react(${node.id},'down')">👎</span>
-
-          <span class="icon"
-                onclick="event.stopPropagation();openSidebar(${node.id})">💬</span>
-
+            onclick="event.stopPropagation();react(${node.id},'down')">👎</span>
         </div>
       `:""}
-
     </div>
   `;
 }
 
-/* DISPUTE VIEW */
+/* FULL VERTICAL DISPUTE VIEW */
 function renderDispute(node){
 
   const children=items.filter(x=>x.parent===node.id);
-  const forked=children.some(c=>c.side);
-
-  const header=`
-    <div class="card" style="border:1px solid #333">
-      ${node.text} <span class="meta">@${node.user}</span>
-    </div>
-  `;
-
-  if(!forked){
-    return `
-      <div>
-        ${header}
-        <div>${children.map(renderNode).join("")}</div>
-      </div>
-    `;
-  }
 
   const left=children.filter(c=>c.side==="left");
   const right=children.filter(c=>c.side==="right");
 
   return `
     <div>
-      ${header}
-      <div class="dispute">
-        <div class="lane">${left.map(renderNode).join("")}</div>
-        <div class="lane">${right.map(renderNode).join("")}</div>
+
+      <div class="card" style="border:1px solid #333">
+        ${node.text} <span class="meta">@${node.user}</span>
       </div>
+
+      ${left.length || right.length ? `
+      <div class="disputeVertical">
+
+        <div>
+          <div class="laneTitle">Challenge / Left Lane</div>
+          <div class="lane">
+            ${left.map(renderNode).join("")}
+          </div>
+        </div>
+
+        <div>
+          <div class="laneTitle">Counter / Right Lane</div>
+          <div class="lane">
+            ${right.map(renderNode).join("")}
+          </div>
+        </div>
+
+      </div>
+      ` : ""}
+
     </div>
   `;
 }
@@ -401,20 +354,31 @@ function render(){
 
   const view=document.getElementById("view");
   const nav=document.getElementById("nav");
-  const comp=document.getElementById("composerWrap");
-
-  comp.style.display = stack.length ? "none" : "block";
 
   view.innerHTML="";
   nav.innerHTML="";
 
   if(stack.length===0){
+
     items.filter(x=>x.parent===null).forEach(n=>{
       view.innerHTML+=renderNode(n);
     });
+
   } else {
+
     const cur=find(stack[stack.length-1]);
-    nav.innerHTML=`<button onclick="back()">⚖️ back</button>`;
+
+    nav.innerHTML=`
+      <button onclick="back()" style="
+        background:#1f1f1f;
+        border:1px solid #333;
+        color:#eee;
+        padding:6px 10px;
+        border-radius:8px;
+        cursor:pointer;
+      ">🔙 back</button>
+    `;
+
     view.innerHTML=renderDispute(cur);
   }
 
@@ -422,19 +386,25 @@ function render(){
     logs.slice(-200).reverse().map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* SEED DATA */
+/* TEST DATA (ENRICHED) */
 items.push({id:id++,text:"Truth exists independent of belief",user:"alice",parent:null});
 items.push({id:id++,text:"Reality is socially constructed",user:"bob",parent:null});
 items.push({id:id++,text:"Logic depends on language",user:"charlie",parent:null});
 items.push({id:id++,text:"Meaning evolves over time",user:"dana",parent:null});
 items.push({id:id++,text:"Some truths cannot be known",user:"eve",parent:null});
 
-items.push({id:id++,text:"What grounds truth?",user:"bob",parent:0,side:"left",type:"question"});
-items.push({id:id++,text:"Empirical consistency",user:"charlie",parent:5});
+/* branching disputes */
+items.push({id:id++,text:"Truth is consensus-based",user:"bob",parent:1,side:"right"});
+items.push({id:id++,text:"Consensus can be wrong",user:"alice",parent:5,side:"left"});
+items.push({id:id++,text:"But consensus stabilizes systems",user:"charlie",parent:5,side:"right"});
 
-items.push({id:id++,text:"Truth emerges socially",user:"bob",parent:1,side:"right"});
-items.push({id:id++,text:"Emergence is not truth",user:"alice",parent:7,side:"left"});
-items.push({id:id++,text:"But stability matters",user:"charlie",parent:8,side:"right"});
+/* deeper branch */
+items.push({id:id++,text:"Stability != truth",user:"dana",parent:6,side:"left"});
+items.push({id:id++,text:"Truth emerges statistically",user:"eve",parent:6,side:"right"});
+
+/* unchallenged */
+items.push({id:id++,text:"Interpretation shapes meaning",user:"charlie",parent:null});
+items.push({id:id++,text:"Disagreement improves clarity",user:"alice",parent:null});
 
 renderUsers();
 render();

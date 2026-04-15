@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v51</title>
+<title>Better Dispute v52</title>
 
 <style>
 body{
@@ -111,7 +111,7 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v51</div>
+  <div id="title">Better Dispute v52</div>
 </header>
 
 <div id="users"></div>
@@ -144,8 +144,6 @@ let id=0;
 let items=[];
 let stack=[];
 let logs=[];
-
-/* question -> expected answerer */
 let openQuestions={};
 
 /* ---------------- LOG ---------------- */
@@ -214,15 +212,14 @@ function submitDispute(){
 
   const target=stack[stack.length-1];
   const parentNode=find(target);
-
   if(!parentNode) return;
 
-  /* ENFORCE TWO-PARTY: only parent author and current user allowed */
-  const participants=[parentNode.user, currentUser];
+  const participants=[parentNode.user,currentUser];
 
   const q=document.getElementById("challenge").value.trim();
   const c=document.getElementById("counter").value.trim();
 
+  /* FIX: challenges ALWAYS belong to LEFT lane */
   if(q){
     const qid=id++;
     items.push({
@@ -231,12 +228,13 @@ function submitDispute(){
       user:currentUser,
       parent:target,
       type:"question",
+      lane:"left",
       participants
     });
-
     openQuestions[qid]=parentNode.user;
   }
 
+  /* counters ALWAYS belong to RIGHT lane */
   if(c){
     items.push({
       id:id++,
@@ -244,6 +242,7 @@ function submitDispute(){
       user:currentUser,
       parent:target,
       type:"proclaim",
+      lane:"right",
       participants
     });
   }
@@ -267,7 +266,6 @@ function answer(qid){
   if(!q || q.answerBy) return;
 
   const expected=openQuestions[qid];
-
   if(currentUser!==expected){
     alert("Only the targeted user can answer.");
     return;
@@ -282,6 +280,7 @@ function answer(qid){
     user:currentUser,
     parent:qid,
     type:"answer",
+    lane:"left", /* answers stay aligned under question */
     participants:q.participants
   });
 
@@ -292,8 +291,8 @@ function answer(qid){
   render();
 }
 
-/* ---------------- BUILD STRUCTURED CHAINS ---------------- */
-function buildLane(rootId, sideUser){
+/* ---------------- BUILD LANES (FIXED) ---------------- */
+function buildLane(rootId, lane){
 
   const out=[];
 
@@ -303,19 +302,15 @@ function buildLane(rootId, sideUser){
 
     children.forEach(c=>{
 
-      /* enforce 2-user participation */
-      if(c.participants && !c.participants.includes(sideUser)) return;
-
-      /* include only correct side */
-      if(c.user!==sideUser) return;
+      if(c.lane!==lane) return;
 
       out.push(c);
 
       if(c.type==="question"){
-        const answer=items.find(x=>x.parent===c.id && x.type==="answer");
-        if(answer){
-          out.push(answer);
-          walk(answer.id);
+        const ans=items.find(x=>x.parent===c.id && x.type==="answer");
+        if(ans){
+          out.push(ans);
+          walk(ans.id);
         }
       } else {
         walk(c.id);
@@ -359,16 +354,8 @@ function renderNode(n){
 /* ---------------- DISPUTE VIEW ---------------- */
 function renderDispute(root){
 
-  /* determine 2 participants */
-  const children=items.filter(x=>x.parent===root.id);
-  const usersInvolved=[root.user, ...(children.map(c=>c.user))];
-  const unique=[...new Set(usersInvolved)].slice(0,2);
-
-  const leftUser=unique[0];
-  const rightUser=unique[1] || unique[0];
-
-  const leftLane=buildLane(root.id,leftUser);
-  const rightLane=buildLane(root.id,rightUser);
+  const leftLane=buildLane(root.id,"left");
+  const rightLane=buildLane(root.id,"right");
 
   return `
     <div class="card">
@@ -417,24 +404,24 @@ function render(){
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (STRICT 2 USER PER DISPUTE) ---------------- */
+/* ---------------- TEST DATA (CORRECT LANES) ---------------- */
 
 items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null,type:"proclaim"});
 
-/* BOB engages Alice */
-items.push({id:id++,text:"Does truth require consensus?",user:"bob",parent:0,type:"question",participants:["alice","bob"]});
+/* LEFT lane: challenges */
+items.push({id:id++,text:"Does truth require consensus?",user:"bob",parent:0,type:"question",lane:"left",participants:["alice","bob"]});
 openQuestions[1]="alice";
 
-items.push({id:id++,text:"No, truth exists regardless",user:"alice",parent:1,type:"answer",participants:["alice","bob"]});
+items.push({id:id++,text:"No, truth exists regardless",user:"alice",parent:1,type:"answer",lane:"left",participants:["alice","bob"]});
 
-/* Alice counters */
-items.push({id:id++,text:"Truth is grounded in reality",user:"alice",parent:2,type:"proclaim",participants:["alice","bob"]});
+/* RIGHT lane: counters */
+items.push({id:id++,text:"Truth is grounded in reality",user:"alice",parent:0,type:"proclaim",lane:"right",participants:["alice","bob"]});
 
-/* Bob follow-up */
-items.push({id:id++,text:"How do we verify reality?",user:"bob",parent:2,type:"question",participants:["alice","bob"]});
+/* LEFT lane follow-up */
+items.push({id:id++,text:"How do we verify reality?",user:"bob",parent:3,type:"question",lane:"left",participants:["alice","bob"]});
 openQuestions[4]="alice";
 
-items.push({id:id++,text:"Through consistent observation",user:"alice",parent:4,type:"answer",participants:["alice","bob"]});
+items.push({id:id++,text:"Through consistent observation",user:"alice",parent:4,type:"answer",lane:"left",participants:["alice","bob"]});
 
 renderUsers();
 render();

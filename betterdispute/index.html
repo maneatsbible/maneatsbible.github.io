@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v35.6</title>
+<title>Better Dispute v35.7</title>
 
 <style>
 body{
@@ -20,7 +20,7 @@ header{
   align-items:center;
 }
 
-/* users */
+/* USERS */
 #users{display:flex;gap:6px;padding:8px}
 .user{
   padding:4px 8px;
@@ -34,7 +34,7 @@ header{
   border-color:#fff;
 }
 
-/* composer */
+/* COMPOSER */
 textarea{
   width:100%;
   height:90px;
@@ -44,7 +44,7 @@ textarea{
   padding:8px;
 }
 
-/* cards */
+/* CARDS */
 .card{
   background:#1a1a1a;
   padding:10px;
@@ -65,7 +65,7 @@ textarea{
 .icon.dim{opacity:.3}
 .icon.active{opacity:1}
 
-/* dispute layout */
+/* DISPUTE LAYOUT */
 .dispute{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -79,14 +79,12 @@ textarea{
   border-radius:8px;
 }
 
-/* nav */
+/* NAV */
 #nav{
   padding:10px;
-  color:#4caf50;
-  cursor:pointer;
 }
 
-/* log */
+/* LOG */
 #log{
   border-top:1px solid #222;
   padding:10px;
@@ -96,7 +94,7 @@ textarea{
   overflow:auto;
 }
 
-/* popup */
+/* POPUP */
 #popup{
   display:none;
   position:fixed;
@@ -114,7 +112,7 @@ textarea{
   height:70px;
 }
 
-/* sidebar */
+/* SIDEBAR */
 #sidebar{
   position:fixed;
   right:0;
@@ -150,13 +148,14 @@ textarea{
     padding:6px 10px;
     border-radius:8px;
     cursor:pointer;
-  ">Home</button>
+  ">⚖️</button>
 
-  <div>Better Dispute v35.6</div>
+  <div>Better Dispute v35.7</div>
 </header>
 
 <div id="users"></div>
 
+<!-- COMPOSER (hidden in drill mode) -->
 <div id="composerWrap">
   <textarea id="composer" placeholder="Start a fire..."></textarea>
   <button onclick="create()">Proclaim</button>
@@ -165,6 +164,7 @@ textarea{
 <div id="nav"></div>
 <div id="view"></div>
 
+<!-- DISPUTE POPUP -->
 <div id="popup">
   <div>Dispute</div>
   <textarea id="counter" placeholder="Counter (optional)"></textarea>
@@ -173,6 +173,7 @@ textarea{
   <button onclick="closePopup()">✕</button>
 </div>
 
+<!-- SIDEBAR -->
 <div id="overlay" onclick="closeSidebar()"></div>
 <div id="sidebar"></div>
 
@@ -188,18 +189,23 @@ let items=[];
 let stack=[];
 let reactions={};
 let logs=[];
-let activeDisputeNode=null;
-let chat={};
 
-/* log */
+/* TURN STATE (ENFORCEMENT) */
+let userState = {
+  lockedNode:null,
+  awaitingAnswer:false
+};
+
+/* LOG */
 function log(e,d){
   logs.push({t:Date.now(),u:currentUser,e,d});
 }
 
+/* HELPERS */
 function find(i){return items.find(x=>x.id===i);}
 function key(u,id){return u+"|"+id;}
 
-/* users */
+/* USERS */
 function renderUsers(){
   const el=document.getElementById("users");
   el.innerHTML="";
@@ -212,12 +218,14 @@ function renderUsers(){
   });
 }
 
-/* navigation */
+/* HOME */
 function home(){stack=[];render();}
+
+/* NAV */
 function enter(i){stack.push(i);render();}
 function back(){stack.pop();render();}
 
-/* create */
+/* CREATE */
 function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
@@ -235,7 +243,14 @@ function create(){
   render();
 }
 
-/* reactions */
+/* QUESTION CHECK */
+function isQuestionUnanswered(id){
+  const n=find(id);
+  const children=items.filter(x=>x.parent===id);
+  return n && n.type==="question" && children.length===0;
+}
+
+/* REACTIONS + TURN LOCK */
 function react(id,type){
 
   const n=find(id);
@@ -247,6 +262,8 @@ function react(id,type){
   reactions[k]=type;
 
   if(type==="down"){
+    userState.lockedNode=id;
+    userState.awaitingAnswer=isQuestionUnanswered(id);
     openDispute(id);
   }
 
@@ -254,7 +271,9 @@ function react(id,type){
   render();
 }
 
-/* dispute popup */
+/* DISPUTE POPUP */
+let activeDisputeNode=null;
+
 function openDispute(id){
   activeDisputeNode=id;
   document.getElementById("popup").style.display="block";
@@ -265,31 +284,49 @@ function closePopup(){
   document.getElementById("popup").style.display="none";
 }
 
+/* SUBMIT + UNLOCK TURN */
 function submitDispute(){
+
   const c=document.getElementById("counter").value.trim();
   const q=document.getElementById("challenge").value.trim();
 
   if(c){
-    items.push({id:id++,text:c,user:currentUser,parent:activeDisputeNode,side:"right"});
+    items.push({
+      id:id++,
+      text:c,
+      user:currentUser,
+      parent:activeDisputeNode,
+      side:"right"
+    });
   }
+
   if(q){
-    items.push({id:id++,text:q,user:currentUser,parent:activeDisputeNode,side:"left"});
+    items.push({
+      id:id++,
+      text:q,
+      user:currentUser,
+      parent:activeDisputeNode,
+      side:"left"
+    });
   }
 
   document.getElementById("counter").value="";
   document.getElementById("challenge").value="";
+
   closePopup();
+
+  userState.lockedNode=null;
+  userState.awaitingAnswer=false;
 
   log("dispute",activeDisputeNode);
   render();
 }
 
-/* sidebar */
+/* SIDEBAR */
 function openSidebar(id){
   document.getElementById("sidebar").style.display="block";
   document.getElementById("overlay").style.display="block";
 
-  chat[id]=chat[id]||[];
   renderSidebar(id);
 }
 
@@ -298,15 +335,20 @@ function closeSidebar(){
   document.getElementById("overlay").style.display="none";
 }
 
-function renderSidebar(id){
-  const s=document.getElementById("sidebar");
+let chat={};
 
-  s.innerHTML=`
+function renderSidebar(id){
+
+  chat[id]=chat[id]||[];
+
+  document.getElementById("sidebar").innerHTML=`
     <div>Chat</div>
+
     ${chat[id].map(m=>`
       <div class="chatMsg"><b>${m.u}</b>: ${m.m}</div>
     `).join("")}
-    <input id="chatIn">
+
+    <input id="chatIn" style="width:100%;margin-top:6px">
     <button onclick="sendChat(${id})">send</button>
   `;
 }
@@ -319,7 +361,7 @@ function sendChat(id){
   renderSidebar(id);
 }
 
-/* node */
+/* NODE */
 function renderNode(node,showActions){
 
   const r=reactions[key(currentUser,node.id)];
@@ -338,7 +380,8 @@ function renderNode(node,showActions){
           <span class="icon ${r==='down'?'active':'dim'}"
                 onclick="event.stopPropagation();react(${node.id},'down')">👎</span>
 
-          <span class="icon" onclick="event.stopPropagation();openSidebar(${node.id})">💬</span>
+          <span class="icon"
+                onclick="event.stopPropagation();openSidebar(${node.id})">💬</span>
 
         </div>
       `:""}
@@ -347,7 +390,7 @@ function renderNode(node,showActions){
   `;
 }
 
-/* dispute view */
+/* DISPUTE VIEW */
 function renderDispute(node){
 
   const children=items.filter(x=>x.parent===node.id);
@@ -382,7 +425,7 @@ function renderDispute(node){
   `;
 }
 
-/* render */
+/* RENDER */
 function render(){
 
   const view=document.getElementById("view");
@@ -400,7 +443,7 @@ function render(){
     });
   } else {
     const cur=find(stack[stack.length-1]);
-    nav.innerHTML=`<button onclick="back()">⬅ back</button>`;
+    nav.innerHTML=`<button onclick="back()">⚖️ back</button>`;
     view.innerHTML=renderDispute(cur);
   }
 
@@ -408,13 +451,18 @@ function render(){
     logs.slice(-200).reverse().map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* seed minimal consistent data */
+/* SEED DATA */
 items.push({id:id++,text:"Truth exists independent of belief",user:"alice",parent:null});
 items.push({id:id++,text:"Reality is socially constructed",user:"bob",parent:null});
 items.push({id:id++,text:"Logic depends on language",user:"charlie",parent:null});
+items.push({id:id++,text:"Some truths are emergent",user:"dana",parent:null});
+items.push({id:id++,text:"Not all questions resolve",user:"eve",parent:null});
 
-items.push({id:id++,text:"What grounds truth?",user:"bob",parent:0,side:"left"});
-items.push({id:id++,text:"Shared observation framework",user:"charlie",parent:3});
+/* QUESTION (valid, no self-violation) */
+items.push({id:id++,text:"What grounds truth?",user:"bob",parent:0,side:"left",type:"question"});
+
+/* ANSWER */
+items.push({id:id++,text:"Shared observation frameworks",user:"charlie",parent:5});
 
 renderUsers();
 render();

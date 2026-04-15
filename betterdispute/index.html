@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v41</title>
+<title>Better Dispute v42</title>
 
 <style>
 body{
@@ -23,18 +23,6 @@ header{
 
 #title{font-weight:600}
 
-#homeBtn, #backBtn{
-  background:#1c1c1c;
-  border:1px solid #333;
-  color:#aaa;
-  padding:6px 10px;
-  border-radius:8px;
-  cursor:pointer;
-  display:flex;
-  gap:6px;
-  align-items:center;
-}
-
 #users{display:flex;gap:6px;padding:8px}
 .user{
   padding:4px 8px;
@@ -45,10 +33,10 @@ header{
 }
 .user.active{opacity:1;border-color:#fff}
 
-/* composer hidden in drill */
 #composerWrap{
   padding:10px;
 }
+
 textarea{
   width:100%;
   height:90px;
@@ -59,7 +47,6 @@ textarea{
   border-radius:6px;
 }
 
-/* cards */
 .card{
   background:#1a1a1a;
   padding:10px;
@@ -80,7 +67,7 @@ textarea{
 .icon.dim{opacity:.25}
 .icon.active{opacity:1}
 
-/* lanes */
+/* TWO LANE */
 .disputeWrap{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -94,28 +81,7 @@ textarea{
   border-radius:8px;
 }
 
-/* sidebar */
-#overlay{
-  display:none;
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.5);
-  z-index:40;
-}
-
-#sidebar{
-  position:fixed;
-  right:0;
-  top:0;
-  width:260px;
-  height:100%;
-  background:#0c0c0c;
-  border-left:1px solid #333;
-  padding:10px;
-  display:none;
-  z-index:50;
-}
-
+/* LOG */
 #log{
   border-top:1px solid #222;
   padding:10px;
@@ -124,36 +90,52 @@ textarea{
   max-height:180px;
   overflow:auto;
 }
+
+/* LINEAGE BAR */
+#lineage{
+  padding:8px 10px;
+  font-size:11px;
+  color:#aaa;
+  border-bottom:1px solid #222;
+}
+
+/* BACK */
+#backBtn{
+  background:#1c1c1c;
+  border:1px solid #333;
+  color:#aaa;
+  padding:6px 10px;
+  border-radius:8px;
+  cursor:pointer;
+}
 </style>
 </head>
 
 <body>
 
 <header>
-  <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">v41</div>
+  <div id="title">Better Dispute v42</div>
 </header>
 
 <div id="users"></div>
 
 <div id="composerWrap">
-  <textarea id="composer" placeholder="Start a fire..."></textarea>
+  <textarea id="composer" placeholder="Start a proclamation..."></textarea>
   <button onclick="create()">Proclaim</button>
 </div>
+
+<div id="lineage"></div>
 
 <div id="nav"></div>
 <div id="view"></div>
 
 <div id="popup" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#111;border:1px solid #333;padding:10px;width:300px;z-index:20;">
   <div>Dispute</div>
-  <textarea id="challenge" placeholder="Challenge (question)"></textarea>
+  <textarea id="challenge" placeholder="Challenge (question - directed)"></textarea>
   <textarea id="counter" placeholder="Counter (proclamation)"></textarea>
   <button onclick="submitDispute()">✓</button>
   <button onclick="closePopup()">✕</button>
 </div>
-
-<div id="overlay" onclick="closeSidebar()"></div>
-<div id="sidebar"></div>
 
 <div id="log"></div>
 
@@ -170,7 +152,6 @@ let reactions={};
 let pending=null;
 let mustAnswer={};
 let logs=[];
-let chat={};
 
 /* ---------------- LOG ---------------- */
 function log(e,d){
@@ -201,11 +182,15 @@ function home(){
   render();
 }
 
-/* BACK = ONE LEVEL BUT SAFE */
+function enter(id){
+  stack.push(id);
+  document.getElementById("composerWrap").style.display="none";
+  render();
+}
+
 function back(){
-  if(stack.length>1){
-    stack.pop();
-  } else {
+  if(stack.length>1) stack.pop();
+  else {
     stack=[];
     document.getElementById("composerWrap").style.display="block";
   }
@@ -220,13 +205,6 @@ function create(){
   items.push({id:id++,text:t,user:currentUser,parent:null});
   document.getElementById("composer").value="";
   log("create",t);
-  render();
-}
-
-/* ---------------- DRILL ---------------- */
-function enter(id){
-  stack.push(id);
-  document.getElementById("composerWrap").style.display="none";
   render();
 }
 
@@ -260,11 +238,13 @@ function closePopup(){
 function submitDispute(){
 
   if(!pending) return;
+
   const target=pending;
 
   const q=document.getElementById("challenge").value.trim();
   const c=document.getElementById("counter").value.trim();
 
+  /* DIRECTED QUESTION: only ONE answer allowed */
   if(q){
     let qid=id++;
     items.push({
@@ -273,7 +253,8 @@ function submitDispute(){
       user:currentUser,
       parent:target,
       side:"left",
-      type:"question"
+      type:"question",
+      answerBy:null
     });
     mustAnswer[qid]=true;
   }
@@ -299,10 +280,13 @@ function submitDispute(){
   render();
 }
 
-/* ---------------- ANSWER ---------------- */
+/* ---------------- ANSWER (DIRECTED) ---------------- */
 function answer(id){
 
-  const t=prompt("Answer:");
+  const n=find(id);
+  if(!n || n.answerBy) return;
+
+  const t=prompt("Answer this question:");
   if(!t) return;
 
   items.push({
@@ -313,36 +297,11 @@ function answer(id){
     type:"answer"
   });
 
+  n.answerBy=currentUser;
   mustAnswer[id]=false;
+
   log("answer",id);
   render();
-}
-
-/* ---------------- SIDEBAR ---------------- */
-function openSidebar(id){
-  chat[id]=chat[id]||[];
-
-  document.getElementById("sidebar").style.display="block";
-  document.getElementById("overlay").style.display="block";
-
-  document.getElementById("sidebar").innerHTML=`
-    <div style="color:#888">thread chat</div>
-    ${chat[id].map(m=>`<div><b>${m.u}</b>: ${m.m}</div>`).join("")}
-    <input id="chatIn" style="width:100%;margin-top:8px">
-    <button onclick="sendChat(${id})">send</button>
-  `;
-}
-
-function sendChat(id){
-  const v=document.getElementById("chatIn").value.trim();
-  if(!v) return;
-  chat[id].push({u:currentUser,m:v});
-  openSidebar(id);
-}
-
-function closeSidebar(){
-  document.getElementById("sidebar").style.display="none";
-  document.getElementById("overlay").style.display="none";
 }
 
 /* ---------------- NODE ---------------- */
@@ -354,10 +313,15 @@ function node(n){
   return `
     <div class="card" onclick="enter(${n.id})">
 
-      <div>${n.text} <span class="meta">@${n.user}</span></div>
+      <div>
+        ${n.text}
+        <span class="meta">@${n.user}</span>
+      </div>
 
       ${n.type==="question" ? `
-        <button onclick="event.stopPropagation();answer(${n.id})">Answer</button>
+        <button onclick="event.stopPropagation();answer(${n.id})">
+          Answer
+        </button>
       `:""}
 
       ${show ? `
@@ -367,9 +331,6 @@ function node(n){
 
           <span class="icon ${r==='down'?'active':'dim'}"
             onclick="event.stopPropagation();react(${n.id},'down')">👎</span>
-
-          <span class="icon"
-            onclick="event.stopPropagation();openSidebar(${n.id})">💬</span>
         </div>
       `:""}
 
@@ -380,13 +341,24 @@ function node(n){
 /* ---------------- DISPUTE VIEW ---------------- */
 function renderDispute(root){
 
-  const children=items.filter(x=>x.parent===root.id);
+  const chain = [];
+  let cur = root;
 
-  const left=children.filter(x=>x.side==="left");
-  const right=children.filter(x=>x.side==="right");
+  while(cur){
+    chain.unshift(cur);
+    cur = find(cur.parent);
+  }
+
+  const children = items.filter(x=>x.parent===root.id);
+  const left = children.filter(x=>x.side==="left");
+  const right = children.filter(x=>x.side==="right");
 
   return `
     <div>
+
+      <div id="lineage">
+        lineage: ${chain.map(c=>c.text).join(" ➜ ")}
+      </div>
 
       <div class="card">
         ${root.text} <span class="meta">@${root.user}</span>
@@ -396,8 +368,6 @@ function renderDispute(root){
         <div class="lane">${left.map(node).join("")}</div>
         <div class="lane">${right.map(node).join("")}</div>
       </div>
-
-      ${children.length>0 ? `<div class="meta" style="padding:0 10px">↳ more branches available</div>`:""}
 
     </div>
   `;
@@ -413,8 +383,7 @@ function render(){
     items.filter(x=>x.parent===null)
       .forEach(n=>view.innerHTML+=node(n));
   } else {
-    let cur=find(stack[stack.length-1]);
-
+    const cur=find(stack[stack.length-1]);
     view.innerHTML=`
       <button id="backBtn" onclick="back()">⬅ back</button>
       ${renderDispute(cur)}
@@ -425,22 +394,18 @@ function render(){
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (CLEAN 3 USER ROOT DISPUTE) ---------------- */
+/* ---------------- TEST DATA (FIXED SINGLE ROOT + CLEAN BRANCHES) ---------------- */
 
 /* ROOT */
-items.push({id:id++,text:"Should truth depend on consensus?",user:"alice",parent:null});
+items.push({id:id++,text:"Is truth defined by consensus?",user:"alice",parent:null});
 
-/* BRANCH 1 */
-items.push({id:id++,text:"Yes, shared agreement defines truth",user:"bob",parent:0,side:"left",type:"question"});
+/* FIRST DISPUTE */
+items.push({id:id++,text:"Yes, truth emerges from agreement",user:"bob",parent:0,side:"left",type:"question"});
 items.push({id:id++,text:"No, truth exists independently",user:"charlie",parent:0,side:"right",type:"statement"});
 
-/* ANSWERS */
-items.push({id:id++,text:"But how do we verify without agreement?",user:"alice",parent:1,side:"left",type:"question"});
-items.push({id:id++,text:"Through consistent external reality",user:"bob",parent:2,side:"right",type:"statement"});
-
-/* SECOND LEVEL */
-items.push({id:id++,text:"Is consistency itself agreement?",user:"charlie",parent:3,side:"left",type:"question"});
-items.push({id:id++,text:"No, it is constraint-based",user:"alice",parent:4,side:"right",type:"statement"});
+/* ANSWER + BRANCH */
+items.push({id:id++,text:"What if consensus is wrong?",user:"alice",parent:1,side:"left",type:"question"});
+items.push({id:id++,text:"Reality corrects consensus over time",user:"bob",parent:2,side:"right",type:"statement"});
 
 renderUsers();
 render();

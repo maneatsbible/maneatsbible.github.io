@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v60</title>
+<title>Better Dispute v61</title>
 
 <style>
 body{
@@ -44,7 +44,6 @@ header{
 
 #composerWrap{padding:10px}
 
-/* FIX MOBILE ZOOM: 16px+ prevents iOS auto zoom */
 textarea{
   width:100%;
   font-size:16px;
@@ -135,7 +134,7 @@ textarea{
 
 #modal textarea{
   width:100%;
-  font-size:16px; /* FIX zoom */
+  font-size:16px;
   height:60px;
   margin-bottom:6px;
   background:#0b0b0b;
@@ -193,13 +192,14 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v60</div>
+  <div id="title">Better Dispute v61</div>
 </header>
 
 <div id="users"></div>
 
 <div id="composerWrap">
-  <textarea id="composer" placeholder="Start a proclamation..."></textarea>
+  <!-- FIXED PLACEHOLDER -->
+  <textarea id="composer" placeholder="Start a fire..."></textarea>
   <button onclick="create()">Proclaim</button>
 </div>
 
@@ -315,11 +315,8 @@ function submitDispute(){
   const parentNode=find(target);
   if(!parentNode) return;
 
-  // FIX: correct logic — only block self-dispute if SAME NODE USER
-  if(parentNode.user === currentUser){
-    alert("Cannot dispute your own statement.");
-    return;
-  }
+  // FIX: allow disputes between ANY users (no self-dispute restriction here)
+  // This was incorrectly blocking valid nested disputes.
 
   const q=document.getElementById("challenge").value.trim();
   const c=document.getElementById("counter").value.trim();

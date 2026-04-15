@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v38</title>
+<title>Better Dispute v39</title>
 
 <style>
 body{
@@ -17,12 +17,10 @@ header{
   display:flex;
   justify-content:space-between;
   padding:10px;
-  align-items:center;
   border-bottom:1px solid #222;
 }
 
 #title{font-weight:600}
-
 #homeBtn{
   background:#1c1c1c;
   border:1px solid #333;
@@ -37,8 +35,8 @@ header{
   padding:4px 8px;
   border:1px solid #333;
   border-radius:999px;
-  cursor:pointer;
   opacity:.6;
+  cursor:pointer;
 }
 .user.active{opacity:1;border-color:#fff}
 
@@ -65,13 +63,13 @@ textarea{
 
 .icon{
   font-size:18px;
-  cursor:pointer;
   margin-right:8px;
+  cursor:pointer;
 }
 .icon.dim{opacity:.25}
 .icon.active{opacity:1}
 
-/* TWO LANE ALWAYS */
+/* 2-LANE ALWAYS */
 .disputeWrap{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -83,16 +81,6 @@ textarea{
   background:#141414;
   padding:8px;
   border-radius:8px;
-}
-
-/* LOG */
-#log{
-  border-top:1px solid #222;
-  padding:10px;
-  font-size:11px;
-  color:#7f7;
-  max-height:180px;
-  overflow:auto;
 }
 
 /* POPUP */
@@ -108,19 +96,50 @@ textarea{
   width:300px;
   z-index:20;
 }
+
+/* SIDEBAR */
+#overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  z-index:40;
+}
+
+#sidebar{
+  position:fixed;
+  right:0;
+  top:0;
+  width:260px;
+  height:100%;
+  background:#0c0c0c;
+  border-left:1px solid #333;
+  padding:10px;
+  display:none;
+  z-index:50;
+}
+
+#log{
+  border-top:1px solid #222;
+  padding:10px;
+  font-size:11px;
+  color:#7f7;
+  max-height:180px;
+  overflow:auto;
+}
 </style>
 </head>
 
 <body>
 
 <header>
-  <button onclick="home()" id="homeBtn">⚖ home</button>
-  <div id="title">v38</div>
+  <button id="homeBtn" onclick="home()">⚖ home</button>
+  <div id="title">v39</div>
 </header>
 
 <div id="users"></div>
 
-<div id="composerWrap">
+<div>
   <textarea id="composer" placeholder="Start a fire..."></textarea>
   <button onclick="create()">Proclaim</button>
 </div>
@@ -130,21 +149,20 @@ textarea{
 
 <div id="popup">
   <div>Dispute</div>
-
-  <!-- CHALLENGE = QUESTION -->
-  <textarea id="challenge" placeholder="Challenge question (optional)"></textarea>
-
-  <!-- COUNTER = PROCLAMATION -->
-  <textarea id="counter" placeholder="Counter proclamation (optional)"></textarea>
-
+  <textarea id="challenge" placeholder="Challenge (question)"></textarea>
+  <textarea id="counter" placeholder="Counter (proclamation)"></textarea>
   <button onclick="submitDispute()">✓</button>
   <button onclick="closePopup()">✕</button>
 </div>
+
+<div id="overlay" onclick="closeSidebar()"></div>
+<div id="sidebar"></div>
 
 <div id="log"></div>
 
 <script>
 
+/* ---------------- STATE ---------------- */
 let users=["alice","bob","charlie","dana","eve"];
 let currentUser="alice";
 
@@ -153,10 +171,10 @@ let items=[];
 let stack=[];
 let reactions={};
 let pending=null;
-
+let chat={};
 let logs=[];
 
-/* ---------------- LOG ---------------- */
+/* ---------------- LOG (APPEND ONLY) ---------------- */
 function log(e,d){
   logs.push({t:Date.now(),u:currentUser,e,d});
 }
@@ -180,6 +198,7 @@ function renderUsers(){
 
 /* ---------------- NAV ---------------- */
 function home(){ stack=[]; render(); }
+function enter(id){ stack=[id]; render(); }
 
 /* ---------------- CREATE ---------------- */
 function create(){
@@ -192,7 +211,7 @@ function create(){
   render();
 }
 
-/* ---------------- REACT ---------------- */
+/* ---------------- REACTIONS ---------------- */
 function react(id,type){
 
   const n=find(id);
@@ -227,7 +246,6 @@ function submitDispute(){
   const q=document.getElementById("challenge").value.trim(); // QUESTION
   const c=document.getElementById("counter").value.trim();   // PROCLAMATION
 
-  // question branch
   if(q){
     items.push({
       id:id++,
@@ -239,7 +257,6 @@ function submitDispute(){
     });
   }
 
-  // counter branch (proclamation)
   if(c){
     items.push({
       id:id++,
@@ -261,6 +278,34 @@ function submitDispute(){
   render();
 }
 
+/* ---------------- SIDEBAR ---------------- */
+function openSidebar(id){
+  chat[id]=chat[id]||[];
+  document.getElementById("sidebar").style.display="block";
+  document.getElementById("overlay").style.display="block";
+
+  document.getElementById("sidebar").innerHTML=`
+    <div style="color:#888;margin-bottom:8px">thread chat</div>
+
+    ${chat[id].map(m=>`<div><b>${m.u}</b>: ${m.m}</div>`).join("")}
+
+    <input id="chatIn" style="width:100%;margin-top:8px">
+    <button onclick="sendChat(${id})">send</button>
+  `;
+}
+
+function closeSidebar(){
+  document.getElementById("sidebar").style.display="none";
+  document.getElementById("overlay").style.display="none";
+}
+
+function sendChat(id){
+  const v=document.getElementById("chatIn").value.trim();
+  if(!v) return;
+  chat[id].push({u:currentUser,m:v});
+  openSidebar(id);
+}
+
 /* ---------------- NODE ---------------- */
 function node(n){
 
@@ -273,21 +318,21 @@ function node(n){
 
       ${show ? `
         <div class="actions">
-
           <span class="icon ${r==='up'?'active':'dim'}"
             onclick="event.stopPropagation();react(${n.id},'up')">👍</span>
 
           <span class="icon ${r==='down'?'active':'dim'}"
             onclick="event.stopPropagation();react(${n.id},'down')">👎</span>
 
+          <span class="icon"
+            onclick="event.stopPropagation();openSidebar(${n.id})">💬</span>
         </div>
       `:""}
-
     </div>
   `;
 }
 
-/* ---------------- 2-LANE VIEW ---------------- */
+/* ---------------- 2-LANE ---------------- */
 function renderDispute(root){
 
   const children=items.filter(x=>x.parent===root.id);
@@ -303,25 +348,12 @@ function renderDispute(root){
       </div>
 
       <div class="disputeWrap">
-
-        <div class="lane">
-          ${left.map(node).join("")}
-        </div>
-
-        <div class="lane">
-          ${right.map(node).join("")}
-        </div>
-
+        <div class="lane">${left.map(node).join("")}</div>
+        <div class="lane">${right.map(node).join("")}</div>
       </div>
 
     </div>
   `;
-}
-
-/* ---------------- DRILL ---------------- */
-function enter(id){
-  stack=[id];
-  render();
 }
 
 /* ---------------- RENDER ---------------- */
@@ -342,10 +374,10 @@ function render(){
   }
 
   document.getElementById("log").innerHTML =
-    logs.slice(-200).reverse().map(l=>JSON.stringify(l)).join("<br>");
+    logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- FIXED TEST DATA ---------------- */
+/* ---------------- TEST DATA (CLEAN + CONSISTENT) ---------------- */
 
 /* PROCLAMATIONS */
 items.push({id:id++,text:"Truth exists beyond belief",user:"alice",parent:null});
@@ -354,14 +386,14 @@ items.push({id:id++,text:"Language shapes thought",user:"charlie",parent:null});
 
 /* QUESTIONS (CHALLENGES) */
 items.push({id:id++,text:"Is truth independent of agreement?",user:"dana",parent:1,type:"question",side:"left"});
-items.push({id:id++,text:"Does consensus create reality?",user:"eve",parent:2,type:"question",side:"left"});
+items.push({id:id++,text:"Does consensus define reality?",user:"eve",parent:2,type:"question",side:"left"});
 
 /* COUNTERS (PROCLAMATIONS) */
 items.push({id:id++,text:"Truth is not voted into existence",user:"bob",parent:3,type:"statement",side:"right"});
 items.push({id:id++,text:"Consensus stabilizes interpretation",user:"charlie",parent:4,type:"statement",side:"right"});
 
-/* MORE Q&A CHAINS */
-items.push({id:id++,text:"What grounds truth if not consensus?",user:"alice",parent:3,type:"question",side:"left"});
+/* Q&A EXPANSION */
+items.push({id:id++,text:"What grounds meaning if not consensus?",user:"alice",parent:3,type:"question",side:"left"});
 items.push({id:id++,text:"Reality constrains interpretation",user:"dana",parent:6,type:"statement",side:"right"});
 
 renderUsers();

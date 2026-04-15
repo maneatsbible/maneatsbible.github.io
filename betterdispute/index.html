@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v44</title>
+<title>Better Dispute v45</title>
 
 <style>
 body{
@@ -13,6 +13,7 @@ body{
   color:#eee;
 }
 
+/* HEADER */
 header{
   display:flex;
   justify-content:space-between;
@@ -23,6 +24,17 @@ header{
 
 #title{font-weight:600}
 
+/* HOME BUTTON (RESTORED) */
+#homeBtn{
+  background:#1c1c1c;
+  border:1px solid #333;
+  color:#aaa;
+  padding:6px 10px;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+/* USERS */
 #users{display:flex;gap:6px;padding:8px}
 .user{
   padding:4px 8px;
@@ -34,9 +46,7 @@ header{
 .user.active{opacity:1;border-color:#fff}
 
 /* COMPOSER */
-#composerWrap{
-  padding:10px;
-}
+#composerWrap{padding:10px}
 
 textarea{
   width:100%;
@@ -113,27 +123,14 @@ textarea{
   max-height:160px;
   overflow:auto;
 }
-
-/* POPUP */
-#popup{
-  display:none;
-  position:fixed;
-  top:20%;
-  left:50%;
-  transform:translateX(-50%);
-  background:#111;
-  border:1px solid #333;
-  padding:10px;
-  width:320px;
-  z-index:20;
-}
 </style>
 </head>
 
 <body>
 
 <header>
-  <div id="title">Better Dispute v44</div>
+  <button id="homeBtn" onclick="home()">⚖ home</button>
+  <div id="title">Better Dispute v45</div>
 </header>
 
 <div id="users"></div>
@@ -146,7 +143,7 @@ textarea{
 <div id="nav"></div>
 <div id="view"></div>
 
-<div id="popup">
+<div id="popup" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#111;border:1px solid #333;padding:10px;width:320px;z-index:20;">
   <div>Dispute</div>
   <textarea id="challenge" placeholder="Challenge (question)"></textarea>
   <textarea id="counter" placeholder="Counter (proclamation)"></textarea>
@@ -214,7 +211,7 @@ function back(){
   render();
 }
 
-/* ---------------- CREATE (PROCLAMATION ONLY) ---------------- */
+/* ---------------- CREATE ---------------- */
 function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
@@ -268,7 +265,6 @@ function submitDispute(){
   const q=document.getElementById("challenge").value.trim();
   const c=document.getElementById("counter").value.trim();
 
-  /* QUESTION = ONLY ASKING STRUCTURE (NOT PROCLAMATION) */
   if(q){
     let qid=id++;
     items.push({
@@ -282,7 +278,6 @@ function submitDispute(){
     mustAnswer[qid]=true;
   }
 
-  /* COUNTER = PROCLAMATION ONLY */
   if(c){
     items.push({
       id:id++,
@@ -413,7 +408,6 @@ function render(){
     const cur=find(stack[stack.length-1]);
 
     nav.innerHTML=`<button id="backBtn" onclick="back()">⬅ back</button>`;
-
     view.innerHTML=renderDispute(cur);
   }
 
@@ -421,20 +415,19 @@ function render(){
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- FIXED TEST DATA (NO QUESTIONS AS PROCLAMATIONS) ---------------- */
+/* ---------------- TEST DATA (CLEAN + CONSISTENT) ---------------- */
 
-/* ROOT PROCLAMATIONS ONLY */
-items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null});
-items.push({id:id++,text:"Meaning is socially constructed",user:"bob",parent:null});
-items.push({id:id++,text:"Language shapes perception",user:"charlie",parent:null});
+items.push({id:id++,text:"Truth is independent of consensus",user:"alice",parent:null});
+items.push({id:id++,text:"Meaning is shaped by agreement",user:"bob",parent:null});
+items.push({id:id++,text:"Reality constrains interpretation",user:"charlie",parent:null});
 
-/* DISPUTE ON ROOT 0 */
-items.push({id:id++,text:"Consensus has no bearing on truth",user:"bob",parent:0,side:"left",type:"question"});
-items.push({id:id++,text:"Truth requires shared verification",user:"charlie",parent:0,side:"right",type:"statement"});
+/* DISPUTE */
+items.push({id:id++,text:"Consensus determines truth",user:"bob",parent:0,side:"left",type:"question"});
+items.push({id:id++,text:"Truth exists regardless of consensus",user:"charlie",parent:0,side:"right",type:"statement"});
 
-/* BRANCH CONTINUATION */
-items.push({id:id++,text:"But verification itself is consensus-dependent",user:"alice",parent:4,side:"left",type:"question"});
-items.push({id:id++,text:"Verification is external constraint, not agreement",user:"bob",parent:5,side:"right",type:"statement"});
+/* BRANCH */
+items.push({id:id++,text:"But how do we verify without agreement?",user:"alice",parent:3,side:"left",type:"question"});
+items.push({id:id++,text:"Through consistent external constraints",user:"bob",parent:4,side:"right",type:"statement"});
 
 renderUsers();
 render();

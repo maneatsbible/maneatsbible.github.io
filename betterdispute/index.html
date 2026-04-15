@@ -1,299 +1,383 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Better Dispute v20</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Better Dispute v1</title>
 
 <style>
 body {
-  margin:0;
-  font-family:-apple-system, sans-serif;
-  background:#0f0f10;
-  color:#fff;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #0f0f0f;
+  color: #fff;
 }
 
-.header {
-  display:flex;
-  justify-content:space-between;
-  padding:10px;
-  border-bottom:1px solid #222;
+#titlebar {
+  position: sticky;
+  top: 0;
+  background: #111;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #222;
+  z-index: 10;
+}
+
+.icon {
+  cursor: pointer;
 }
 
 .container {
-  max-width:600px;
-  margin:auto;
-  padding:10px;
+  padding: 12px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 100px;
+  font-size: 16px;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  background: #1a1a1a;
+  color: #fff;
+}
+
+button {
+  margin-top: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #2a2a2a;
+  color: #fff;
+  cursor: pointer;
 }
 
 .card {
-  background:#1a1a1c;
-  padding:10px;
-  border-radius:10px;
-  margin-bottom:10px;
-  cursor:pointer;
+  background: #1a1a1a;
+  padding: 12px;
+  border-radius: 10px;
+  margin-top: 10px;
 }
 
-.meta { opacity:0.6; font-size:12px; }
-
-.turn {
-  padding:10px;
-  border-radius:8px;
-  margin:6px 0;
+.row {
+  display: flex;
 }
 
-.q { background:#2c2c2f; }
-.a { background:#1f3a2c; }
-
-.inputBar {
-  position:fixed;
-  bottom:0;
-  left:0;
-  right:0;
-  padding:10px;
-  background:#0f0f10;
-  border-top:1px solid #222;
+.left {
+  justify-content: flex-start;
 }
 
-.hidden { display:none; }
-
-textarea {
-  width:100%;
-  min-height:70px;
-  background:#1a1a1c;
-  color:#fff;
-  border:1px solid #333;
-  border-radius:8px;
-  padding:10px;
+.right {
+  justify-content: flex-end;
 }
-button {
-  margin-top:6px;
-  padding:6px 10px;
+
+.bubble {
+  max-width: 75%;
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.left .bubble {
+  background: #2a2a2a;
+}
+
+.right .bubble {
+  background: #0044ff;
+}
+
+.meta {
+  font-size: 12px;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+
+.status {
+  font-size: 13px;
+  margin-top: 6px;
+  opacity: 0.8;
+}
+
+.back {
+  cursor: pointer;
 }
 </style>
 </head>
 
 <body>
 
-<div class="header">
-  <div><b>Better Dispute</b></div>
-  <div>v20</div>
+<div id="titlebar">
+  <div class="icon" onclick="goHome()">⚖️</div>
+  <div>Better Dispute v1</div>
 </div>
 
-<div class="container" id="home"></div>
-<div class="container" id="view"></div>
-
-<div class="inputBar hidden" id="inputBar">
-  <textarea id="input"></textarea>
-  <button onclick="submit()">Send</button>
-</div>
+<div id="app" class="container"></div>
 
 <script>
+let state = {
+  view: 'home',
+  navigationStack: [],
+  currentDisputeId: null,
+  posts: {},
+  disputes: {},
+  currentUser: 'alice'
+}
 
-/* ---------------- USERS ---------------- */
+let idCounter = 1
+function genId() {
+  return "id" + (idCounter++)
+}
 
-let currentUser = "bob";
+function now() {
+  return Date.now()
+}
 
-/* ---------------- STATE STACK (KEY FIX) ---------------- */
+// MODEL HELPERS
 
-let stack = []; 
-// [ {type:"post", id}, {type:"chain", id}, ... ]
-
-/* ---------------- DATA ---------------- */
-
-const posts = {
-  p1: {
-    id:"p1",
-    user:"alice",
-    text:"Faith alone is sufficient for salvation.",
-    chains:["c1"]
+function createPost(type, content, parentId=null, disputeId=null) {
+  const id = genId()
+  state.posts[id] = {
+    id,
+    type,
+    content,
+    parentId,
+    childrenIds: [],
+    disputeId,
+    authorId: state.currentUser,
+    createdAt: now()
   }
-};
 
-const chains = {
-  c1: {
-    id:"c1",
-    a:"alice",
-    b:"bob",
-    state:"awaiting_answer",
-    turns:[
-      {id:"t1", type:"question", user:"bob", text:"Where is that stated?", status:"awaiting_answer", nested:[]}
-    ]
+  if (parentId) {
+    state.posts[parentId].childrenIds.push(id)
   }
-};
 
-/* ---------------- NAV ---------------- */
-
-function openPost(id){
-  stack = [{type:"post", id}];
-  render();
+  return state.posts[id]
 }
 
-function drillChain(id){
-  stack.push({type:"chain", id});
-  render();
+function createDispute(rootPostId, challengeContent) {
+  const root = state.posts[rootPostId]
+
+  const id = genId()
+
+  const challenge = createPost('challenge', challengeContent, rootPostId, id)
+
+  state.disputes[id] = {
+    id,
+    rootPostId,
+    userA: root.authorId,
+    userB: state.currentUser,
+    lastTurnUserId: state.currentUser,
+    isResolved: false
+  }
+
+  return id
 }
 
-function back(){
-  stack.pop();
-  render();
+function getPostsByDispute(disputeId) {
+  return Object.values(state.posts)
+    .filter(p => p.disputeId === disputeId)
+    .sort((a,b) => a.createdAt - b.createdAt)
 }
 
-/* ---------------- RESOLVE ---------------- */
-
-function currentPost(){
-  return posts[stack[0].id];
+function getLastPost(disputeId) {
+  const posts = getPostsByDispute(disputeId)
+  return posts[posts.length - 1]
 }
 
-function currentChain(){
-  const c = stack.findLast(s=>s.type==="chain");
-  return c ? chains[c.id] : null;
+// CONTROLLER
+
+function createAssertion(content) {
+  createPost('assertion', content)
+  render()
 }
 
-/* ---------------- CHALLENGE ---------------- */
+function challengePost(postId, content) {
+  const post = state.posts[postId]
+  if (post.authorId === state.currentUser) {
+    alert("Cannot challenge your own post")
+    return
+  }
 
-function challenge(turn){
-  const c = {
-    id:"c"+Math.random(),
-    a:currentUser,
-    b:"other",
-    state:"awaiting_answer",
-    turns:[
-      {id:"x"+Math.random(), type:"question", user:currentUser, text:"Challenge opened", status:"awaiting_answer", nested:[]}
-    ]
-  };
+  const dispute = state.disputes[post.disputeId]
 
-  chains[c.id]=c;
-  turn.nested.push(c);
+  if (!dispute) {
+    const newId = createDispute(postId, content)
+    openDispute(newId)
+    return
+  }
 
-  stack.push({type:"chain", id:c.id});
-  render();
-}
+  const isParticipant =
+    state.currentUser === dispute.userA ||
+    state.currentUser === dispute.userB
 
-/* ---------------- INPUT ---------------- */
+  const lastPost = getLastPost(dispute.id)
 
-function submit(){
-  const chain = currentChain();
-  if(!chain) return;
+  const isCorrectTurn = dispute.lastTurnUserId !== state.currentUser
+  const isDirectFollowUp = lastPost.id === postId
 
-  const text = document.getElementById("input").value.trim();
-  if(!text) return;
-
-  const lastTurn = chain.turns[chain.turns.length-1];
-
-  if(lastTurn.status === "awaiting_answer"){
-    lastTurn.answer = text;
-    lastTurn.status = "answered";
-    chain.state = "ready_to_challenge";
+  if (isParticipant && isCorrectTurn && isDirectFollowUp) {
+    createPost('challenge', content, postId, dispute.id)
+    dispute.lastTurnUserId = state.currentUser
+    render()
   } else {
-    chain.turns.push({
-      id:"t"+Math.random(),
-      type:"question",
-      user:currentUser,
-      text,
-      status:"awaiting_answer",
-      nested:[]
-    });
-    chain.state = "awaiting_answer";
+    const newId = createDispute(postId, content)
+    openDispute(newId)
   }
-
-  document.getElementById("input").value="";
-  render();
 }
 
-/* ---------------- RENDER HOME ---------------- */
+function answerPost(postId, content) {
+  const post = state.posts[postId]
+  const dispute = state.disputes[post.disputeId]
 
-function renderHome(){
-  let html="";
+  if (!dispute) return
 
-  Object.values(posts).forEach(p=>{
-    html += `
-      <div class="card" onclick="openPost('${p.id}')">
-        <b>${p.text}</b>
-        <div class="meta">@${p.user}</div>
-      </div>
-    `;
-  });
+  if (dispute.lastTurnUserId === state.currentUser) {
+    alert("Not your turn")
+    return
+  }
 
-  document.getElementById("home").innerHTML = html;
+  createPost('answer', content, postId, dispute.id)
+  dispute.lastTurnUserId = state.currentUser
+  render()
 }
 
-/* ---------------- RENDER VIEW ---------------- */
+// NAV
 
-function renderView(){
+function openDispute(disputeId) {
+  state.navigationStack.push({
+    view: state.view,
+    disputeId: state.currentDisputeId
+  })
 
-  if(stack.length===0){
-    document.getElementById("view").innerHTML="";
-    return;
-  }
+  state.view = 'dispute'
+  state.currentDisputeId = disputeId
+  render()
+}
 
-  const post = currentPost();
-  const chain = currentChain();
+function goBack() {
+  const prev = state.navigationStack.pop()
+  if (!prev) return goHome()
 
-  let html = "";
+  state.view = prev.view
+  state.currentDisputeId = prev.disputeId
+  render()
+}
 
-  if(stack.length>1){
-    html += `<div onclick="back()" class="meta">← Back (level ${stack.length})</div>`;
-  }
+function goHome() {
+  state.view = 'home'
+  state.currentDisputeId = null
+  state.navigationStack = []
+  render()
+}
 
-  if(post){
-    html += `<div class="card"><b>${post.text}</b><div class="meta">@${post.user}</div></div>`;
-  }
+// VIEW
 
-  if(chain){
-    chain.turns.forEach(t=>{
-      html += `
-        <div class="turn ${t.type==="question"?"q":"a"}">
-          <b>${t.text}</b>
-          <div class="meta">@${t.user}</div>
-          ${t.status==="awaiting_answer" ? "<div class='meta'>Awaiting answer…</div>" : ""}
-          ${t.status==="answered" ? "<div class='meta'>Answered ✓</div>" : ""}
-        </div>
-      `;
+function render() {
+  const app = document.getElementById('app')
+  app.innerHTML = ''
 
-      if(t.nested.length){
-        t.nested.forEach(n=>{
-          html += `<div class="card" onclick="drillChain('${n.id}')">Nested dispute →</div>`;
-        });
-      }
-    });
+  if (state.view === 'home') renderHome(app)
+  if (state.view === 'dispute') renderDispute(app)
+}
 
-    if(chain.state==="ready_to_challenge"){
-      html += `<div class="meta">You may challenge again or drill deeper.</div>`;
+function renderHome(app) {
+  const compose = document.createElement('div')
+
+  compose.innerHTML = `
+    <textarea id="assertionInput" placeholder="Start a fire..."></textarea>
+    <button onclick="submitAssertion()">Post Assertion</button>
+  `
+  app.appendChild(compose)
+
+  Object.values(state.posts)
+    .filter(p => p.type === 'assertion')
+    .forEach(p => {
+      const div = document.createElement('div')
+      div.className = 'card'
+      div.innerHTML = `
+        <div>${p.content}</div>
+        <button onclick="challengePrompt('${p.id}')">Challenge</button>
+      `
+      app.appendChild(div)
+    })
+}
+
+function renderDispute(app) {
+  const dispute = state.disputes[state.currentDisputeId]
+
+  const back = document.createElement('div')
+  back.className = 'back'
+  back.innerText = "← Back"
+  back.onclick = goBack
+  app.appendChild(back)
+
+  const header = document.createElement('div')
+  header.className = 'card'
+  header.innerText = `${dispute.userA} vs ${dispute.userB}`
+  app.appendChild(header)
+
+  const thread = getPostsByDispute(dispute.id)
+
+  thread.forEach(p => {
+    const row = document.createElement('div')
+    row.className = 'row ' + (p.authorId === state.currentUser ? 'right' : 'left')
+
+    const bubble = document.createElement('div')
+    bubble.className = 'bubble'
+
+    bubble.innerHTML = `
+      <div class="meta">${p.type}</div>
+      <div>${p.content}</div>
+      <button onclick="challengePrompt('${p.id}')">Challenge</button>
+    `
+
+    if (p.type === 'challenge' && p.authorId !== state.currentUser) {
+      bubble.innerHTML += `<button onclick="answerPrompt('${p.id}')">Answer</button>`
     }
 
-    document.getElementById("inputBar").classList.remove("hidden");
+    row.appendChild(bubble)
+    app.appendChild(row)
+  })
+
+  const last = getLastPost(dispute.id)
+
+  const status = document.createElement('div')
+  status.className = 'status'
+
+  if (last.authorId === state.currentUser) {
+    status.innerText = "Waiting for opponent..."
   } else {
-    document.getElementById("inputBar").classList.add("hidden");
+    status.innerText = "Your turn"
   }
 
-  document.getElementById("view").innerHTML = html;
+  app.appendChild(status)
 }
 
-/* ---------------- INPUT RULE ---------------- */
+// PROMPTS
 
-function updateInput(){
-  const chain = currentChain();
-  if(!chain) {
-    document.getElementById("inputBar").classList.add("hidden");
-  }
+function challengePrompt(postId) {
+  const content = prompt("Enter challenge")
+  if (!content) return
+  challengePost(postId, content)
 }
 
-/* ---------------- RENDER ---------------- */
-
-function render(){
-  document.getElementById("home").style.display = stack.length ? "none":"block";
-  document.getElementById("view").style.display = stack.length ? "block":"none";
-
-  renderHome();
-  renderView();
-  updateInput();
+function answerPrompt(postId) {
+  const content = prompt("Enter answer")
+  if (!content) return
+  answerPost(postId, content)
 }
 
-/* INIT */
+function submitAssertion() {
+  const input = document.getElementById('assertionInput')
+  if (!input.value) return
+  createAssertion(input.value)
+  input.value = ''
+}
 
-render();
-
+// INIT
+render()
 </script>
 
 </body>

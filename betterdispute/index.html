@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v58</title>
+<title>Better Dispute v59</title>
 
 <style>
 body{
@@ -60,7 +60,6 @@ textarea{
   padding:10px;
   margin-bottom:8px;
   border-radius:8px;
-  cursor:pointer;
 }
 
 .meta{font-size:11px;color:#888}
@@ -107,7 +106,7 @@ textarea{
   border-color:#FF7C7C;
 }
 
-/* MODAL OVERLAY */
+/* MODAL */
 #overlay{
   display:none;
   position:fixed;
@@ -117,21 +116,29 @@ textarea{
 }
 
 #modal{
+  display:none;
   position:fixed;
   top:50%;
   left:50%;
   transform:translate(-50%,-50%);
-  width:360px;
+  width:280px;
+  max-width:90vw;
   background:#111;
   border:1px solid #333;
   border-radius:10px;
-  padding:12px;
+  padding:10px;
   z-index:60;
 }
 
 #modal textarea{
-  height:70px;
-  margin-bottom:8px;
+  width:100%;
+  height:60px;
+  margin-bottom:6px;
+  background:#0b0b0b;
+  color:#eee;
+  border:1px solid #333;
+  border-radius:6px;
+  padding:6px;
 }
 
 .modalActions{
@@ -181,7 +188,7 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v58</div>
+  <div id="title">Better Dispute v59</div>
 </header>
 
 <div id="users"></div>
@@ -198,7 +205,7 @@ textarea{
 <div id="overlay" onclick="closeModal()"></div>
 
 <div id="modal">
-  <div style="margin-bottom:8px;">Dispute</div>
+  <div style="margin-bottom:6px;">Dispute</div>
   <textarea id="challenge" placeholder="Question"></textarea>
   <textarea id="counter" placeholder="Counter"></textarea>
 
@@ -211,6 +218,12 @@ textarea{
 <div id="log"></div>
 
 <script>
+
+/* ---------------- SAFE INIT (prevents modal flash) ---------------- */
+window.onload = () => {
+  document.getElementById("overlay").style.display = "none";
+  document.getElementById("modal").style.display = "none";
+};
 
 /* ---------------- STATE ---------------- */
 let users=["alice","bob","charlie"];
@@ -230,6 +243,7 @@ function log(e,d){
 
 /* ---------------- HELPERS ---------------- */
 function find(i){return items.find(x=>x.id===i);}
+function isOwn(n){return n.user===currentUser;}
 
 /* ---------------- USERS ---------------- */
 function renderUsers(){
@@ -307,8 +321,6 @@ function submitDispute(){
     return;
   }
 
-  const participants=[parentNode.user,currentUser];
-
   const q=document.getElementById("challenge").value.trim();
   const c=document.getElementById("counter").value.trim();
 
@@ -320,8 +332,7 @@ function submitDispute(){
       user:currentUser,
       parent:target,
       type:"question",
-      lane:"left",
-      participants
+      lane:"left"
     });
     openQuestions[qid]=parentNode.user;
   }
@@ -333,8 +344,7 @@ function submitDispute(){
       user:currentUser,
       parent:target,
       type:"proclaim",
-      lane:"right",
-      participants
+      lane:"right"
     });
   }
 
@@ -346,7 +356,7 @@ function submitDispute(){
   render();
 }
 
-/* ---------------- REACTIONS ---------------- */
+/* ---------------- AGREEMENT SYSTEM (RESTORED) ---------------- */
 function getReaction(id){
   return reactions[id]?.[currentUser];
 }
@@ -359,14 +369,19 @@ function setReaction(id,type){
 
   if(prev==="disagree") return;
 
-  reactions[id][currentUser]=type;
-
-  if(type==="disagree"){
-    openModal();
+  if(type==="agree"){
+    reactions[id][currentUser]="agree";
+    log("agree",id);
+    render();
+    return;
   }
 
-  log(type,id);
-  render();
+  if(type==="disagree"){
+    reactions[id][currentUser]="disagree";
+    log("disagree",id);
+    openModal(); // ONLY here
+    render();
+  }
 }
 
 /* ---------------- ANSWER ---------------- */
@@ -393,8 +408,7 @@ function answer(qid){
     user:currentUser,
     parent:qid,
     type:"answer",
-    lane:"left",
-    participants:q.participants
+    lane:"left"
   });
 
   delete openQuestions[qid];
@@ -407,10 +421,8 @@ function buildLane(rootId,lane){
   const out=[];
 
   function walk(pid){
-
     items.filter(x=>x.parent===pid).forEach(c=>{
       if(c.lane!==lane) return;
-
       out.push(c);
 
       if(c.type==="question"){
@@ -431,7 +443,6 @@ function buildLane(rootId,lane){
 function renderNode(n){
 
   const r=getReaction(n.id);
-
   const agreeActive=r==="agree";
   const disagreeActive=r==="disagree";
 
@@ -448,32 +459,26 @@ function renderNode(n){
         <span class="meta">@${n.user}</span>
       </div>
 
+      ${!isOwn(n) ? `
       <div class="reactionRow">
         <button class="reactionBtn ${agreeActive?'activeAgree':''}"
           onclick="setReaction(${n.id},'agree')">👍</button>
 
-        ${
-          !isOwn(n) ? `
         <button class="reactionBtn ${disagreeActive?'activeDisagree':''}"
           onclick="setReaction(${n.id},'disagree')">👎</button>
-        ` : ""
-        }
       </div>
+      ` : ""}
 
       ${
         n.type==="question" &&
         !hasAnswer &&
         openQuestions[n.id]===currentUser
-        ? `<button onclick="answer(${n.id})">Answer</button>`
-        : ""
+          ? `<button onclick="answer(${n.id})">Answer</button>`
+          : ""
       }
 
     </div>
   `;
-}
-
-function isOwn(n){
-  return n.user===currentUser;
 }
 
 /* ---------------- DISPUTE VIEW ---------------- */
@@ -532,12 +537,17 @@ function render(){
 
 items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null,type:"proclaim"});
 
-items.push({id:id++,text:"Does truth require agreement?",user:"bob",parent:0,type:"question",lane:"left",participants:["alice","bob"]});
+items.push({id:id++,text:"Does truth require agreement?",user:"bob",parent:0,type:"question",lane:"left"});
 openQuestions[1]="alice";
 
-items.push({id:id++,text:"No, truth stands regardless",user:"alice",parent:1,type:"answer",lane:"left",participants:["alice","bob"]});
+items.push({id:id++,text:"No, truth stands regardless",user:"alice",parent:1,type:"answer",lane:"left"});
 
-items.push({id:id++,text:"Truth depends on shared understanding",user:"bob",parent:0,type:"proclaim",lane:"right",participants:["alice","bob"]});
+items.push({id:id++,text:"Truth depends on shared understanding",user:"bob",parent:0,type:"proclaim",lane:"right"});
+
+items.push({id:id++,text:"Can shared understanding be wrong?",user:"alice",parent:3,type:"question",lane:"left"});
+openQuestions[4]="bob";
+
+items.push({id:id++,text:"Yes, consensus can be mistaken",user:"bob",parent:4,type:"answer",lane:"left"});
 
 renderUsers();
 render();

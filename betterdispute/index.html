@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v37</title>
+<title>Better Dispute v38</title>
 
 <style>
 body{
@@ -21,6 +21,8 @@ header{
   border-bottom:1px solid #222;
 }
 
+#title{font-weight:600}
+
 #homeBtn{
   background:#1c1c1c;
   border:1px solid #333;
@@ -29,8 +31,6 @@ header{
   border-radius:6px;
   cursor:pointer;
 }
-
-#title{font-weight:600}
 
 #users{display:flex;gap:6px;padding:8px}
 .user{
@@ -71,7 +71,7 @@ textarea{
 .icon.dim{opacity:.25}
 .icon.active{opacity:1}
 
-/* TWO-LANE ALWAYS */
+/* TWO LANE ALWAYS */
 .disputeWrap{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -85,7 +85,7 @@ textarea{
   border-radius:8px;
 }
 
-/* LOG ALWAYS */
+/* LOG */
 #log{
   border-top:1px solid #222;
   padding:10px;
@@ -108,8 +108,6 @@ textarea{
   width:300px;
   z-index:20;
 }
-
-#popup textarea{height:70px}
 </style>
 </head>
 
@@ -117,7 +115,7 @@ textarea{
 
 <header>
   <button onclick="home()" id="homeBtn">⚖ home</button>
-  <div id="title">v37</div>
+  <div id="title">v38</div>
 </header>
 
 <div id="users"></div>
@@ -132,8 +130,13 @@ textarea{
 
 <div id="popup">
   <div>Dispute</div>
-  <textarea id="counter" placeholder="Counter question (optional)"></textarea>
+
+  <!-- CHALLENGE = QUESTION -->
   <textarea id="challenge" placeholder="Challenge question (optional)"></textarea>
+
+  <!-- COUNTER = PROCLAMATION -->
+  <textarea id="counter" placeholder="Counter proclamation (optional)"></textarea>
+
   <button onclick="submitDispute()">✓</button>
   <button onclick="closePopup()">✕</button>
 </div>
@@ -189,20 +192,11 @@ function create(){
   render();
 }
 
-/* ---------------- ENFORCED QUESTION STATE ---------------- */
-let mustAnswer={}; // nodeId -> true if user must answer before continuing
-
-function canAct(nodeId){
-  return !mustAnswer[nodeId];
-}
-
 /* ---------------- REACT ---------------- */
 function react(id,type){
 
   const n=find(id);
   if(!n || n.user===currentUser) return;
-
-  if(!canAct(id)) return;
 
   const k=key(currentUser,id);
   if(reactions[k]) return;
@@ -218,7 +212,7 @@ function react(id,type){
   render();
 }
 
-/* ---------------- DISPUTE (QUESTION FLOW) ---------------- */
+/* ---------------- DISPUTE ---------------- */
 function closePopup(){
   pending=null;
   document.getElementById("popup").style.display="none";
@@ -230,66 +224,40 @@ function submitDispute(){
 
   const target=pending;
 
-  const c=document.getElementById("counter").value.trim();
-  const q=document.getElementById("challenge").value.trim();
+  const q=document.getElementById("challenge").value.trim(); // QUESTION
+  const c=document.getElementById("counter").value.trim();   // PROCLAMATION
 
-  // QUESTIONS ONLY NOW
-  if(c){
-    const cid=id++;
-    items.push({
-      id:cid,
-      text:c,
-      user:currentUser,
-      parent:target,
-      type:"question",
-      side:"right"
-    });
-    mustAnswer[cid]=true;
-  }
-
+  // question branch
   if(q){
-    const qid=id++;
     items.push({
-      id:qid,
+      id:id++,
       text:q,
       user:currentUser,
       parent:target,
       type:"question",
       side:"left"
     });
-    mustAnswer[qid]=true;
   }
 
-  document.getElementById("counter").value="";
-  document.getElementById("challenge").value="";
+  // counter branch (proclamation)
+  if(c){
+    items.push({
+      id:id++,
+      text:c,
+      user:currentUser,
+      parent:target,
+      type:"statement",
+      side:"right"
+    });
+  }
 
-  log("dispute-question",target);
+  document.getElementById("challenge").value="";
+  document.getElementById("counter").value="";
+
+  log("dispute",target);
 
   pending=null;
   closePopup();
-  render();
-}
-
-/* ---------------- ANSWER SYSTEM (FORCING FLOW) ---------------- */
-function answer(nodeId){
-
-  const text=prompt("Answer:");
-  if(!text) return;
-
-  const n=find(nodeId);
-  if(!n) return;
-
-  items.push({
-    id:id++,
-    text:text,
-    user:currentUser,
-    parent:nodeId,
-    type:"answer"
-  });
-
-  mustAnswer[nodeId]=false;
-
-  log("answer",nodeId);
   render();
 }
 
@@ -299,31 +267,19 @@ function node(n){
   const r=reactions[key(currentUser,n.id)];
   const show=n.user!==currentUser;
 
-  const needsAnswer = mustAnswer[n.id];
-
   return `
     <div class="card" onclick="enter(${n.id})">
-
-      <div>
-        ${n.text}
-        <span class="meta">@${n.user}</span>
-      </div>
-
-      ${n.type==="question" ? `
-        <div style="margin-top:6px">
-          <button onclick="event.stopPropagation();answer(${n.id})">
-            Answer
-          </button>
-        </div>
-      `:""}
+      <div>${n.text} <span class="meta">@${n.user}</span></div>
 
       ${show ? `
         <div class="actions">
+
           <span class="icon ${r==='up'?'active':'dim'}"
             onclick="event.stopPropagation();react(${n.id},'up')">👍</span>
 
           <span class="icon ${r==='down'?'active':'dim'}"
             onclick="event.stopPropagation();react(${n.id},'down')">👎</span>
+
         </div>
       `:""}
 
@@ -331,7 +287,7 @@ function node(n){
   `;
 }
 
-/* ---------------- DISPUTE VIEW (2-LANE) ---------------- */
+/* ---------------- 2-LANE VIEW ---------------- */
 function renderDispute(root){
 
   const children=items.filter(x=>x.parent===root.id);
@@ -378,12 +334,9 @@ function render(){
   nav.innerHTML="";
 
   if(stack.length===0){
-
     items.filter(x=>x.parent===null)
       .forEach(n=>view.innerHTML+=node(n));
-
   } else {
-
     const cur=find(stack[0]);
     view.innerHTML=renderDispute(cur);
   }
@@ -392,20 +345,24 @@ function render(){
     logs.slice(-200).reverse().map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (Q&A HEAVY) ---------------- */
+/* ---------------- FIXED TEST DATA ---------------- */
 
-items.push({id:id++,text:"Is truth independent of belief?",user:"alice",parent:null,type:"question"});
-items.push({id:id++,text:"Truth depends on shared reality",user:"bob",parent:0,type:"answer"});
+/* PROCLAMATIONS */
+items.push({id:id++,text:"Truth exists beyond belief",user:"alice",parent:null});
+items.push({id:id++,text:"Consensus defines meaning",user:"bob",parent:null});
+items.push({id:id++,text:"Language shapes thought",user:"charlie",parent:null});
 
-items.push({id:id++,text:"Can consensus define truth?",user:"charlie",parent:null,type:"question"});
-items.push({id:id++,text:"Consensus stabilizes perception",user:"dana",parent:2,type:"answer"});
+/* QUESTIONS (CHALLENGES) */
+items.push({id:id++,text:"Is truth independent of agreement?",user:"dana",parent:1,type:"question",side:"left"});
+items.push({id:id++,text:"Does consensus create reality?",user:"eve",parent:2,type:"question",side:"left"});
 
-items.push({id:id++,text:"Does language limit logic?",user:"eve",parent:null,type:"question"});
-items.push({id:id++,text:"Language structures logic",user:"alice",parent:4,type:"answer"});
+/* COUNTERS (PROCLAMATIONS) */
+items.push({id:id++,text:"Truth is not voted into existence",user:"bob",parent:3,type:"statement",side:"right"});
+items.push({id:id++,text:"Consensus stabilizes interpretation",user:"charlie",parent:4,type:"statement",side:"right"});
 
-/* DISPUTES */
-items.push({id:id++,text:"Is consensus reliable?",user:"bob",parent:2,side:"left"});
-items.push({id:id++,text:"Is consensus useful?",user:"charlie",parent:2,side:"right"});
+/* MORE Q&A CHAINS */
+items.push({id:id++,text:"What grounds truth if not consensus?",user:"alice",parent:3,type:"question",side:"left"});
+items.push({id:id++,text:"Reality constrains interpretation",user:"dana",parent:6,type:"statement",side:"right"});
 
 renderUsers();
 render();

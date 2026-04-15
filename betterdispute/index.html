@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Better Dispute v15</title>
+<title>Better Dispute v16</title>
 
 <style>
 body {
@@ -13,7 +13,7 @@ body {
   color: #fff;
 }
 
-/* HEADER (UNCHANGED) */
+/* HEADER */
 .header {
   display: flex;
   justify-content: space-between;
@@ -21,9 +21,21 @@ body {
   border-bottom: 1px solid #222;
 }
 
+.left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .home {
   cursor: pointer;
   font-size: 18px;
+}
+
+.back {
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.8;
 }
 
 .right {
@@ -31,7 +43,7 @@ body {
   opacity: 0.6;
 }
 
-/* USER BUTTONS (FIXED CONTRAST) */
+/* USER BAR */
 .userBar {
   display: flex;
   gap: 6px;
@@ -40,17 +52,15 @@ body {
 
 .userBar button {
   background: #2a2a2d;
-  color: #cfcfcf;
+  color: #ccc;
   border: 1px solid #333;
   padding: 6px 10px;
   border-radius: 6px;
-  font-size: 12px;
 }
 
 .userBar button.active {
   background: #3a6df0;
   color: #fff;
-  border-color: #3a6df0;
 }
 
 /* LAYOUT */
@@ -60,7 +70,7 @@ body {
   padding: 10px;
 }
 
-/* COMPOSE (HOME ONLY) */
+/* COMPOSE */
 .compose {
   background: #141416;
   border-radius: 10px;
@@ -79,13 +89,12 @@ textarea {
   color: #fff;
 }
 
-/* CARDS (CLICKABLE SUMMARIES) */
+/* CARDS */
 .card {
   background: #1a1a1c;
   border-radius: 10px;
   padding: 10px;
   margin-bottom: 10px;
-  cursor: pointer;
 }
 
 .meta {
@@ -94,7 +103,7 @@ textarea {
   margin-top: 4px;
 }
 
-/* TURN VIEW */
+/* TURN */
 .turn {
   background: #141416;
   border-radius: 8px;
@@ -105,7 +114,7 @@ textarea {
 .q { background: #2c2c2f; }
 .a { background: #1f3a2c; }
 
-/* NESTED VISUAL ONLY (NO LABELS) */
+/* NESTED VISUAL ONLY */
 .nested {
   margin-left: 14px;
   border-left: 2px solid #333;
@@ -131,8 +140,12 @@ textarea {
 <body>
 
 <div class="header">
-  <div class="home" onclick="goHome()">⚖️ Better Dispute</div>
-  <div class="right">v15</div>
+  <div class="left">
+    <div class="home" onclick="goHome()">⚖️</div>
+    <div class="back hidden" id="backBtn" onclick="goBack()">←</div>
+    <div><b>Better Dispute</b></div>
+  </div>
+  <div class="right">v16</div>
 </div>
 
 <div class="userBar">
@@ -142,7 +155,7 @@ textarea {
 </div>
 
 <div class="container" id="home"></div>
-<div class="container" id="focus"></div>
+<div class="container" id="dispute"></div>
 
 <div class="inputBar hidden" id="inputBar">
   <textarea id="input"></textarea>
@@ -150,35 +163,87 @@ textarea {
 
 <script>
 let currentUser = "bob";
-
 let mode = "home";
+
 let activePost = null;
 let activeChain = null;
 
-/* POSTS */
+/* ------------------ TEST DATA ------------------ */
 let posts = [
-  { id: 1, user: "alice", text: "Faith alone is sufficient for salvation.", chains: [] },
-  { id: 2, user: "charlie", text: "AI will replace most jobs.", chains: [] }
+  {
+    id: 1,
+    user: "alice",
+    text: "Faith alone is sufficient for salvation.",
+    chains: [
+      {
+        id: 101,
+        a: "alice",
+        b: "bob",
+        active_user: "bob",
+        turn_state: "question",
+        turns: [
+          {
+            type: "question",
+            user: "bob",
+            text: "Where is that stated?",
+            nested: [
+              {
+                id: 201,
+                a: "bob",
+                b: "alice",
+                active_user: "alice",
+                turn_state: "question",
+                turns: [
+                  {
+                    type: "question",
+                    user: "alice",
+                    text: "What do you mean by 'faith'?",
+                    nested: []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            type: "answer",
+            user: "alice",
+            text: "Ephesians 2:8-9.",
+            nested: []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    id: 2,
+    user: "charlie",
+    text: "AI will replace most jobs in 20 years.",
+    chains: [
+      {
+        id: 301,
+        a: "charlie",
+        b: "alice",
+        active_user: "alice",
+        turn_state: "question",
+        turns: [
+          {
+            type: "question",
+            user: "alice",
+            text: "Which jobs specifically?",
+            nested: []
+          }
+        ]
+      }
+    ]
+  }
 ];
 
-/* SAMPLE */
-posts[0].chains.push({
-  id: 101,
-  a: "alice",
-  b: "bob",
-  turns: [
-    {
-      type: "question",
-      user: "bob",
-      text: "Where is that stated?",
-      nested: []
-    }
-  ],
-  active_user: "bob",
-  turn_state: "question"
-});
+/* ------------------ STATE ------------------ */
+function currentChain() {
+  return activeChain;
+}
 
-/* SWITCH USER */
+/* ------------------ NAV ------------------ */
 function switchUser(u) {
   currentUser = u;
 
@@ -190,7 +255,6 @@ function switchUser(u) {
   render();
 }
 
-/* HOME */
 function goHome() {
   mode = "home";
   activePost = null;
@@ -199,113 +263,112 @@ function goHome() {
   render();
 }
 
-/* OPEN ANYTHING (UNIFIED DRILL RULE) */
-function openChain(post, chain) {
+function goBack() {
+  if (activeChain?.parent) {
+    activeChain = activeChain.parent;
+  } else {
+    mode = "home";
+    activeChain = null;
+    activePost = null;
+  }
+  render();
+  updateInput();
+}
+
+/* ------------------ CHALLENGE ------------------ */
+function challenge(postOrChain) {
+  const chain = {
+    id: Date.now(),
+    a: currentUser,
+    b: "opponent",
+    active_user: currentUser,
+    turn_state: "question",
+    turns: [],
+    parent: postOrChain
+  };
+
+  if (postOrChain.turns) {
+    postOrChain.turns.push({
+      type: "question",
+      user: currentUser,
+      text: "Challenge opened",
+      nested: [chain]
+    });
+  } else {
+    postOrChain.chains.push(chain);
+  }
+
+  openDispute(postOrChain, chain);
+}
+
+/* ------------------ OPEN ------------------ */
+function openDispute(post, chain) {
   mode = "dispute";
   activePost = post;
   activeChain = chain;
   render();
 }
 
-/* CREATE POST */
-function createPost() {
-  const ta = document.getElementById("composeInput");
-  if (!ta.value.trim()) return;
+/* ------------------ INPUT ------------------ */
+document.getElementById("input").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  if (!activeChain) return;
+  if (activeChain.active_user !== currentUser) return;
 
-  posts.unshift({
-    id: Date.now(),
+  const val = e.target.value.trim();
+  if (!val) return;
+
+  activeChain.turns.push({
+    type: activeChain.turn_state,
     user: currentUser,
-    text: ta.value.trim(),
-    chains: []
+    text: val,
+    nested: []
   });
 
-  ta.value = "";
+  activeChain.turn_state =
+    activeChain.turn_state === "question" ? "answer" : "question";
+
+  activeChain.active_user =
+    currentUser === activeChain.a ? activeChain.b : activeChain.a;
+
+  e.target.value = "";
   render();
-}
+});
 
-/* CHALLENGE (RESTORED) */
-function challenge(chain, parentTurn) {
-  const nested = {
-    id: Date.now(),
-    a: currentUser,
-    b: "other",
-    turns: [],
-    active_user: currentUser,
-    turn_state: "question"
-  };
-
-  if (!parentTurn.nested) parentTurn.nested = [];
-  parentTurn.nested.push(nested);
-
-  openChain(activePost, nested);
-}
-
-/* SUMMARY */
-function summarize(chain) {
-  return chain.turns
-    .slice(-2)
-    .map(t => (t.type === "question" ? "Q" : "A") + ": " + t.text)
-    .join(" → ") || "New dispute";
-}
-
-/* HOME RENDER */
+/* ------------------ RENDER HOME ------------------ */
 function renderHome() {
   const home = document.getElementById("home");
 
-  let html = `
-    <div class="compose">
-      <textarea id="composeInput" placeholder="Start a fire..."></textarea>
-      <button onclick="createPost()">Post</button>
-    </div>
-  `;
+  let html = "";
 
   posts.forEach(post => {
     html += `
-      <div class="card" onclick="openChain(posts.find(p=>p.id===${post.id}), posts.find(p=>p.id===${post.id}).chains[0])">
+      <div class="card">
         <b>${post.text}</b>
         <div class="meta">@${post.user}</div>
-      </div>
+        <button onclick="challenge(posts.find(p=>p.id===${post.id}))">Challenge</button>
     `;
+
+    post.chains.forEach(chain => {
+      html += `
+        <div class="card" onclick="openDispute(posts.find(p=>p.id===${post.id}), posts.find(p=>p.id===${post.id}).chains.find(c=>c.id===${chain.id}))">
+          ${chain.turns.map(t => (t.type === "question" ? "Q" : "A") + ": " + t.text).slice(-2).join(" → ") || "New dispute"}
+        </div>
+      `;
+    });
+
+    html += `</div>`;
   });
 
   home.innerHTML = html;
 }
 
-/* RECURSIVE RENDER */
-function renderTurns(turns) {
-  let html = "";
-
-  turns.forEach(t => {
-    html += `
-      <div class="turn ${t.type === "question" ? "q" : "a"}"
-           onclick="challenge(activeChain, arguments[0])">
-        ${t.text}
-        <div class="meta">@${t.user}</div>
-      </div>
-    `;
-
-    if (t.nested && t.nested.length) {
-      html += `<div class="nested">`;
-      t.nested.forEach(n => {
-        html += `
-          <div class="card" onclick='openChain(activePost, ${JSON.stringify(n)})'>
-            ${summarize(n)}
-          </div>
-        `;
-      });
-      html += `</div>`;
-    }
-  });
-
-  return html;
-}
-
-/* FOCUS */
-function renderFocus() {
-  const focus = document.getElementById("focus");
+/* ------------------ RENDER DISPUTE ------------------ */
+function renderDispute() {
+  const el = document.getElementById("dispute");
 
   if (mode !== "dispute" || !activeChain) {
-    focus.innerHTML = "";
+    el.innerHTML = "";
     return;
   }
 
@@ -313,18 +376,37 @@ function renderFocus() {
     <div class="card">
       <b>${activePost.text}</b>
       <div class="meta">@${activePost.user}</div>
+      <button onclick="challenge(activeChain)">Challenge</button>
     </div>
   `;
 
-  html += renderTurns(activeChain.turns);
+  activeChain.turns.forEach(t => {
+    html += `
+      <div class="turn ${t.type === "question" ? "q" : "a"}">
+        ${t.text}
+        <div class="meta">@${t.user}</div>
+      </div>
+    `;
 
-  focus.innerHTML = html;
+    if (t.nested?.length) {
+      html += `<div class="nested">`;
+      t.nested.forEach(n => {
+        html += `
+          <div class="card" onclick="openDispute(activePost, ${JSON.stringify(n)})">
+            ${n.turns?.[0]?.text || "Nested dispute"}
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+  });
+
+  el.innerHTML = html;
 }
 
-/* INPUT RULE */
+/* ------------------ INPUT RULE ------------------ */
 function updateInput() {
   const bar = document.getElementById("inputBar");
-  const input = document.getElementById("input");
 
   if (
     mode === "dispute" &&
@@ -332,27 +414,22 @@ function updateInput() {
     activeChain.active_user === currentUser
   ) {
     bar.classList.remove("hidden");
-
-    input.placeholder =
-      activeChain.turn_state === "question"
-        ? "Ask a question..."
-        : "Answer...";
   } else {
     bar.classList.add("hidden");
   }
 }
 
-/* RENDER */
+/* ------------------ RENDER ------------------ */
 function render() {
-  document.getElementById("home").style.display =
-    mode === "home" ? "block" : "none";
-
-  document.getElementById("focus").style.display =
-    mode === "dispute" ? "block" : "none";
+  document.getElementById("home").style.display = mode === "home" ? "block" : "none";
+  document.getElementById("dispute").style.display = mode === "dispute" ? "block" : "none";
 
   renderHome();
-  renderFocus();
+  renderDispute();
   updateInput();
+
+  document.getElementById("backBtn")
+    .classList.toggle("hidden", mode === "home");
 }
 
 /* INIT */

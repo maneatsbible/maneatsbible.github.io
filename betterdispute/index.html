@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v40</title>
+<title>Better Dispute v41</title>
 
 <style>
 body{
@@ -13,7 +13,6 @@ body{
   color:#eee;
 }
 
-/* HEADER */
 header{
   display:flex;
   justify-content:space-between;
@@ -24,7 +23,6 @@ header{
 
 #title{font-weight:600}
 
-/* HOME / BACK */
 #homeBtn, #backBtn{
   background:#1c1c1c;
   border:1px solid #333;
@@ -33,11 +31,10 @@ header{
   border-radius:8px;
   cursor:pointer;
   display:flex;
-  align-items:center;
   gap:6px;
+  align-items:center;
 }
 
-/* USERS */
 #users{display:flex;gap:6px;padding:8px}
 .user{
   padding:4px 8px;
@@ -48,7 +45,7 @@ header{
 }
 .user.active{opacity:1;border-color:#fff}
 
-/* INPUT */
+/* composer hidden in drill */
 #composerWrap{
   padding:10px;
 }
@@ -62,7 +59,7 @@ textarea{
   border-radius:6px;
 }
 
-/* CARD */
+/* cards */
 .card{
   background:#1a1a1a;
   padding:10px;
@@ -83,7 +80,7 @@ textarea{
 .icon.dim{opacity:.25}
 .icon.active{opacity:1}
 
-/* TWO LANE */
+/* lanes */
 .disputeWrap{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -97,7 +94,28 @@ textarea{
   border-radius:8px;
 }
 
-/* LOG */
+/* sidebar */
+#overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  z-index:40;
+}
+
+#sidebar{
+  position:fixed;
+  right:0;
+  top:0;
+  width:260px;
+  height:100%;
+  background:#0c0c0c;
+  border-left:1px solid #333;
+  padding:10px;
+  display:none;
+  z-index:50;
+}
+
 #log{
   border-top:1px solid #222;
   padding:10px;
@@ -106,20 +124,6 @@ textarea{
   max-height:180px;
   overflow:auto;
 }
-
-/* POPUP */
-#popup{
-  display:none;
-  position:fixed;
-  top:20%;
-  left:50%;
-  transform:translateX(-50%);
-  background:#111;
-  border:1px solid #333;
-  padding:10px;
-  width:300px;
-  z-index:20;
-}
 </style>
 </head>
 
@@ -127,12 +131,11 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v40</div>
+  <div id="title">v41</div>
 </header>
 
 <div id="users"></div>
 
-<!-- TOP INPUT (HIDDEN IN DRILL) -->
 <div id="composerWrap">
   <textarea id="composer" placeholder="Start a fire..."></textarea>
   <button onclick="create()">Proclaim</button>
@@ -141,7 +144,7 @@ textarea{
 <div id="nav"></div>
 <div id="view"></div>
 
-<div id="popup">
+<div id="popup" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#111;border:1px solid #333;padding:10px;width:300px;z-index:20;">
   <div>Dispute</div>
   <textarea id="challenge" placeholder="Challenge (question)"></textarea>
   <textarea id="counter" placeholder="Counter (proclamation)"></textarea>
@@ -149,12 +152,15 @@ textarea{
   <button onclick="closePopup()">✕</button>
 </div>
 
+<div id="overlay" onclick="closeSidebar()"></div>
+<div id="sidebar"></div>
+
 <div id="log"></div>
 
 <script>
 
 /* ---------------- STATE ---------------- */
-let users=["alice","bob","charlie","dana","eve"];
+let users=["alice","bob","charlie"];
 let currentUser="alice";
 
 let id=0;
@@ -162,7 +168,9 @@ let items=[];
 let stack=[];
 let reactions={};
 let pending=null;
+let mustAnswer={};
 let logs=[];
+let chat={};
 
 /* ---------------- LOG ---------------- */
 function log(e,d){
@@ -193,16 +201,14 @@ function home(){
   render();
 }
 
-function enter(id){
-  stack=[id];
-  document.getElementById("composerWrap").style.display="none"; // REQUIRED FIX
-  render();
-}
-
-/* BACK BUTTON */
+/* BACK = ONE LEVEL BUT SAFE */
 function back(){
-  stack=[];
-  document.getElementById("composerWrap").style.display="block";
+  if(stack.length>1){
+    stack.pop();
+  } else {
+    stack=[];
+    document.getElementById("composerWrap").style.display="block";
+  }
   render();
 }
 
@@ -217,11 +223,19 @@ function create(){
   render();
 }
 
-/* ---------------- REACT ---------------- */
+/* ---------------- DRILL ---------------- */
+function enter(id){
+  stack.push(id);
+  document.getElementById("composerWrap").style.display="none";
+  render();
+}
+
+/* ---------------- REACTION ---------------- */
 function react(id,type){
 
   const n=find(id);
   if(!n || n.user===currentUser) return;
+  if(mustAnswer[id]) return;
 
   const k=key(currentUser,id);
   if(reactions[k]) return;
@@ -246,21 +260,22 @@ function closePopup(){
 function submitDispute(){
 
   if(!pending) return;
-
   const target=pending;
 
   const q=document.getElementById("challenge").value.trim();
   const c=document.getElementById("counter").value.trim();
 
   if(q){
+    let qid=id++;
     items.push({
-      id:id++,
+      id:qid,
       text:q,
       user:currentUser,
       parent:target,
-      type:"question",
-      side:"left"
+      side:"left",
+      type:"question"
     });
+    mustAnswer[qid]=true;
   }
 
   if(c){
@@ -269,8 +284,8 @@ function submitDispute(){
       text:c,
       user:currentUser,
       parent:target,
-      type:"statement",
-      side:"right"
+      side:"right",
+      type:"statement"
     });
   }
 
@@ -284,6 +299,52 @@ function submitDispute(){
   render();
 }
 
+/* ---------------- ANSWER ---------------- */
+function answer(id){
+
+  const t=prompt("Answer:");
+  if(!t) return;
+
+  items.push({
+    id:id++,
+    text:t,
+    user:currentUser,
+    parent:id,
+    type:"answer"
+  });
+
+  mustAnswer[id]=false;
+  log("answer",id);
+  render();
+}
+
+/* ---------------- SIDEBAR ---------------- */
+function openSidebar(id){
+  chat[id]=chat[id]||[];
+
+  document.getElementById("sidebar").style.display="block";
+  document.getElementById("overlay").style.display="block";
+
+  document.getElementById("sidebar").innerHTML=`
+    <div style="color:#888">thread chat</div>
+    ${chat[id].map(m=>`<div><b>${m.u}</b>: ${m.m}</div>`).join("")}
+    <input id="chatIn" style="width:100%;margin-top:8px">
+    <button onclick="sendChat(${id})">send</button>
+  `;
+}
+
+function sendChat(id){
+  const v=document.getElementById("chatIn").value.trim();
+  if(!v) return;
+  chat[id].push({u:currentUser,m:v});
+  openSidebar(id);
+}
+
+function closeSidebar(){
+  document.getElementById("sidebar").style.display="none";
+  document.getElementById("overlay").style.display="none";
+}
+
 /* ---------------- NODE ---------------- */
 function node(n){
 
@@ -292,7 +353,12 @@ function node(n){
 
   return `
     <div class="card" onclick="enter(${n.id})">
+
       <div>${n.text} <span class="meta">@${n.user}</span></div>
+
+      ${n.type==="question" ? `
+        <button onclick="event.stopPropagation();answer(${n.id})">Answer</button>
+      `:""}
 
       ${show ? `
         <div class="actions">
@@ -301,13 +367,17 @@ function node(n){
 
           <span class="icon ${r==='down'?'active':'dim'}"
             onclick="event.stopPropagation();react(${n.id},'down')">👎</span>
+
+          <span class="icon"
+            onclick="event.stopPropagation();openSidebar(${n.id})">💬</span>
         </div>
       `:""}
+
     </div>
   `;
 }
 
-/* ---------------- 2-LANE ---------------- */
+/* ---------------- DISPUTE VIEW ---------------- */
 function renderDispute(root){
 
   const children=items.filter(x=>x.parent===root.id);
@@ -327,6 +397,8 @@ function renderDispute(root){
         <div class="lane">${right.map(node).join("")}</div>
       </div>
 
+      ${children.length>0 ? `<div class="meta" style="padding:0 10px">↳ more branches available</div>`:""}
+
     </div>
   `;
 }
@@ -335,51 +407,40 @@ function renderDispute(root){
 function render(){
 
   const view=document.getElementById("view");
-  const nav=document.getElementById("nav");
-
   view.innerHTML="";
-  nav.innerHTML="";
 
   if(stack.length===0){
     items.filter(x=>x.parent===null)
       .forEach(n=>view.innerHTML+=node(n));
   } else {
-    const cur=find(stack[0]);
+    let cur=find(stack[stack.length-1]);
 
-    nav.innerHTML=`
+    view.innerHTML=`
       <button id="backBtn" onclick="back()">⬅ back</button>
+      ${renderDispute(cur)}
     `;
-
-    view.innerHTML=renderDispute(cur);
   }
 
   document.getElementById("log").innerHTML =
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (FULL RESET, CONSISTENT DISPUTES) ---------------- */
+/* ---------------- TEST DATA (CLEAN 3 USER ROOT DISPUTE) ---------------- */
 
-/* ROOT PROCLAMATIONS */
-items.push({id:id++,text:"Truth is independent of belief",user:"alice",parent:null});
-items.push({id:id++,text:"Meaning is consensus-based",user:"bob",parent:null});
-items.push({id:id++,text:"Language shapes reality",user:"charlie",parent:null});
-items.push({id:id++,text:"Logic is human constructed",user:"dana",parent:null});
+/* ROOT */
+items.push({id:id++,text:"Should truth depend on consensus?",user:"alice",parent:null});
 
-/* DISPUTE 1 */
-items.push({id:id++,text:"Is truth dependent on agreement?",user:"bob",parent:0,type:"question",side:"left"});
-items.push({id:id++,text:"Truth exists without observers",user:"charlie",parent:0,type:"statement",side:"right"});
+/* BRANCH 1 */
+items.push({id:id++,text:"Yes, shared agreement defines truth",user:"bob",parent:0,side:"left",type:"question"});
+items.push({id:id++,text:"No, truth exists independently",user:"charlie",parent:0,side:"right",type:"statement"});
 
-/* DISPUTE 2 */
-items.push({id:id++,text:"Does consensus define meaning?",user:"alice",parent:1,type:"question",side:"left"});
-items.push({id:id++,text:"Consensus stabilizes language",user:"dana",parent:1,type:"statement",side:"right"});
+/* ANSWERS */
+items.push({id:id++,text:"But how do we verify without agreement?",user:"alice",parent:1,side:"left",type:"question"});
+items.push({id:id++,text:"Through consistent external reality",user:"bob",parent:2,side:"right",type:"statement"});
 
-/* DISPUTE 3 */
-items.push({id:id++,text:"Can logic exist without language?",user:"bob",parent:2,type:"question",side:"left"});
-items.push({id:id++,text:"Logic precedes language structure",user:"charlie",parent:2,type:"statement",side:"right"});
-
-/* SECONDARY NESTING */
-items.push({id:id++,text:"What defines truth then?",user:"eve",parent:5,type:"question",side:"left"});
-items.push({id:id++,text:"Reality constrains interpretation",user:"alice",parent:5,type:"statement",side:"right"});
+/* SECOND LEVEL */
+items.push({id:id++,text:"Is consistency itself agreement?",user:"charlie",parent:3,side:"left",type:"question"});
+items.push({id:id++,text:"No, it is constraint-based",user:"alice",parent:4,side:"right",type:"statement"});
 
 renderUsers();
 render();

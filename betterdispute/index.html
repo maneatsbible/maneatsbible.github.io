@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v53</title>
+<title>Better Dispute v54</title>
 
 <style>
 body{
@@ -111,7 +111,7 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v53</div>
+  <div id="title">Better Dispute v54</div>
 </header>
 
 <div id="users"></div>
@@ -213,6 +213,12 @@ function submitDispute(){
   const target=stack[stack.length-1];
   const parentNode=find(target);
   if(!parentNode) return;
+
+  /* FIX: prevent self-dispute */
+  if(parentNode.user === currentUser){
+    alert("Cannot dispute your own statement.");
+    return;
+  }
 
   const participants=[parentNode.user,currentUser];
 
@@ -330,6 +336,7 @@ function renderNode(n){
 
   return `
     <div class="card">
+
       <div>
         <span class="icon">${icon}</span>
         ${n.text}
@@ -338,11 +345,12 @@ function renderNode(n){
 
       ${
         n.type==="question" &&
-        !n.answerBy &&
+        !n.answerBy && /* FIX: hide if answered */
         openQuestions[n.id]===currentUser
         ? `<button onclick="answer(${n.id})">Answer</button>`
         : ""
       }
+
     </div>
   `;
 }
@@ -400,32 +408,26 @@ function render(){
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (STRICT + CLEAN) ---------------- */
+/* ---------------- TEST DATA (NO SELF INTERACTION) ---------------- */
 
-/* Top-level proclamations */
 items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null,type:"proclaim"});
-items.push({id:id++,text:"Meaning is socially constructed",user:"charlie",parent:null,type:"proclaim"});
 
-/* Dispute 1: Alice vs Bob ONLY */
+/* Bob challenges Alice */
 items.push({id:id++,text:"Does truth require agreement?",user:"bob",parent:0,type:"question",lane:"left",participants:["alice","bob"]});
-openQuestions[2]="alice";
+openQuestions[1]="alice";
 
-items.push({id:id++,text:"No, truth stands regardless of belief",user:"alice",parent:2,type:"answer",lane:"left",participants:["alice","bob"]});
+/* Alice answers */
+items.push({id:id++,text:"No, truth stands regardless of belief",user:"alice",parent:1,type:"answer",lane:"left",participants:["alice","bob"]});
 
-items.push({id:id++,text:"Truth must be grounded in reality",user:"alice",parent:0,type:"proclaim",lane:"right",participants:["alice","bob"]});
+/* Bob counters */
+items.push({id:id++,text:"Truth depends on shared understanding",user:"bob",parent:0,type:"proclaim",lane:"right",participants:["alice","bob"]});
 
-items.push({id:id++,text:"How do we access that reality?",user:"bob",parent:4,type:"question",lane:"left",participants:["alice","bob"]});
-openQuestions[5]="alice";
+/* Alice challenges Bob's counter */
+items.push({id:id++,text:"Can shared understanding be wrong?",user:"alice",parent:3,type:"question",lane:"left",participants:["alice","bob"]});
+openQuestions[4]="bob";
 
-items.push({id:id++,text:"Through consistent observation and testing",user:"alice",parent:5,type:"answer",lane:"left",participants:["alice","bob"]});
-
-/* Dispute 2: Charlie vs Alice ONLY (separate clean dispute) */
-items.push({id:id++,text:"Is meaning ever objective?",user:"alice",parent:1,type:"question",lane:"left",participants:["charlie","alice"]});
-openQuestions[7]="charlie";
-
-items.push({id:id++,text:"No, meaning depends on interpretation",user:"charlie",parent:7,type:"answer",lane:"left",participants:["charlie","alice"]});
-
-items.push({id:id++,text:"Some meanings are constrained by reality",user:"charlie",parent:1,type:"proclaim",lane:"right",participants:["charlie","alice"]});
+/* Bob answers */
+items.push({id:id++,text:"Yes, consensus can still be mistaken",user:"bob",parent:4,type:"answer",lane:"left",participants:["alice","bob"]});
 
 renderUsers();
 render();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v43</title>
+<title>Better Dispute v44</title>
 
 <style>
 body{
@@ -13,7 +13,6 @@ body{
   color:#eee;
 }
 
-/* HEADER */
 header{
   display:flex;
   justify-content:space-between;
@@ -24,7 +23,6 @@ header{
 
 #title{font-weight:600}
 
-/* USERS */
 #users{display:flex;gap:6px;padding:8px}
 .user{
   padding:4px 8px;
@@ -35,12 +33,11 @@ header{
 }
 .user.active{opacity:1;border-color:#fff}
 
-/* COMPOSER (HOME ONLY) */
+/* COMPOSER */
 #composerWrap{
   padding:10px;
 }
 
-/* TEXTAREAS */
 textarea{
   width:100%;
   height:90px;
@@ -72,7 +69,7 @@ textarea{
 .icon.dim{opacity:.25}
 .icon.active{opacity:1}
 
-/* TWO LANE VIEW */
+/* TWO LANE */
 .disputeWrap{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -87,11 +84,8 @@ textarea{
 }
 
 /* NAV */
-#nav{
-  padding:0 10px;
-}
+#nav{padding:0 10px}
 
-/* BACK BUTTON */
 #backBtn{
   background:#1c1c1c;
   border:1px solid #333;
@@ -110,7 +104,7 @@ textarea{
   border-bottom:1px solid #222;
 }
 
-/* LOG (ALWAYS VISIBLE) */
+/* LOG */
 #log{
   border-top:1px solid #222;
   padding:10px;
@@ -133,22 +127,17 @@ textarea{
   width:320px;
   z-index:20;
 }
-
-#popup textarea{
-  height:80px;
-}
 </style>
 </head>
 
 <body>
 
 <header>
-  <div id="title">Better Dispute v43</div>
+  <div id="title">Better Dispute v44</div>
 </header>
 
 <div id="users"></div>
 
-<!-- HOME INPUT ONLY -->
 <div id="composerWrap">
   <textarea id="composer" placeholder="Start a proclamation..."></textarea>
   <button onclick="create()">Proclaim</button>
@@ -157,13 +146,10 @@ textarea{
 <div id="nav"></div>
 <div id="view"></div>
 
-<!-- DISPUTE POPUP -->
 <div id="popup">
-  <div style="margin-bottom:6px;">Dispute</div>
-
+  <div>Dispute</div>
   <textarea id="challenge" placeholder="Challenge (question)"></textarea>
   <textarea id="counter" placeholder="Counter (proclamation)"></textarea>
-
   <button onclick="submitDispute()">✓</button>
   <button onclick="closePopup()">✕</button>
 </div>
@@ -228,12 +214,19 @@ function back(){
   render();
 }
 
-/* ---------------- CREATE ---------------- */
+/* ---------------- CREATE (PROCLAMATION ONLY) ---------------- */
 function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
 
-  items.push({id:id++,text:t,user:currentUser,parent:null});
+  items.push({
+    id:id++,
+    text:t,
+    user:currentUser,
+    parent:null,
+    type:"statement"
+  });
+
   document.getElementById("composer").value="";
   log("create",t);
   render();
@@ -260,7 +253,7 @@ function react(id,type){
   render();
 }
 
-/* ---------------- DISPUTE FLOW ---------------- */
+/* ---------------- DISPUTE ---------------- */
 function closePopup(){
   pending=null;
   document.getElementById("popup").style.display="none";
@@ -272,10 +265,10 @@ function submitDispute(){
 
   const target=pending;
 
-  const q=document.getElementById("challenge").value.trim(); // QUESTION
-  const c=document.getElementById("counter").value.trim();   // PROCLAMATION
+  const q=document.getElementById("challenge").value.trim();
+  const c=document.getElementById("counter").value.trim();
 
-  /* CHALLENGE = QUESTION NODE */
+  /* QUESTION = ONLY ASKING STRUCTURE (NOT PROCLAMATION) */
   if(q){
     let qid=id++;
     items.push({
@@ -286,11 +279,10 @@ function submitDispute(){
       side:"left",
       type:"question"
     });
-
     mustAnswer[qid]=true;
   }
 
-  /* COUNTER = PROCLAMATION NODE */
+  /* COUNTER = PROCLAMATION ONLY */
   if(c){
     items.push({
       id:id++,
@@ -312,13 +304,13 @@ function submitDispute(){
   render();
 }
 
-/* ---------------- ANSWER (FORCED SINGLE RESPONDER) ---------------- */
+/* ---------------- ANSWER ---------------- */
 function answer(qid){
 
   const q=find(qid);
   if(!q || q.answerBy) return;
 
-  const t=prompt("Answer this question:");
+  const t=prompt("Answer:");
   if(!t) return;
 
   items.push({
@@ -429,23 +421,20 @@ function render(){
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (REBUILT CLEAN + BRANCHING) ---------------- */
+/* ---------------- FIXED TEST DATA (NO QUESTIONS AS PROCLAMATIONS) ---------------- */
 
-/* ROOT */
-items.push({id:id++,text:"Should truth depend on consensus?",user:"alice",parent:null});
+/* ROOT PROCLAMATIONS ONLY */
+items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null});
+items.push({id:id++,text:"Meaning is socially constructed",user:"bob",parent:null});
+items.push({id:id++,text:"Language shapes perception",user:"charlie",parent:null});
 
-/* PRIMARY DISPUTE */
-items.push({id:id++,text:"Yes — truth is socially constructed",user:"bob",parent:0,side:"left",type:"question"});
-items.push({id:id++,text:"No — truth exists independently",user:"charlie",parent:0,side:"right",type:"statement"});
+/* DISPUTE ON ROOT 0 */
+items.push({id:id++,text:"Consensus has no bearing on truth",user:"bob",parent:0,side:"left",type:"question"});
+items.push({id:id++,text:"Truth requires shared verification",user:"charlie",parent:0,side:"right",type:"statement"});
 
-/* ANSWER TO LEFT QUESTION */
-items.push({id:id++,text:"But consensus can be wrong",user:"alice",parent:1,side:"left",type:"question"});
-
-/* COUNTER TO THAT */
-items.push({id:id++,text:"Even wrong consensus still stabilizes meaning",user:"bob",parent:3,side:"right",type:"statement"});
-
-/* FURTHER BRANCH */
-items.push({id:id++,text:"So is stability truth or illusion?",user:"charlie",parent:3,side:"left",type:"question"});
+/* BRANCH CONTINUATION */
+items.push({id:id++,text:"But verification itself is consensus-dependent",user:"alice",parent:4,side:"left",type:"question"});
+items.push({id:id++,text:"Verification is external constraint, not agreement",user:"bob",parent:5,side:"right",type:"statement"});
 
 renderUsers();
 render();

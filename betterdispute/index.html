@@ -1,273 +1,373 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Better Dispute v1</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Better Dispute v1.1</title>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0f0f10;
-      color: #fff;
-    }
+<style>
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #0f0f10;
+  color: #fff;
+}
 
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 12px;
-    }
+.header {
+  position: sticky;
+  top: 0;
+  background: #0f0f10;
+  padding: 12px;
+  border-bottom: 1px solid #222;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
-    .card {
-      background: #1a1a1c;
-      border-radius: 12px;
-      padding: 14px;
-      margin-bottom: 12px;
-    }
+.title { font-weight: bold; }
+.version { font-size: 12px; opacity: 0.6; }
+.balance { font-size: 18px; }
 
-    .message {
-      font-size: 16px;
-      line-height: 1.4;
-    }
+.userSwitch button {
+  margin-right: 4px;
+}
 
-    .meta {
-      font-size: 12px;
-      opacity: 0.6;
-      margin-top: 6px;
-    }
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 12px;
+}
 
-    .actions {
-      margin-top: 10px;
-      display: flex;
-      gap: 8px;
-    }
+.card {
+  background: #1a1a1c;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
 
-    button {
-      border: none;
-      border-radius: 8px;
-      padding: 8px 12px;
-      background: #2a2a2d;
-      color: #fff;
-      font-size: 14px;
-    }
+.message { font-size: 16px; }
 
-    button.primary {
-      background: #3a6df0;
-    }
+.meta {
+  font-size: 12px;
+  opacity: 0.6;
+  margin-top: 6px;
+}
 
-    .chain {
-      margin-top: 12px;
-    }
+.actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
-    .turn {
-      margin-bottom: 10px;
-      padding: 10px;
-      border-radius: 10px;
-    }
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #2a2a2d;
+  color: #fff;
+}
 
-    .question {
-      background: #2c2c2f;
-    }
+button.primary { background: #3a6df0; }
 
-    .answer {
-      background: #1f3a2c;
-    }
+.chainPreview {
+  margin-top: 10px;
+  padding: 10px;
+  background: #141416;
+  border-radius: 10px;
+  font-size: 14px;
+}
 
-    .turn.you {
-      outline: 2px solid #3a6df0;
-    }
+.turn {
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: 10px;
+}
 
-    .status {
-      font-size: 12px;
-      opacity: 0.7;
-      margin-top: 6px;
-    }
+.question { background: #2c2c2f; }
+.answer { background: #1f3a2c; }
 
-    .inputBar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: #0f0f10;
-      padding: 10px;
-      border-top: 1px solid #222;
-    }
+.you { outline: 2px solid #3a6df0; }
 
-    .inputBar input {
-      width: 100%;
-      padding: 10px;
-      border-radius: 10px;
-      border: none;
-      font-size: 14px;
-    }
+.status {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-top: 8px;
+}
 
-    .hidden {
-      display: none;
-    }
-  </style>
+.inputBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #0f0f10;
+  padding: 10px;
+  border-top: 1px solid #222;
+}
+
+textarea {
+  width: 100%;
+  min-height: 80px;
+  border-radius: 12px;
+  border: none;
+  padding: 12px;
+  font-size: 15px;
+  resize: none;
+}
+
+.hidden { display: none; }
+</style>
 </head>
 
 <body>
 
-<div class="container">
-
-  <!-- ROOT MESSAGE -->
-  <div class="card" id="rootCard">
-    <div class="message" id="rootText">
-      “This claim can be challenged.”
-    </div>
-
-    <div class="meta">
-      Posted by @alice
-    </div>
-
-    <div class="actions">
-      <button class="primary" onclick="startChallenge()">Challenge</button>
-      <button onclick="viewChains()">View Interrogations</button>
-    </div>
+<div class="header">
+  <div>
+    <div class="title">Better Dispute</div>
+    <div class="version">v1.1</div>
   </div>
 
-  <!-- INTERROGATION LIST -->
-  <div id="chainList"></div>
+  <div class="userSwitch">
+    <button onclick="switchUser('alice')">Alice</button>
+    <button onclick="switchUser('bob')">Bob</button>
+  </div>
 
-  <!-- ACTIVE CHAIN -->
-  <div id="chainView" class="hidden"></div>
-
+  <div class="balance">⚖️</div>
 </div>
 
-<!-- INPUT -->
+<div class="container" id="feed"></div>
+<div class="container hidden" id="chainView"></div>
+
 <div class="inputBar hidden" id="inputBar">
-  <input id="inputField" placeholder="" />
+  <textarea id="inputField"></textarea>
 </div>
 
 <script>
-  // ---- MOCK USER ----
-  const currentUser = "bob";
+let currentUser = "bob";
 
-  // ---- STATE ----
-  let chains = [];
-  let activeChain = null;
+// Demo timeout for crickets (10s instead of hours)
+const CRICKET_TIMEOUT = 10000;
 
-  // ---- START CHALLENGE ----
-  function startChallenge() {
-    const newChain = {
-      id: Date.now(),
-      root_id: 1,
-      user_a: "alice",
-      user_b: currentUser,
-      turns: [],
-      turn_state: "question", // first move = challenger asks
-      active_user: currentUser,
-      status: "active"
-    };
-
-    chains.push(newChain);
-    openChain(newChain.id);
-
-    setInput("Ask a precise question...");
+let posts = [
+  {
+    id: 1,
+    user: "alice",
+    text: "This claim can be challenged.",
+    chains: []
   }
+];
 
-  // ---- VIEW CHAINS ----
-  function viewChains() {
-    const list = document.getElementById("chainList");
-    list.innerHTML = "";
+// SWITCH USER
+function switchUser(u) {
+  currentUser = u;
+  renderFeed();
+}
 
-    chains.forEach(c => {
-      const div = document.createElement("div");
-      div.className = "card";
-      div.innerHTML = `
-        Interrogation (${c.turns.length} turns)<br/>
-        <button onclick="openChain(${c.id})">Open</button>
-      `;
-      list.appendChild(div);
-    });
-  }
+// START CHALLENGE
+function startChallenge(postId) {
+  const post = posts.find(p => p.id === postId);
 
-  // ---- OPEN CHAIN ----
-  function openChain(id) {
-    activeChain = chains.find(c => c.id === id);
-    renderChain();
-    document.getElementById("chainView").classList.remove("hidden");
-  }
+  const chain = {
+    id: Date.now(),
+    user_a: post.user,
+    user_b: currentUser,
+    turns: [],
+    turn_state: "question",
+    active_user: currentUser,
+    status: "active",
+    last_action: Date.now()
+  };
 
-  // ---- RENDER CHAIN ----
-  function renderChain() {
-    const view = document.getElementById("chainView");
+  post.chains.push(chain);
+  openChain(postId, chain.id);
 
-    let html = `<div class="card"><strong>Interrogation</strong></div>`;
+  setInput("Ask a precise question...");
+}
 
-    activeChain.turns.forEach(t => {
+// OPEN CHAIN
+let activePost, activeChain;
+
+function openChain(postId, chainId) {
+  activePost = posts.find(p => p.id === postId);
+  activeChain = activePost.chains.find(c => c.id === chainId);
+
+  document.getElementById("feed").classList.add("hidden");
+  document.getElementById("chainView").classList.remove("hidden");
+
+  renderChain();
+}
+
+// BACK
+function goHome() {
+  document.getElementById("feed").classList.remove("hidden");
+  document.getElementById("chainView").classList.add("hidden");
+  hideInput();
+}
+
+// RENDER FEED
+function renderFeed() {
+  const feed = document.getElementById("feed");
+  feed.innerHTML = "";
+
+  posts.forEach(post => {
+    let html = `
+      <div class="card">
+        <div class="message">${post.text}</div>
+        <div class="meta">@${post.user}</div>
+
+        <div class="actions">
+          <button class="primary" onclick="startChallenge(${post.id})">Challenge</button>
+        </div>
+    `;
+
+    post.chains.forEach(chain => {
+      const last = chain.turns[chain.turns.length - 1];
+      if (!last) return;
+
       html += `
-        <div class="turn ${t.type} ${t.user === currentUser ? 'you' : ''}">
-          <div>${t.text}</div>
-          <div class="meta">@${t.user}</div>
+        <div class="chainPreview" onclick="openChain(${post.id}, ${chain.id})">
+          ${last.type.toUpperCase()}: ${last.text}
+          <div class="meta">${chain.statusLabel || ""}</div>
         </div>
       `;
     });
 
-    html += `<div class="status">`;
-
-    if (activeChain.active_user === currentUser) {
-      html += activeChain.turn_state === "question"
-        ? "Your turn to ask"
-        : "Your turn to answer";
-      showInput();
-    } else {
-      html += "Waiting on them";
-      hideInput();
-    }
-
     html += `</div>`;
+    feed.innerHTML += html;
+  });
+}
 
-    view.innerHTML = html;
-  }
+// RENDER CHAIN
+function renderChain() {
+  updateCrickets(activeChain);
 
-  // ---- INPUT ----
-  const input = document.getElementById("inputField");
+  const view = document.getElementById("chainView");
 
-  input.addEventListener("keydown", e => {
-    if (e.key === "Enter") submitTurn();
+  let html = `
+    <button onclick="goHome()">← Back</button>
+    <div class="card">
+      <div class="message">${activePost.text}</div>
+    </div>
+  `;
+
+  activeChain.turns.forEach(t => {
+    html += `
+      <div class="turn ${t.type} ${t.user === currentUser ? 'you' : ''}">
+        ${t.text}
+        <div class="meta">@${t.user}</div>
+      </div>
+    `;
   });
 
-  function setInput(placeholder) {
-    input.placeholder = placeholder;
+  html += `<div class="status">`;
+
+  if (activeChain.status !== "active") {
+    html += activeChain.statusLabel;
+    hideInput();
+  } else if (activeChain.active_user === currentUser) {
+    html += activeChain.turn_state === "question"
+      ? "Your turn to ask"
+      : "Your turn to answer";
     showInput();
-    input.focus();
+  } else {
+    html += "Waiting on them";
+    showInput();
+    html += `
+      <div class="actions">
+        <button onclick="markDodged()">Dodged</button>
+        <button onclick="endChain()">End</button>
+      </div>
+    `;
   }
 
-  function showInput() {
-    document.getElementById("inputBar").classList.remove("hidden");
+  html += `</div>`;
+
+  view.innerHTML = html;
+}
+
+// INPUT
+const input = document.getElementById("inputField");
+
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    submitTurn();
   }
+});
 
-  function hideInput() {
-    document.getElementById("inputBar").classList.add("hidden");
+function setInput(ph) {
+  input.placeholder = ph;
+  showInput();
+  input.focus();
+}
+
+function showInput() {
+  document.getElementById("inputBar").classList.remove("hidden");
+}
+
+function hideInput() {
+  document.getElementById("inputBar").classList.add("hidden");
+}
+
+// SUBMIT TURN
+function submitTurn() {
+  if (!input.value.trim()) return;
+
+  const type = activeChain.turn_state;
+
+  activeChain.turns.push({
+    type,
+    user: currentUser,
+    text: input.value.trim()
+  });
+
+  activeChain.last_action = Date.now();
+
+  activeChain.turn_state = type === "question" ? "answer" : "question";
+  activeChain.active_user =
+    currentUser === activeChain.user_a
+      ? activeChain.user_b
+      : activeChain.user_a;
+
+  input.value = "";
+
+  renderChain();
+}
+
+// DODGED
+function markDodged() {
+  activeChain.status = "dodged";
+  activeChain.statusLabel = "Marked as dodged";
+  renderChain();
+}
+
+// END
+function endChain() {
+  activeChain.status = "ended";
+  activeChain.statusLabel = "Ended";
+  renderChain();
+}
+
+// CRICKETS
+function updateCrickets(chain) {
+  if (chain.status !== "active") return;
+
+  const now = Date.now();
+  if (now - chain.last_action > CRICKET_TIMEOUT) {
+    chain.status = "crickets";
+    chain.statusLabel = "🐦 No response (crickets)";
   }
+}
 
-  // ---- SUBMIT TURN ----
-  function submitTurn() {
-    if (!input.value.trim()) return;
+// INIT
+setInterval(() => {
+  posts.forEach(p =>
+    p.chains.forEach(updateCrickets)
+  );
+  renderFeed();
+}, 2000);
 
-    const type = activeChain.turn_state;
-
-    activeChain.turns.push({
-      type: type,
-      user: currentUser,
-      text: input.value.trim()
-    });
-
-    // SWITCH TURN
-    activeChain.turn_state = type === "question" ? "answer" : "question";
-    activeChain.active_user =
-      activeChain.active_user === activeChain.user_a
-        ? activeChain.user_b
-        : activeChain.user_a;
-
-    input.value = "";
-
-    renderChain();
-  }
-
+renderFeed();
 </script>
 
 </body>

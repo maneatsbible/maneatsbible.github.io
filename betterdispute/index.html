@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v56</title>
+<title>Better Dispute v58</title>
 
 <style>
 body{
@@ -80,15 +80,14 @@ textarea{
   border-radius:8px;
 }
 
-/* VOTE */
-.voteRow{
+/* REACTIONS */
+.reactionRow{
   margin-top:6px;
   display:flex;
   gap:8px;
-  align-items:center;
 }
 
-.voteBtn{
+.reactionBtn{
   background:#111;
   border:1px solid #333;
   color:#aaa;
@@ -98,15 +97,60 @@ textarea{
   font-size:12px;
 }
 
-.voteBtn.activeUp{
+.activeAgree{
   color:#7CFF7C;
   border-color:#7CFF7C;
 }
 
-.voteBtn.activeDown{
+.activeDisagree{
   color:#FF7C7C;
   border-color:#FF7C7C;
 }
+
+/* MODAL OVERLAY */
+#overlay{
+  display:none;
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.7);
+  z-index:50;
+}
+
+#modal{
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:360px;
+  background:#111;
+  border:1px solid #333;
+  border-radius:10px;
+  padding:12px;
+  z-index:60;
+}
+
+#modal textarea{
+  height:70px;
+  margin-bottom:8px;
+}
+
+.modalActions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+}
+
+.btn{
+  padding:6px 10px;
+  border-radius:6px;
+  cursor:pointer;
+  border:1px solid #333;
+  background:#1a1a1a;
+  color:#ddd;
+}
+
+.btn.ok{border-color:#7CFF7C;color:#7CFF7C}
+.btn.cancel{border-color:#FF7C7C;color:#FF7C7C}
 
 /* NAV */
 #nav{padding:0 10px}
@@ -137,7 +181,7 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v56</div>
+  <div id="title">Better Dispute v58</div>
 </header>
 
 <div id="users"></div>
@@ -150,12 +194,18 @@ textarea{
 <div id="nav"></div>
 <div id="view"></div>
 
-<div id="popup" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#111;border:1px solid #333;padding:10px;width:320px;z-index:20;">
-  <div>Dispute</div>
+<!-- MODAL -->
+<div id="overlay" onclick="closeModal()"></div>
+
+<div id="modal">
+  <div style="margin-bottom:8px;">Dispute</div>
   <textarea id="challenge" placeholder="Question"></textarea>
   <textarea id="counter" placeholder="Counter"></textarea>
-  <button onclick="submitDispute()">✓</button>
-  <button onclick="closePopup()">✕</button>
+
+  <div class="modalActions">
+    <button class="btn cancel" onclick="closeModal()">✕ Cancel</button>
+    <button class="btn ok" onclick="submitDispute()">✓ Submit</button>
+  </div>
 </div>
 
 <div id="log"></div>
@@ -171,8 +221,7 @@ let items=[];
 let stack=[];
 let logs=[];
 let openQuestions={};
-let votes={}; 
-// {itemId: {user: "up"|"down"}}
+let reactions={};
 
 /* ---------------- LOG ---------------- */
 function log(e,d){
@@ -217,6 +266,17 @@ function back(){
   render();
 }
 
+/* ---------------- MODAL ---------------- */
+function openModal(){
+  document.getElementById("overlay").style.display="block";
+  document.getElementById("modal").style.display="block";
+}
+
+function closeModal(){
+  document.getElementById("overlay").style.display="none";
+  document.getElementById("modal").style.display="none";
+}
+
 /* ---------------- CREATE ---------------- */
 function create(){
   const t=document.getElementById("composer").value.trim();
@@ -242,8 +302,8 @@ function submitDispute(){
   const parentNode=find(target);
   if(!parentNode) return;
 
-  if(parentNode.user === currentUser){
-    alert("Cannot dispute your own statement.");
+  if(parentNode.user===currentUser){
+    alert("Cannot dispute own statement.");
     return;
   }
 
@@ -282,12 +342,31 @@ function submitDispute(){
   document.getElementById("counter").value="";
 
   log("dispute",target);
-  closePopup();
+  closeModal();
   render();
 }
 
-function closePopup(){
-  document.getElementById("popup").style.display="none";
+/* ---------------- REACTIONS ---------------- */
+function getReaction(id){
+  return reactions[id]?.[currentUser];
+}
+
+function setReaction(id,type){
+
+  if(!reactions[id]) reactions[id]={};
+
+  const prev=reactions[id][currentUser];
+
+  if(prev==="disagree") return;
+
+  reactions[id][currentUser]=type;
+
+  if(type==="disagree"){
+    openModal();
+  }
+
+  log(type,id);
+  render();
 }
 
 /* ---------------- ANSWER ---------------- */
@@ -296,12 +375,12 @@ function answer(qid){
   const q=find(qid);
   if(!q) return;
 
-  const hasAnswer = items.some(x => x.parent === qid && x.type === "answer");
+  const hasAnswer=items.some(x=>x.parent===qid && x.type==="answer");
   if(hasAnswer) return;
 
   const expected=openQuestions[qid];
   if(currentUser!==expected){
-    alert("Only the targeted user can answer.");
+    alert("Not your turn.");
     return;
   }
 
@@ -319,34 +398,17 @@ function answer(qid){
   });
 
   delete openQuestions[qid];
-
-  log("answer",qid);
   render();
 }
 
-/* ---------------- VOTES ---------------- */
-function vote(itemId, dir){
-  if(!votes[itemId]) votes[itemId]={};
-  votes[itemId][currentUser]=dir;
-  log("vote",itemId+" "+dir);
-  render();
-}
-
-function getVote(itemId){
-  return votes[itemId]?.[currentUser];
-}
-
-/* ---------------- BUILD LANES ---------------- */
-function buildLane(rootId, lane){
+/* ---------------- LANES ---------------- */
+function buildLane(rootId,lane){
 
   const out=[];
 
-  function walk(parentId){
+  function walk(pid){
 
-    const children=items.filter(x=>x.parent===parentId);
-
-    children.forEach(c=>{
-
+    items.filter(x=>x.parent===pid).forEach(c=>{
       if(c.lane!==lane) return;
 
       out.push(c);
@@ -357,10 +419,7 @@ function buildLane(rootId, lane){
           out.push(ans);
           walk(ans.id);
         }
-      } else {
-        walk(c.id);
-      }
-
+      } else walk(c.id);
     });
   }
 
@@ -371,47 +430,57 @@ function buildLane(rootId, lane){
 /* ---------------- NODE ---------------- */
 function renderNode(n){
 
-  let icon="!";
-  if(n.type==="question") icon="?";
-  if(n.type==="answer") icon="✓";
+  const r=getReaction(n.id);
 
-  const hasAnswer = n.type==="question"
+  const agreeActive=r==="agree";
+  const disagreeActive=r==="disagree";
+
+  const hasAnswer=n.type==="question"
     ? items.some(x=>x.parent===n.id && x.type==="answer")
     : false;
-
-  const v = getVote(n.id);
 
   return `
     <div class="card">
 
       <div>
-        <span class="icon">${icon}</span>
+        <span class="icon">${n.type==="question"?"?":n.type==="answer"?"✓":"!"}</span>
         ${n.text}
         <span class="meta">@${n.user}</span>
+      </div>
+
+      <div class="reactionRow">
+        <button class="reactionBtn ${agreeActive?'activeAgree':''}"
+          onclick="setReaction(${n.id},'agree')">👍</button>
+
+        ${
+          !isOwn(n) ? `
+        <button class="reactionBtn ${disagreeActive?'activeDisagree':''}"
+          onclick="setReaction(${n.id},'disagree')">👎</button>
+        ` : ""
+        }
       </div>
 
       ${
         n.type==="question" &&
         !hasAnswer &&
         openQuestions[n.id]===currentUser
-          ? `<button onclick="answer(${n.id})">Answer</button>`
-          : ""
+        ? `<button onclick="answer(${n.id})">Answer</button>`
+        : ""
       }
-
-      <div class="voteRow">
-        <button class="voteBtn ${v==='up'?'activeUp':''}" onclick="vote(${n.id},'up')">↑</button>
-        <button class="voteBtn ${v==='down'?'activeDown':''}" onclick="vote(${n.id},'down')">↓</button>
-      </div>
 
     </div>
   `;
 }
 
+function isOwn(n){
+  return n.user===currentUser;
+}
+
 /* ---------------- DISPUTE VIEW ---------------- */
 function renderDispute(root){
 
-  const leftLane=buildLane(root.id,"left");
-  const rightLane=buildLane(root.id,"right");
+  const left=buildLane(root.id,"left");
+  const right=buildLane(root.id,"right");
 
   return `
     <div class="card">
@@ -421,8 +490,8 @@ function renderDispute(root){
     </div>
 
     <div class="disputeWrap">
-      <div class="lane">${leftLane.map(renderNode).join("")}</div>
-      <div class="lane">${rightLane.map(renderNode).join("")}</div>
+      <div class="lane">${left.map(renderNode).join("")}</div>
+      <div class="lane">${right.map(renderNode).join("")}</div>
     </div>
   `;
 }
@@ -443,13 +512,6 @@ function render(){
         <div class="card" onclick="enter(${r.id})">
           <span class="icon">!</span>
           ${r.text}
-          <span class="meta">@${r.user}</span>
-
-          <div class="voteRow">
-            <button class="voteBtn ${getVote(r.id)==='up'?'activeUp':''}" onclick="event.stopPropagation();vote(${r.id},'up')">↑</button>
-            <button class="voteBtn ${getVote(r.id)==='down'?'activeDown':''}" onclick="event.stopPropagation();vote(${r.id},'down')">↓</button>
-          </div>
-
         </div>
       `;
     });
@@ -462,7 +524,7 @@ function render(){
 
   }
 
-  document.getElementById("log").innerHTML =
+  document.getElementById("log").innerHTML=
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
@@ -470,18 +532,12 @@ function render(){
 
 items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null,type:"proclaim"});
 
-/* Bob challenges Alice */
 items.push({id:id++,text:"Does truth require agreement?",user:"bob",parent:0,type:"question",lane:"left",participants:["alice","bob"]});
 openQuestions[1]="alice";
+
 items.push({id:id++,text:"No, truth stands regardless",user:"alice",parent:1,type:"answer",lane:"left",participants:["alice","bob"]});
 
-/* Bob counter */
 items.push({id:id++,text:"Truth depends on shared understanding",user:"bob",parent:0,type:"proclaim",lane:"right",participants:["alice","bob"]});
-
-/* Alice challenge Bob */
-items.push({id:id++,text:"Can shared understanding be wrong?",user:"alice",parent:3,type:"question",lane:"left",participants:["alice","bob"]});
-openQuestions[4]="bob";
-items.push({id:id++,text:"Yes, consensus can be mistaken",user:"bob",parent:4,type:"answer",lane:"left",participants:["alice","bob"]});
 
 renderUsers();
 render();

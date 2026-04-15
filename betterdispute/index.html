@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Better Dispute v3</title>
+<title>Better Dispute v4</title>
 
 <style>
 body {
@@ -13,7 +13,6 @@ body {
   color: #fff;
 }
 
-/* HEADER */
 .header {
   position: sticky;
   top: 0;
@@ -24,20 +23,16 @@ body {
 
 .topRow {
   display: flex;
-  align-items: center;
   justify-content: space-between;
 }
 
 .left {
   display: flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
 }
 
-.home {
-  font-size: 18px;
-  cursor: pointer;
-}
+.home { cursor: pointer; font-size: 18px; }
 
 .title { font-weight: bold; }
 .version { font-size: 11px; opacity: 0.6; }
@@ -52,7 +47,6 @@ body {
   background: #3a6df0;
 }
 
-/* FEED */
 .container {
   max-width: 600px;
   margin: 0 auto;
@@ -66,34 +60,31 @@ body {
   margin-bottom: 10px;
 }
 
-.message {
-  font-size: 15px;
-  line-height: 1.4;
-}
+.message { font-size: 15px; }
 
 .meta {
   font-size: 11px;
   opacity: 0.6;
-  margin-top: 5px;
+  margin-top: 4px;
 }
 
 .actions {
   margin-top: 8px;
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
 }
 
 button {
   border: none;
   border-radius: 6px;
   padding: 6px 10px;
+  font-size: 12px;
   background: #2a2a2d;
   color: #fff;
-  font-size: 12px;
 }
 
 button.primary { background: #3a6df0; }
+button.disabled { opacity: 0.4; }
 
 .chainPreview {
   margin-top: 8px;
@@ -103,7 +94,6 @@ button.primary { background: #3a6df0; }
   font-size: 13px;
 }
 
-/* CHAIN */
 .turn {
   margin-bottom: 8px;
   padding: 10px;
@@ -115,13 +105,8 @@ button.primary { background: #3a6df0; }
 
 .you { outline: 1.5px solid #3a6df0; }
 
-.status {
-  font-size: 12px;
-  opacity: 0.85;
-  margin-top: 6px;
-}
+.status { font-size: 12px; margin-top: 6px; }
 
-/* INPUT */
 .inputBar {
   position: fixed;
   bottom: 0;
@@ -135,11 +120,10 @@ button.primary { background: #3a6df0; }
 textarea {
   width: 100%;
   min-height: 80px;
+  font-size: 16px;
   border-radius: 10px;
   border: none;
   padding: 10px;
-  font-size: 16px;
-  resize: none;
 }
 
 .sendBtn {
@@ -159,12 +143,11 @@ textarea {
       <div class="home" onclick="goHome()">⚖️</div>
       <div>
         <div class="title">Better Dispute</div>
-        <div class="version">v3</div>
+        <div class="version">v4</div>
       </div>
     </div>
   </div>
 
-  <!-- USER SWITCH BELOW HEADER -->
   <div class="userBar">
     <button id="u-alice" onclick="switchUser('alice')">Alice</button>
     <button id="u-bob" onclick="switchUser('bob')">Bob</button>
@@ -184,7 +167,6 @@ textarea {
 let currentUser = "bob";
 const CRICKET_TIMEOUT = 15000;
 
-// DATA
 let posts = [
   {
     id: 1,
@@ -200,40 +182,24 @@ let posts = [
   }
 ];
 
-// PRELOAD CHAINS
+// SAMPLE CHAINS
 posts[0].chains.push({
   id: 101,
   user_a: "alice",
   user_b: "bob",
   turns: [
     { type: "question", user: "bob", text: "Where is that stated?" },
-    { type: "answer", user: "alice", text: "Ephesians 2:8-9." },
-    { type: "question", user: "bob", text: "Does that exclude works entirely?" }
+    { type: "answer", user: "alice", text: "Ephesians 2:8-9." }
   ],
-  turn_state: "answer",
-  active_user: "alice",
+  turn_state: "question",
+  active_user: "bob",
   status: "active",
   last_action: Date.now()
-});
-
-posts[1].chains.push({
-  id: 102,
-  user_a: "charlie",
-  user_b: "alice",
-  turns: [
-    { type: "question", user: "alice", text: "Which industries first?" }
-  ],
-  turn_state: "answer",
-  active_user: "charlie",
-  status: "active",
-  last_action: Date.now() - 20000
 });
 
 // USER SWITCH
 function switchUser(u) {
   currentUser = u;
-
-  // highlight active user
   document.querySelectorAll(".userBar button").forEach(b => b.classList.remove("active"));
   document.getElementById("u-" + u).classList.add("active");
 
@@ -267,6 +233,8 @@ function goHome() {
 function startChallenge(postId) {
   const post = posts.find(p => p.id === postId);
 
+  if (post.user === currentUser) return;
+
   const chain = {
     id: Date.now(),
     user_a: post.user,
@@ -289,21 +257,25 @@ function renderFeed() {
   feed.innerHTML = "";
 
   posts.forEach(post => {
+    const self = post.user === currentUser;
+
     let html = `
       <div class="card">
         <div class="message">${post.text}</div>
         <div class="meta">@${post.user}</div>
         <div class="actions">
-          <button class="primary" onclick="startChallenge(${post.id})">Challenge</button>
+          <button class="${self ? 'disabled' : 'primary'}"
+            ${self ? '' : `onclick="startChallenge(${post.id})"`}>
+            ${self ? 'Your post' : 'Challenge'}
+          </button>
         </div>
     `;
 
     post.chains.forEach(chain => {
       updateCrickets(chain);
-
       html += `
         <div class="chainPreview" onclick="openChain(${post.id}, ${chain.id})">
-          ${summarizeChain(chain)}
+          ${chain.turns.map(t => `${t.type === "question" ? "Q" : "A"}: ${t.text}`).join(" → ")}
           <div class="meta">${chain.statusLabel || ""}</div>
         </div>
       `;
@@ -312,11 +284,6 @@ function renderFeed() {
     html += `</div>`;
     feed.innerHTML += html;
   });
-}
-
-// FULL CHAIN SUMMARY (NO SKIPPING)
-function summarizeChain(chain) {
-  return chain.turns.map(t => `${t.type === "question" ? "Q" : "A"}: ${t.text}`).join(" → ");
 }
 
 // CHAIN VIEW
@@ -328,6 +295,7 @@ function renderChain() {
   let html = `
     <div class="card">
       <div class="message">${activePost.text}</div>
+      <div class="meta">@${activePost.user}</div>
     </div>
   `;
 
@@ -346,15 +314,12 @@ function renderChain() {
     html += activeChain.statusLabel;
     hideInput();
   } else if (activeChain.active_user === currentUser) {
-    html += activeChain.turn_state === "question"
-      ? "Your turn to ask"
-      : "Your turn to answer";
-
+    html += "Your turn";
     setInput(activeChain.turn_state === "question"
       ? "Ask a precise question..."
       : "Answer directly...");
   } else {
-    html += "Waiting on them";
+    html += "Waiting on @" + activeChain.active_user;
 
     html += `
       <div class="actions">

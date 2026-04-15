@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v62</title>
+<title>Better Dispute v63</title>
 
 <style>
 body{
@@ -192,7 +192,7 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v62</div>
+  <div id="title">Better Dispute v63</div>
 </header>
 
 <div id="users"></div>
@@ -233,6 +233,8 @@ let stack=[];
 let logs=[];
 let openQuestions={};
 let reactions={};
+
+let pendingReaction = { itemId:null, type:null };
 
 /* ---------------- LOG ---------------- */
 function log(e,d){
@@ -287,6 +289,7 @@ function openModal(){
 function closeModal(){
   document.getElementById("overlay").style.display="none";
   document.getElementById("modal").style.display="none";
+  pendingReaction = { itemId:null, type:null };
 }
 
 /* ---------------- CREATE ---------------- */
@@ -307,8 +310,48 @@ function create(){
   render();
 }
 
-/* ---------------- DISPUTE (FIXED FORKING) ---------------- */
+/* ---------------- REACTIONS (DEFERRED) ---------------- */
+function setReaction(itemId,type){
+
+  const node=find(itemId);
+  if(!node) return;
+  if(node.user===currentUser) return;
+
+  if(type==="agree"){
+    if(!reactions[itemId]) reactions[itemId]={};
+    if(reactions[itemId][currentUser]==="disagree") return;
+
+    reactions[itemId][currentUser]="agree";
+    log("agree",itemId);
+    render();
+    return;
+  }
+
+  if(type==="disagree"){
+    pendingReaction = { itemId, type:"disagree" };
+    openModal();
+    render();
+  }
+}
+
+/* ---------------- DISPUTE (TRUE FORK) ---------------- */
 function submitDispute(){
+
+  /* commit deferred disagreement first */
+  if(pendingReaction.itemId !== null && pendingReaction.type==="disagree"){
+
+    const rid = pendingReaction.itemId;
+
+    if(!reactions[rid]) reactions[rid]={};
+    reactions[rid][currentUser]="disagree";
+
+    log("disagree",rid);
+
+    pendingReaction={itemId:null,type:null};
+    closeModal();
+    render();
+    return;
+  }
 
   const target=stack[stack.length-1];
   const parentNode=find(target);
@@ -317,7 +360,7 @@ function submitDispute(){
   const q=document.getElementById("challenge").value.trim();
   const c=document.getElementById("counter").value.trim();
 
-  /* ✅ FIX: CREATE FORK NODE ALWAYS */
+  /* TRUE BRANCH */
   const forkId=id++;
 
   items.push({
@@ -341,7 +384,6 @@ function submitDispute(){
       type:"question",
       lane:"left"
     });
-    openQuestions[qid]=parentNode.user;
   }
 
   if(c){
@@ -358,66 +400,7 @@ function submitDispute(){
   document.getElementById("challenge").value="";
   document.getElementById("counter").value="";
 
-  log("dispute",target);
   closeModal();
-  render();
-}
-
-/* ---------------- REACTIONS ---------------- */
-function getReaction(id){
-  return reactions[id]?.[currentUser];
-}
-
-function setReaction(id,type){
-
-  if(!reactions[id]) reactions[id]={};
-
-  const prev=reactions[id][currentUser];
-  if(prev==="disagree") return;
-
-  if(type==="agree"){
-    reactions[id][currentUser]="agree";
-    log("agree",id);
-    render();
-    return;
-  }
-
-  if(type==="disagree"){
-    reactions[id][currentUser]="disagree";
-    log("disagree",id);
-    openModal();
-    render();
-  }
-}
-
-/* ---------------- ANSWER ---------------- */
-function answer(qid){
-
-  const q=find(qid);
-  if(!q) return;
-
-  const hasAnswer=items.some(x=>x.parent===qid && x.type==="answer");
-  if(hasAnswer) return;
-
-  const expected=openQuestions[qid];
-  if(currentUser!==expected){
-    alert("Not your turn.");
-    return;
-  }
-
-  const t=prompt("Answer:");
-  if(!t) return;
-
-  items.push({
-    id:id++,
-    text:t,
-    user:currentUser,
-    parent:qid,
-    type:"answer",
-    lane:"left"
-  });
-
-  delete openQuestions[qid];
   render();
 }
 
@@ -448,7 +431,7 @@ function buildLane(rootId,lane){
 /* ---------------- NODE ---------------- */
 function renderNode(n){
 
-  const r=getReaction(n.id);
+  const r=reactions[n.id]?.[currentUser];
   const agreeActive=r==="agree";
   const disagreeActive=r==="disagree";
 
@@ -465,7 +448,7 @@ function renderNode(n){
         <span class="meta">@${n.user}</span>
       </div>
 
-      ${!isOwn(n) ? `
+      ${n.user!==currentUser ? `
       <div class="reactionRow">
         <button class="reactionBtn ${agreeActive?'activeAgree':''}"
           onclick="setReaction(${n.id},'agree')">👍</button>
@@ -474,14 +457,6 @@ function renderNode(n){
           onclick="setReaction(${n.id},'disagree')">👎</button>
       </div>
       ` : ""}
-
-      ${
-        n.type==="question" &&
-        !hasAnswer &&
-        openQuestions[n.id]===currentUser
-          ? `<button onclick="answer(${n.id})">Answer</button>`
-          : ""
-      }
 
     </div>
   `;
@@ -548,12 +523,7 @@ openQuestions[1]="alice";
 
 items.push({id:id++,text:"No, truth stands regardless",user:"alice",parent:1,type:"answer",lane:"left"});
 
-items.push({id:id++,text:"Truth depends on shared understanding",user:"bob",parent:0,type:"proclaim",lane:"right"});
-
-items.push({id:id++,text:"Can shared understanding be wrong?",user:"alice",parent:3,type:"question",lane:"left"});
-openQuestions[4]="bob";
-
-items.push({id:id++,text:"Yes, consensus can be mistaken",user:"bob",parent:4,type:"answer",lane:"left"});
+items.push({id:id++,text:"Truth depends on shared understanding",user:"bob",parent:0,type:"proclaim"});
 
 renderUsers();
 render();

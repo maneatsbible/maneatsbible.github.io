@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Better Dispute v6</title>
+<title>Better Dispute v7</title>
 
 <style>
 body {
@@ -13,7 +13,6 @@ body {
   color: #fff;
 }
 
-/* HEADER */
 .header {
   position: sticky;
   top: 0;
@@ -30,39 +29,22 @@ body {
 
 .left {
   display: flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
 }
 
-.home {
-  font-size: 18px;
-  cursor: pointer;
-}
+.home { cursor: pointer; font-size: 18px; }
 
-.title { font-weight: bold; }
-.version {
-  font-size: 11px;
-  opacity: 0.6;
-}
+.right { font-size: 11px; opacity: 0.6; }
 
-/* version top-right requirement */
-.right {
-  font-size: 11px;
-  opacity: 0.6;
-}
-
-/* USER BAR */
 .userBar {
   margin-top: 8px;
   display: flex;
   gap: 6px;
 }
 
-.userBar button.active {
-  background: #3a6df0;
-}
+.userBar button.active { background: #3a6df0; }
 
-/* LAYOUT */
 .container {
   max-width: 600px;
   margin: 0 auto;
@@ -77,12 +59,7 @@ body {
 }
 
 .message { font-size: 15px; }
-
-.meta {
-  font-size: 11px;
-  opacity: 0.6;
-  margin-top: 4px;
-}
+.meta { font-size: 11px; opacity: 0.6; margin-top: 4px; }
 
 .actions {
   margin-top: 8px;
@@ -101,7 +78,6 @@ button {
 }
 
 button.primary { background: #3a6df0; }
-button.disabled { opacity: 0.4; }
 
 .chainPreview {
   margin-top: 8px;
@@ -109,9 +85,9 @@ button.disabled { opacity: 0.4; }
   background: #141416;
   border-radius: 8px;
   font-size: 13px;
+  cursor: pointer;
 }
 
-/* TURNS */
 .turn {
   margin-bottom: 8px;
   padding: 10px;
@@ -120,17 +96,21 @@ button.disabled { opacity: 0.4; }
 
 .question { background: #2c2c2f; }
 .answer { background: #1f3a2c; }
-
 .you { outline: 1.5px solid #3a6df0; }
 
-/* STATUS */
 .status {
   font-size: 12px;
   margin-top: 6px;
   opacity: 0.85;
 }
 
-/* INPUT (FIXED UX) */
+.tailBox {
+  margin-top: 10px;
+  padding: 10px;
+  background: #141416;
+  border-radius: 8px;
+}
+
 .inputBar {
   position: fixed;
   bottom: 0;
@@ -152,11 +132,6 @@ textarea {
   outline: none;
 }
 
-.sendBtn {
-  margin-top: 6px;
-  width: 100%;
-}
-
 .hidden { display: none; }
 </style>
 </head>
@@ -167,9 +142,9 @@ textarea {
   <div class="topRow">
     <div class="left">
       <div class="home" onclick="goHome()">⚖️</div>
-      <div class="title">Better Dispute</div>
+      <div>Better Dispute</div>
     </div>
-    <div class="right">v6</div>
+    <div class="right">v7</div>
   </div>
 
   <div class="userBar">
@@ -180,16 +155,14 @@ textarea {
 </div>
 
 <div class="container" id="feed"></div>
-<div class="container hidden" id="chainView"></div>
+<div class="container hidden" id="threadView"></div>
 
 <div class="inputBar hidden" id="inputBar">
-  <textarea id="inputField"></textarea>
-  <button class="primary sendBtn" onclick="submitTurn()">Send</button>
+  <textarea id="input"></textarea>
 </div>
 
 <script>
 let currentUser = "bob";
-const CRICKET_TIMEOUT = 15000;
 
 let posts = [
   {
@@ -229,7 +202,7 @@ function switchUser(u) {
   document.getElementById("u-" + u).classList.add("active");
 
   renderFeed();
-  if (activeChain) renderChain();
+  if (activeChain) renderThread();
 }
 
 // NAV
@@ -237,29 +210,30 @@ function goHome() {
   activePost = null;
   activeChain = null;
   document.getElementById("feed").classList.remove("hidden");
-  document.getElementById("chainView").classList.add("hidden");
+  document.getElementById("threadView").classList.add("hidden");
   hideInput();
 }
 
-function openChain(postId, chainId) {
+// DRILL INTO POST (NEW REQUIREMENT)
+function openPost(postId) {
   activePost = posts.find(p => p.id === postId);
-  activeChain = activePost.chains.find(c => c.id === chainId);
 
   document.getElementById("feed").classList.add("hidden");
-  document.getElementById("chainView").classList.remove("hidden");
+  document.getElementById("threadView").classList.remove("hidden");
 
-  renderChain();
+  activeChain = null;
+  renderThread();
 }
 
-// START CHALLENGE (ENFORCED)
-function startChallenge(postId) {
+// START DISPUTE
+function startChallenge(postId, targetUser) {
   const post = posts.find(p => p.id === postId);
 
-  if (post.user === currentUser) return;
+  if (targetUser === currentUser) return;
 
   const chain = {
     id: Date.now(),
-    user_a: post.user,
+    user_a: targetUser,
     user_b: currentUser,
     turns: [],
     turn_state: "question",
@@ -269,8 +243,14 @@ function startChallenge(postId) {
   };
 
   post.chains.push(chain);
-  openChain(postId, chain.id);
-  setInput("Ask a precise question...");
+
+  activeChain = chain;
+  activePost = post;
+
+  document.getElementById("feed").classList.add("hidden");
+  document.getElementById("threadView").classList.remove("hidden");
+
+  renderThread();
 }
 
 // FEED
@@ -283,24 +263,21 @@ function renderFeed() {
 
     let html = `
       <div class="card">
-        <div class="message">${post.text}</div>
+        <div class="message" onclick="openPost(${post.id})">${post.text}</div>
         <div class="meta">@${post.user}</div>
 
         <div class="actions">
-          <button class="${self ? 'disabled' : 'primary'}"
-            ${self ? '' : `onclick="startChallenge(${post.id})"`}>
-            ${self ? 'Your post' : 'Challenge'}
+          <button class="primary"
+            ${self ? 'disabled' : `onclick="startChallenge(${post.id}, '${post.user}')"`}>
+            Challenge
           </button>
         </div>
     `;
 
     post.chains.forEach(chain => {
-      updateCrickets(chain);
-
       html += `
-        <div class="chainPreview" onclick="openChain(${post.id}, ${chain.id})">
-          ${renderSummary(chain)}
-          <div class="meta">${chain.statusLabel || ""}</div>
+        <div class="chainPreview" onclick="openPost(${post.id})">
+          ${chain.turns.map(t => `${t.type[0].toUpperCase()}: ${t.text}`).join(" → ")}
         </div>
       `;
     });
@@ -310,143 +287,91 @@ function renderFeed() {
   });
 }
 
-// FULL TRACE (NO SKIPPING LINKS)
-function renderSummary(chain) {
-  return chain.turns
-    .map(t => `${t.type === "question" ? "Q" : "A"}: ${t.text}`)
-    .join(" → ");
-}
+// THREAD VIEW (POST + ALL CHAINS)
+function renderThread() {
+  const view = document.getElementById("threadView");
 
-// CHAIN VIEW
-function renderChain() {
-  updateCrickets(activeChain);
+  let html = "";
 
-  const view = document.getElementById("chainView");
+  if (!activePost) {
+    view.innerHTML = "";
+    return;
+  }
 
-  let html = `
+  html += `
     <div class="card">
       <div class="message">${activePost.text}</div>
       <div class="meta">@${activePost.user}</div>
     </div>
   `;
 
-  activeChain.turns.forEach(t => {
+  activePost.chains.forEach(chain => {
+    html += `<div class="card">`;
+
+    chain.turns.forEach(t => {
+      html += `
+        <div class="turn ${t.type}">
+          ${t.text}
+          <div class="meta">@${t.user}</div>
+        </div>
+      `;
+    });
+
     html += `
-      <div class="turn ${t.type} ${t.user === currentUser ? 'you' : ''}">
-        ${t.text}
-        <div class="meta">@${t.user}</div>
+      <div class="actions">
+        <button class="primary"
+          ${chain.user_a === currentUser || chain.user_b === currentUser ? 'disabled' : '' }
+          onclick="startChallenge(${activePost.id}, '${chain.user_a === currentUser ? chain.user_b : chain.user_a}')">
+          Challenge This
+        </button>
       </div>
     `;
+
+    html += `</div>`;
   });
 
-  html += `<div class="status">`;
-
-  if (activeChain.status !== "active") {
-    html += activeChain.statusLabel;
-    html += renderTailActions(true);
-    hideInput();
-  }
-  else if (activeChain.active_user === currentUser) {
-    html += "Your turn";
-    setInput(activeChain.turn_state === "question"
-      ? "Ask a precise question..."
-      : "Answer directly...");
-  }
-  else {
-    html += "Waiting on @" + activeChain.active_user;
-    html += renderTailActions(false);
-    hideInput();
-  }
-
-  html += `</div>`;
   view.innerHTML = html;
 }
 
-// TAIL ACTIONS (FORCED CONTINUATION UX)
-function renderTailActions(canRestart) {
-  return `
-    <div class="actions">
-      <button onclick="markDodged()">Dodged</button>
-      <button onclick="endChain()">End</button>
-      <button onclick="startChallenge(${activePost.id})">Challenge</button>
-      ${canRestart ? `<button onclick="startChallenge(${activePost.id})">Restart</button>` : ""}
-    </div>
-  `;
-}
+// INPUT (FIXED UX)
+const input = document.getElementById("input");
 
-// INPUT
-const input = document.getElementById("inputField");
-
-function setInput(ph) {
-  input.placeholder = ph;
-  showInput();
-}
-
-function showInput() {
-  document.getElementById("inputBar").classList.remove("hidden");
-}
-
-function hideInput() {
-  document.getElementById("inputBar").classList.add("hidden");
-}
-
-// SUBMIT (HARD ENFORCEMENT)
 function submitTurn() {
   if (!activeChain) return;
   if (activeChain.active_user !== currentUser) return;
   if (!input.value.trim()) return;
 
-  const type = activeChain.turn_state;
-
   activeChain.turns.push({
-    type,
+    type: activeChain.turn_state,
     user: currentUser,
     text: input.value.trim()
   });
 
   activeChain.last_action = Date.now();
 
-  activeChain.turn_state = type === "question" ? "answer" : "question";
+  activeChain.turn_state =
+    activeChain.turn_state === "question" ? "answer" : "question";
+
   activeChain.active_user =
     currentUser === activeChain.user_a
       ? activeChain.user_b
       : activeChain.user_a;
 
   input.value = "";
-  renderChain();
+
+  // FIX: prevents zoom/focus loop issues
+  document.activeElement.blur();
+
+  renderThread();
 }
 
-// ACTIONS
-function markDodged() {
-  activeChain.status = "dodged";
-  activeChain.statusLabel = "Marked as dodged";
-  renderChain();
+function hideInput() {
+  document.getElementById("inputBar").classList.add("hidden");
 }
-
-function endChain() {
-  activeChain.status = "ended";
-  activeChain.statusLabel = "Ended";
-  renderChain();
-}
-
-// CRICKETS
-function updateCrickets(chain) {
-  if (chain.status !== "active") return;
-
-  if (Date.now() - chain.last_action > CRICKET_TIMEOUT) {
-    chain.status = "crickets";
-    chain.statusLabel = "No response";
-  }
-}
-
-// LOOP
-setInterval(() => {
-  posts.forEach(p => p.chains.forEach(updateCrickets));
-  renderFeed();
-}, 3000);
 
 // INIT
 switchUser(currentUser);
+renderFeed();
 </script>
 
 </body>

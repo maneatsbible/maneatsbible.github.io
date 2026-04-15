@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v35.5</title>
+<title>Better Dispute v35.6</title>
 
 <style>
 body{
@@ -13,7 +13,6 @@ body{
   color:#eee;
 }
 
-/* header */
 header{
   display:flex;
   justify-content:space-between;
@@ -45,29 +44,6 @@ textarea{
   padding:8px;
 }
 
-/* root cards */
-.rootItem{
-  margin:10px;
-  padding:10px;
-  background:#1a1a1a;
-  border-radius:10px;
-  cursor:pointer;
-}
-
-/* dispute layout */
-.dispute{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin:10px;
-}
-
-.lane{
-  background:#141414;
-  padding:8px;
-  border-radius:8px;
-}
-
 /* cards */
 .card{
   background:#1a1a1a;
@@ -88,6 +64,20 @@ textarea{
 }
 .icon.dim{opacity:.3}
 .icon.active{opacity:1}
+
+/* dispute layout */
+.dispute{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:10px;
+}
+
+.lane{
+  background:#141414;
+  padding:8px;
+  border-radius:8px;
+}
 
 /* nav */
 #nav{
@@ -160,14 +150,13 @@ textarea{
     padding:6px 10px;
     border-radius:8px;
     cursor:pointer;
-  ">⚖️</button>
+  ">Home</button>
 
-  <div>Better Dispute v35.5</div>
+  <div>Better Dispute v35.6</div>
 </header>
 
 <div id="users"></div>
 
-<!-- composer (hidden in drill mode) -->
 <div id="composerWrap">
   <textarea id="composer" placeholder="Start a fire..."></textarea>
   <button onclick="create()">Proclaim</button>
@@ -185,7 +174,6 @@ textarea{
 </div>
 
 <div id="overlay" onclick="closeSidebar()"></div>
-
 <div id="sidebar"></div>
 
 <div id="log"></div>
@@ -203,16 +191,15 @@ let logs=[];
 let activeDisputeNode=null;
 let chat={};
 
-/* ---------------- LOG ---------------- */
+/* log */
 function log(e,d){
   logs.push({t:Date.now(),u:currentUser,e,d});
 }
 
-/* ---------------- HELPERS ---------------- */
 function find(i){return items.find(x=>x.id===i);}
 function key(u,id){return u+"|"+id;}
 
-/* ---------------- USERS ---------------- */
+/* users */
 function renderUsers(){
   const el=document.getElementById("users");
   el.innerHTML="";
@@ -225,13 +212,12 @@ function renderUsers(){
   });
 }
 
-/* ---------------- HOME ---------------- */
-function home(){
-  stack=[];
-  render();
-}
+/* navigation */
+function home(){stack=[];render();}
+function enter(i){stack.push(i);render();}
+function back(){stack.pop();render();}
 
-/* ---------------- CREATE ---------------- */
+/* create */
 function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
@@ -249,11 +235,7 @@ function create(){
   render();
 }
 
-/* ---------------- NAV ---------------- */
-function enter(i){stack.push(i);render();}
-function back(){stack.pop();render();}
-
-/* ---------------- REACTIONS (LOCKED + DISPUTE ON DOWN) ---------------- */
+/* reactions */
 function react(id,type){
 
   const n=find(id);
@@ -272,7 +254,7 @@ function react(id,type){
   render();
 }
 
-/* ---------------- DISPUTE POPUP ---------------- */
+/* dispute popup */
 function openDispute(id){
   activeDisputeNode=id;
   document.getElementById("popup").style.display="block";
@@ -302,14 +284,12 @@ function submitDispute(){
   render();
 }
 
-/* ---------------- SIDEBAR ---------------- */
+/* sidebar */
 function openSidebar(id){
-  const s=document.getElementById("sidebar");
-  const o=document.getElementById("overlay");
+  document.getElementById("sidebar").style.display="block";
+  document.getElementById("overlay").style.display="block";
 
-  s.style.display="block";
-  o.style.display="block";
-
+  chat[id]=chat[id]||[];
   renderSidebar(id);
 }
 
@@ -321,16 +301,12 @@ function closeSidebar(){
 function renderSidebar(id){
   const s=document.getElementById("sidebar");
 
-  chat[id]=chat[id]||[];
-
   s.innerHTML=`
-    <div style="margin-bottom:10px">Chat</div>
-
+    <div>Chat</div>
     ${chat[id].map(m=>`
       <div class="chatMsg"><b>${m.u}</b>: ${m.m}</div>
     `).join("")}
-
-    <input id="chatIn" style="width:100%;margin-top:6px">
+    <input id="chatIn">
     <button onclick="sendChat(${id})">send</button>
   `;
 }
@@ -343,7 +319,7 @@ function sendChat(id){
   renderSidebar(id);
 }
 
-/* ---------------- NODE ---------------- */
+/* node */
 function renderNode(node,showActions){
 
   const r=reactions[key(currentUser,node.id)];
@@ -362,8 +338,6 @@ function renderNode(node,showActions){
           <span class="icon ${r==='down'?'active':'dim'}"
                 onclick="event.stopPropagation();react(${node.id},'down')">👎</span>
 
-          <span class="icon" onclick="event.stopPropagation();openDispute(${node.id})">⚖</span>
-
           <span class="icon" onclick="event.stopPropagation();openSidebar(${node.id})">💬</span>
 
         </div>
@@ -373,7 +347,7 @@ function renderNode(node,showActions){
   `;
 }
 
-/* ---------------- DISPUTE VIEW ---------------- */
+/* dispute view */
 function renderDispute(node){
 
   const children=items.filter(x=>x.parent===node.id);
@@ -408,7 +382,7 @@ function renderDispute(node){
   `;
 }
 
-/* ---------------- RENDER ---------------- */
+/* render */
 function render(){
 
   const view=document.getElementById("view");
@@ -434,35 +408,13 @@ function render(){
     logs.slice(-200).reverse().map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (FIXED) ---------------- */
-
-/* roots */
+/* seed minimal consistent data */
 items.push({id:id++,text:"Truth exists independent of belief",user:"alice",parent:null});
 items.push({id:id++,text:"Reality is socially constructed",user:"bob",parent:null});
 items.push({id:id++,text:"Logic depends on language",user:"charlie",parent:null});
-items.push({id:id++,text:"Knowledge evolves",user:"dana",parent:null});
-items.push({id:id++,text:"Some questions are unanswerable",user:"eve",parent:null});
-items.push({id:id++,text:"Meaning is contextual",user:"bob",parent:null});
 
-/* valid question (NOT SELF-REFERENTIAL BUG FIXED) */
 items.push({id:id++,text:"What grounds truth?",user:"bob",parent:0,side:"left"});
-
-/* answer */
-items.push({id:id++,text:"Shared observation frameworks",user:"charlie",parent:6});
-
-/* dispute */
-items.push({id:id++,text:"Truth depends on consensus",user:"bob",parent:1,side:"right"});
-items.push({id:id++,text:"Consensus can be wrong",user:"alice",parent:8,side:"left"});
-items.push({id:id++,text:"Wrong consensus still functions",user:"charlie",parent:9,side:"right"});
-
-/* deeper */
-items.push({id:id++,text:"Function ≠ truth",user:"dana",parent:10,side:"left"});
-items.push({id:id++,text:"Truth may be emergent",user:"eve",parent:11,side:"right"});
-
-/* extra uncontested roots */
-items.push({id:id++,text:"Disagreement sharpens reasoning",user:"alice",parent:null});
-items.push({id:id++,text:"Not all claims resolve cleanly",user:"bob",parent:null});
-items.push({id:id++,text:"Perspective shapes interpretation",user:"charlie",parent:null});
+items.push({id:id++,text:"Shared observation framework",user:"charlie",parent:3});
 
 renderUsers();
 render();

@@ -1,419 +1,307 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v50</title>
+<meta charset="UTF-8" />
+<title>Dispute UI</title>
 
 <style>
-body{
-  margin:0;
-  font-family:system-ui;
-  background:#0f0f0f;
-  color:#eee;
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0f0f0f;
+  color: #eee;
 }
 
-header{
-  display:flex;
-  justify-content:space-between;
-  padding:10px;
-  align-items:center;
-  border-bottom:1px solid #222;
+header {
+  background: #1a1a1a;
+  padding: 12px;
+  text-align: center;
+  font-weight: bold;
+  border-bottom: 1px solid #333;
 }
 
-#homeBtn{
-  background:#1c1c1c;
-  border:1px solid #333;
-  color:#aaa;
-  padding:6px 10px;
-  border-radius:8px;
-  cursor:pointer;
+.container {
+  display: flex;
+  height: calc(100vh - 50px);
 }
 
-#title{font-weight:600}
-
-#users{display:flex;gap:6px;padding:8px}
-.user{
-  padding:4px 8px;
-  border:1px solid #333;
-  border-radius:999px;
-  opacity:.6;
-  cursor:pointer;
-}
-.user.active{opacity:1;border-color:#fff}
-
-#composerWrap{padding:10px}
-
-textarea{
-  width:100%;
-  height:90px;
-  background:#0b0b0b;
-  color:#eee;
-  border:1px solid #333;
-  padding:8px;
-  border-radius:6px;
+.lane {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  border-right: 1px solid #222;
 }
 
-/* CARD */
-.card{
-  background:#1a1a1a;
-  padding:10px;
-  margin-bottom:8px;
-  border-radius:8px;
+.lane:last-child {
+  border-right: none;
 }
 
-.meta{font-size:11px;color:#888}
-
-/* ICONS */
-.icon{margin-right:6px}
-
-/* TWO LANE */
-.disputeWrap{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin:10px;
+.card {
+  background: #1c1c1c;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
 }
 
-.lane{
-  background:#141414;
-  padding:8px;
-  border-radius:8px;
+.proclamation { border-left: 4px solid #ffcc00; }
+.question { border-left: 4px solid #00bfff; }
+.answer { border-left: 4px solid #00cc66; }
+
+.meta {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 4px;
 }
 
-/* NAV */
-#nav{padding:0 10px}
-
-#backBtn{
-  background:#1c1c1c;
-  border:1px solid #333;
-  color:#aaa;
-  padding:6px 10px;
-  border-radius:8px;
-  cursor:pointer;
-  margin-bottom:10px;
+.icon {
+  font-weight: bold;
+  margin-right: 6px;
 }
 
-/* LOG */
-#log{
-  border-top:1px solid #222;
-  padding:10px;
-  font-size:11px;
-  color:#7f7;
-  max-height:160px;
-  overflow:auto;
+button {
+  margin-top: 6px;
+  padding: 5px 8px;
+  border: none;
+  background: #333;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #555;
+}
+
+.error {
+  color: red;
+  padding: 10px;
 }
 </style>
 </head>
 
 <body>
 
-<header>
-  <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v50</div>
-</header>
+<header>Dispute</header>
 
-<div id="users"></div>
+<div id="error" class="error"></div>
 
-<div id="composerWrap">
-  <textarea id="composer" placeholder="Start a proclamation..."></textarea>
-  <button onclick="create()">Proclaim</button>
+<div class="container">
+  <div class="lane" id="laneA"></div>
+  <div class="lane" id="laneB"></div>
 </div>
-
-<div id="nav"></div>
-<div id="view"></div>
-
-<div id="popup" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#111;border:1px solid #333;padding:10px;width:320px;z-index:20;">
-  <div>Dispute</div>
-  <textarea id="challenge" placeholder="Question"></textarea>
-  <textarea id="counter" placeholder="Counter"></textarea>
-  <button onclick="submitDispute()">✓</button>
-  <button onclick="closePopup()">✕</button>
-</div>
-
-<div id="log"></div>
 
 <script>
+/* =========================
+   CONFIG / SESSION
+========================= */
 
-/* ---------------- STATE ---------------- */
-let users=["alice","bob","charlie"];
-let currentUser="alice";
+const CURRENT_USER = "B";
 
-let id=0;
-let items=[];
-let stack=[];
-let logs=[];
+/* =========================
+   STRICT DATA MODEL
+========================= */
 
-/* question -> expected answerer */
-let openQuestions={};
+const dispute = {
+  users: ["A", "B"],
 
-/* ---------------- LOG ---------------- */
-function log(e,d){
-  logs.push({t:Date.now(),u:currentUser,e,d});
-}
+  messages: [
+    {
+      id: 1,
+      type: "proclamation",
+      author: "A",
+      text: "AI is inherently deceptive."
+    },
+    {
+      id: 2,
+      type: "question",
+      author: "B",
+      target: "A",
+      parentId: 1,
+      text: "What makes it deceptive?"
+    },
+    {
+      id: 3,
+      type: "answer",
+      author: "A",
+      parentId: 2,
+      text: "Because it scales fallen human influence."
+    },
+    {
+      id: 4,
+      type: "question",
+      author: "A",
+      target: "B",
+      parentId: 1,
+      text: "Can it ever produce truth?"
+    }
+  ]
+};
 
-/* ---------------- HELPERS ---------------- */
-function find(i){return items.find(x=>x.id===i);}
+/* =========================
+   VALIDATION (CRITICAL)
+========================= */
 
-/* ---------------- USERS ---------------- */
-function renderUsers(){
-  const el=document.getElementById("users");
-  el.innerHTML="";
-  users.forEach(u=>{
-    const d=document.createElement("div");
-    d.className="user"+(u===currentUser?" active":"");
-    d.textContent=u;
-    d.onclick=()=>{currentUser=u;renderUsers();render();};
-    el.appendChild(d);
+function validateDispute() {
+  const err = [];
+
+  if (dispute.users.length !== 2) {
+    err.push("Must have exactly 2 users.");
+  }
+
+  const ids = new Set();
+
+  dispute.messages.forEach(m => {
+    if (ids.has(m.id)) err.push("Duplicate message ID: " + m.id);
+    ids.add(m.id);
+
+    if (!dispute.users.includes(m.author)) {
+      err.push("Invalid author: " + m.author);
+    }
+
+    if (m.type === "question") {
+      if (!m.target) err.push("Question missing target");
+      if (!dispute.users.includes(m.target)) {
+        err.push("Invalid target: " + m.target);
+      }
+      if (m.target === m.author) {
+        err.push("User cannot question themselves");
+      }
+    }
+
+    if (m.type === "answer") {
+      const parent = dispute.messages.find(p => p.id === m.parentId);
+      if (!parent || parent.type !== "question") {
+        err.push("Answer must target a question");
+      } else if (parent.target !== m.author) {
+        err.push("Only target user can answer");
+      }
+    }
   });
+
+  return err;
 }
 
-/* ---------------- NAV ---------------- */
-function home(){
-  stack=[];
-  document.getElementById("composerWrap").style.display="block";
-  render();
-}
+/* =========================
+   TREE BUILD
+========================= */
 
-function enter(id){
-  stack.push(id);
-  document.getElementById("composerWrap").style.display="none";
-  render();
-}
-
-function back(){
-  if(stack.length>1) stack.pop();
-  else {
-    stack=[];
-    document.getElementById("composerWrap").style.display="block";
-  }
-  render();
-}
-
-/* ---------------- CREATE ---------------- */
-function create(){
-  const t=document.getElementById("composer").value.trim();
-  if(!t) return;
-
-  items.push({
-    id:id++,
-    text:t,
-    user:currentUser,
-    parent:null,
-    type:"proclaim"
+function buildTree() {
+  const map = {};
+  dispute.messages.forEach(m => {
+    map[m.id] = {...m, children: []};
   });
 
-  document.getElementById("composer").value="";
-  log("create",t);
-  render();
+  const roots = [];
+
+  dispute.messages.forEach(m => {
+    if (m.parentId) {
+      map[m.parentId].children.push(map[m.id]);
+    } else {
+      roots.push(map[m.id]);
+    }
+  });
+
+  return roots;
 }
 
-/* ---------------- DISPUTE ---------------- */
-function submitDispute(){
+/* =========================
+   UI HELPERS
+========================= */
 
-  const target=stack[stack.length-1];
+function getIcon(type) {
+  return type === "proclamation" ? "!" :
+         type === "question" ? "?" :
+         "✓";
+}
 
-  const q=document.getElementById("challenge").value.trim();
-  const c=document.getElementById("counter").value.trim();
+function createCard(msg) {
+  const div = document.createElement("div");
+  div.className = `card ${msg.type}`;
 
-  if(q){
-    const qid=id++;
-    items.push({
-      id:qid,
-      text:q,
-      user:currentUser,
-      parent:target,
-      type:"question"
-    });
-    openQuestions[qid]=find(target)?.user;
+  div.innerHTML = `
+    <div><span class="icon">${getIcon(msg.type)}</span>${msg.text}</div>
+    <div class="meta">${msg.author}</div>
+  `;
+
+  // Answer button rules
+  if (
+    msg.type === "question" &&
+    msg.target === CURRENT_USER &&
+    !msg.children.some(c => c.type === "answer")
+  ) {
+    const btn = document.createElement("button");
+    btn.textContent = "Answer";
+
+    btn.onclick = () => {
+      const text = prompt("Answer:");
+      if (!text) return;
+
+      dispute.messages.push({
+        id: Date.now(),
+        type: "answer",
+        author: CURRENT_USER,
+        parentId: msg.id,
+        text
+      });
+
+      render();
+    };
+
+    div.appendChild(btn);
   }
 
-  if(c){
-    items.push({
-      id:id++,
-      text:c,
-      user:currentUser,
-      parent:target,
-      type:"proclaim"
+  return div;
+}
+
+/* =========================
+   RENDER LOGIC (NO DUPES)
+========================= */
+
+function renderThread(root, laneEl) {
+  laneEl.appendChild(createCard(root));
+
+  root.children
+    .filter(c => c.type === "question")
+    .forEach(q => {
+      laneEl.appendChild(createCard(q));
+
+      const ans = q.children.find(c => c.type === "answer");
+      if (ans) {
+        laneEl.appendChild(createCard(ans));
+      }
     });
-  }
-
-  document.getElementById("challenge").value="";
-  document.getElementById("counter").value="";
-
-  log("dispute",target);
-  closePopup();
-  render();
 }
 
-function closePopup(){
-  document.getElementById("popup").style.display="none";
-}
+function render() {
+  const errorEl = document.getElementById("error");
+  errorEl.innerHTML = "";
 
-/* ---------------- ANSWER ---------------- */
-function answer(qid){
-
-  const q=find(qid);
-  if(!q || q.answerBy) return;
-
-  const expected=openQuestions[qid];
-
-  if(expected && currentUser!==expected){
-    alert("Only the assigned respondent can answer.");
+  const errors = validateDispute();
+  if (errors.length) {
+    errorEl.innerHTML = errors.join("<br>");
     return;
   }
 
-  const t=prompt("Answer:");
-  if(!t) return;
+  const laneA = document.getElementById("laneA");
+  const laneB = document.getElementById("laneB");
 
-  items.push({
-    id:id++,
-    text:t,
-    user:currentUser,
-    parent:qid,
-    type:"answer"
+  laneA.innerHTML = "";
+  laneB.innerHTML = "";
+
+  const roots = buildTree();
+
+  roots.forEach(root => {
+    if (root.author === "A") {
+      renderThread(root, laneA);
+    } else {
+      renderThread(root, laneB);
+    }
   });
-
-  q.answerBy=currentUser;
-  delete openQuestions[qid];
-
-  log("answer",qid);
-  render();
 }
 
-/* ---------------- BUILD TREE ---------------- */
-function buildTree(parentId){
-  const nodes = items.filter(x=>x.parent===parentId);
+/* =========================
+   INIT
+========================= */
 
-  const grouped = nodes.map(n=>{
-    if(n.type==="question"){
-      return {
-        ...n,
-        children: buildTree(n.id)
-      };
-    }
-    if(n.type==="answer"){
-      return n;
-    }
-    return {
-      ...n,
-      children: buildTree(n.id)
-    };
-  });
-
-  return grouped;
-}
-
-/* ---------------- RENDER NESTED LINEAR (NO FORK INSIDE LANE) ---------------- */
-function renderChain(nodes,depth=0){
-
-  let html="";
-
-  for(const n of nodes){
-
-    let icon="!";
-    if(n.type==="question") icon="?";
-    if(n.type==="answer") icon="✓";
-
-    html+=`
-      <div class="card" style="margin-left:${depth*12}px">
-
-        <div>
-          <span class="icon">${icon}</span>
-          ${n.text}
-          <span class="meta">@${n.user}</span>
-        </div>
-
-        ${n.type==="question" && (!n.answerBy) && (openQuestions[n.id]===currentUser || true) ? `
-          ${openQuestions[n.id]===currentUser ? `
-            <button onclick="answer(${n.id})">Answer</button>
-          `:""}
-        `:""}
-
-      </div>
-    `;
-
-    if(n.children && n.children.length){
-      html+=renderChain(n.children, depth+1);
-    }
-  }
-
-  return html;
-}
-
-/* ---------------- VIEW ---------------- */
-function renderDispute(root){
-
-  const tree = buildTree(root.id);
-
-  return `
-    <div class="card">
-      <span class="icon">!</span>
-      ${root.text}
-      <span class="meta">@${root.user}</span>
-    </div>
-
-    <div class="disputeWrap">
-      <div class="lane">${renderChain(tree.filter(n=>n.user))}</div>
-      <div class="lane">${renderChain(tree.filter(n=>n.user))}</div>
-    </div>
-  `;
-}
-
-/* ---------------- MAIN RENDER ---------------- */
-function render(){
-
-  const view=document.getElementById("view");
-  const nav=document.getElementById("nav");
-
-  view.innerHTML="";
-  nav.innerHTML="";
-
-  if(stack.length===0){
-
-    const roots=items.filter(x=>x.parent===null);
-
-    roots.forEach(r=>{
-      view.innerHTML+=`
-        <div class="card" onclick="enter(${r.id})">
-          <span class="icon">!</span>
-          ${r.text}
-          <span class="meta">@${r.user}</span>
-        </div>
-      `;
-    });
-
-  } else {
-
-    const cur=find(stack[stack.length-1]);
-    nav.innerHTML=`<button id="backBtn" onclick="back()">⬅ back</button>`;
-    view.innerHTML=renderDispute(cur);
-
-  }
-
-  document.getElementById("log").innerHTML =
-    logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
-}
-
-/* ---------------- TEST DATA (CORRECT Q → A STRUCTURE) ---------------- */
-
-items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null,type:"proclaim"});
-items.push({id:id++,text:"Meaning is shaped by agreement",user:"bob",parent:null,type:"proclaim"});
-items.push({id:id++,text:"Reality constrains interpretation",user:"charlie",parent:null,type:"proclaim"});
-
-/* QUESTION ON ALICE */
-items.push({id:id++,text:"Does truth require consensus?",user:"bob",parent:0,type:"question"});
-
-/* ANSWER (ONLY ALICE) */
-items.push({id:id++,text:"No, truth exists regardless",user:"alice",parent:3,type:"answer"});
-
-/* FOLLOWUP QUESTION */
-items.push({id:id++,text:"Then how is truth verified?",user:"charlie",parent:3,type:"question"});
-
-/* ANSWER */
-items.push({id:id++,text:"Through stable external consistency",user:"bob",parent:5,type:"answer"});
-
-renderUsers();
 render();
 
 </script>

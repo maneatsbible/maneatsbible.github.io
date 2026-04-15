@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Better Dispute v4</title>
+<title>Better Dispute v5</title>
 
 <style>
 body {
@@ -72,6 +72,7 @@ body {
   margin-top: 8px;
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 button {
@@ -106,6 +107,13 @@ button.disabled { opacity: 0.4; }
 .you { outline: 1.5px solid #3a6df0; }
 
 .status { font-size: 12px; margin-top: 6px; }
+
+.tailBox {
+  margin-top: 10px;
+  padding: 10px;
+  background: #141416;
+  border-radius: 8px;
+}
 
 .inputBar {
   position: fixed;
@@ -143,7 +151,7 @@ textarea {
       <div class="home" onclick="goHome()">⚖️</div>
       <div>
         <div class="title">Better Dispute</div>
-        <div class="version">v4</div>
+        <div class="version">v5</div>
       </div>
     </div>
   </div>
@@ -173,16 +181,9 @@ let posts = [
     user: "alice",
     text: "Faith alone is sufficient for salvation.",
     chains: []
-  },
-  {
-    id: 2,
-    user: "charlie",
-    text: "AI will replace most human jobs.",
-    chains: []
   }
 ];
 
-// SAMPLE CHAINS
 posts[0].chains.push({
   id: 101,
   user_a: "alice",
@@ -232,7 +233,6 @@ function goHome() {
 // START CHALLENGE
 function startChallenge(postId) {
   const post = posts.find(p => p.id === postId);
-
   if (post.user === currentUser) return;
 
   const chain = {
@@ -308,23 +308,30 @@ function renderChain() {
     `;
   });
 
-  html += `<div class="status">`;
+  // TAIL PROMPT BOX
+  html += `<div class="tailBox">`;
 
   if (activeChain.status !== "active") {
     html += activeChain.statusLabel;
+    html += `<div class="actions">
+      <button onclick="startChallenge(${activePost.id})">New Challenge</button>
+    </div>`;
     hideInput();
-  } else if (activeChain.active_user === currentUser) {
+  }
+  else if (activeChain.active_user === currentUser) {
     html += "Your turn";
     setInput(activeChain.turn_state === "question"
       ? "Ask a precise question..."
       : "Answer directly...");
-  } else {
+  }
+  else {
     html += "Waiting on @" + activeChain.active_user;
 
     html += `
       <div class="actions">
         <button onclick="markDodged()">Dodged</button>
         <button onclick="endChain()">End</button>
+        <button onclick="startChallenge(${activePost.id})">Challenge Instead</button>
       </div>
     `;
 
@@ -332,6 +339,7 @@ function renderChain() {
   }
 
   html += `</div>`;
+
   view.innerHTML = html;
 }
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v63</title>
+<title>Better Dispute v65</title>
 
 <style>
 body{
@@ -17,7 +17,6 @@ header{
   display:flex;
   justify-content:space-between;
   padding:10px;
-  align-items:center;
   border-bottom:1px solid #222;
 }
 
@@ -32,22 +31,11 @@ header{
 
 #title{font-weight:600}
 
-#users{display:flex;gap:6px;padding:8px}
-.user{
-  padding:4px 8px;
-  border:1px solid #333;
-  border-radius:999px;
-  opacity:.6;
-  cursor:pointer;
-}
-.user.active{opacity:1;border-color:#fff}
-
 #composerWrap{padding:10px}
 
 textarea{
   width:100%;
   font-size:16px;
-  line-height:1.3;
   background:#0b0b0b;
   color:#eee;
   border:1px solid #333;
@@ -56,7 +44,6 @@ textarea{
   box-sizing:border-box;
 }
 
-/* CARD */
 .card{
   background:#1a1a1a;
   padding:10px;
@@ -64,10 +51,6 @@ textarea{
   border-radius:8px;
 }
 
-.meta{font-size:11px;color:#888}
-.icon{margin-right:6px}
-
-/* LANES */
 .disputeWrap{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -81,12 +64,7 @@ textarea{
   border-radius:8px;
 }
 
-/* REACTIONS */
-.reactionRow{
-  margin-top:6px;
-  display:flex;
-  gap:8px;
-}
+.reactionRow{margin-top:6px}
 
 .reactionBtn{
   background:#111;
@@ -95,77 +73,12 @@ textarea{
   padding:4px 6px;
   border-radius:6px;
   cursor:pointer;
-  font-size:12px;
 }
 
-.activeAgree{
-  color:#7CFF7C;
-  border-color:#7CFF7C;
-}
+.activeAgree{color:#7CFF7C;border-color:#7CFF7C}
+.activeDisagree{color:#FF7C7C;border-color:#FF7C7C}
 
-.activeDisagree{
-  color:#FF7C7C;
-  border-color:#FF7C7C;
-}
-
-/* MODAL */
-#overlay{
-  display:none;
-  position:fixed;
-  top:0;left:0;right:0;bottom:0;
-  background:rgba(0,0,0,0.7);
-  z-index:50;
-}
-
-#modal{
-  display:none;
-  position:fixed;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-  width:280px;
-  max-width:90vw;
-  background:#111;
-  border:1px solid #333;
-  border-radius:10px;
-  padding:10px;
-  z-index:60;
-}
-
-#modal textarea{
-  width:100%;
-  font-size:16px;
-  height:60px;
-  margin-bottom:6px;
-  background:#0b0b0b;
-  color:#eee;
-  border:1px solid #333;
-  border-radius:6px;
-  padding:6px;
-  box-sizing:border-box;
-}
-
-.modalActions{
-  display:flex;
-  justify-content:flex-end;
-  gap:8px;
-}
-
-.btn{
-  padding:6px 10px;
-  border-radius:6px;
-  cursor:pointer;
-  border:1px solid #333;
-  background:#1a1a1a;
-  color:#ddd;
-}
-
-.btn.ok{border-color:#7CFF7C;color:#7CFF7C}
-.btn.cancel{border-color:#FF7C7C;color:#FF7C7C}
-
-/* NAV */
 #nav{padding:0 10px}
-
 #backBtn{
   background:#1c1c1c;
   border:1px solid #333;
@@ -176,14 +89,27 @@ textarea{
   margin-bottom:10px;
 }
 
-/* LOG */
 #log{
   border-top:1px solid #222;
   padding:10px;
   font-size:11px;
   color:#7f7;
-  max-height:160px;
+  max-height:140px;
   overflow:auto;
+}
+
+#modal{
+  display:none;
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:280px;
+  background:#111;
+  border:1px solid #333;
+  border-radius:10px;
+  padding:10px;
+  z-index:10;
 }
 </style>
 </head>
@@ -192,10 +118,8 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v63</div>
+  <div id="title">Better Dispute v65</div>
 </header>
-
-<div id="users"></div>
 
 <div id="composerWrap">
   <textarea id="composer" placeholder="Start a fire..."></textarea>
@@ -205,18 +129,10 @@ textarea{
 <div id="nav"></div>
 <div id="view"></div>
 
-<!-- MODAL -->
-<div id="overlay" onclick="closeModal()"></div>
-
 <div id="modal">
-  <div style="margin-bottom:6px;">Dispute</div>
-  <textarea id="challenge" placeholder="Question"></textarea>
-  <textarea id="counter" placeholder="Counter"></textarea>
-
-  <div class="modalActions">
-    <button class="btn cancel" onclick="closeModal()">✕ Cancel</button>
-    <button class="btn ok" onclick="submitDispute()">✓ Submit</button>
-  </div>
+  <textarea id="q" placeholder="Question"></textarea>
+  <textarea id="c" placeholder="Counter"></textarea>
+  <button onclick="submitDispute()">Submit</button>
 </div>
 
 <div id="log"></div>
@@ -224,41 +140,23 @@ textarea{
 <script>
 
 /* ---------------- STATE ---------------- */
-let users=["alice","bob","charlie"];
-let currentUser="alice";
 
 let id=0;
-let items=[];
+let nodes=[];
 let stack=[];
 let logs=[];
-let openQuestions={};
-let reactions={};
 
-let pendingReaction = { itemId:null, type:null };
+let reactions={};
+let pendingDisagree=null;
 
 /* ---------------- LOG ---------------- */
+
 function log(e,d){
-  logs.push({t:Date.now(),u:currentUser,e,d});
-}
-
-/* ---------------- HELPERS ---------------- */
-function find(i){return items.find(x=>x.id===i);}
-function isOwn(n){return n.user===currentUser;}
-
-/* ---------------- USERS ---------------- */
-function renderUsers(){
-  const el=document.getElementById("users");
-  el.innerHTML="";
-  users.forEach(u=>{
-    const d=document.createElement("div");
-    d.className="user"+(u===currentUser?" active":"");
-    d.textContent=u;
-    d.onclick=()=>{currentUser=u;renderUsers();render();};
-    el.appendChild(d);
-  });
+  logs.push({t:Date.now(),e,d});
 }
 
 /* ---------------- NAV ---------------- */
+
 function home(){
   stack=[];
   document.getElementById("composerWrap").style.display="block";
@@ -280,181 +178,179 @@ function back(){
   render();
 }
 
-/* ---------------- MODAL ---------------- */
-function openModal(){
-  document.getElementById("overlay").style.display="block";
-  document.getElementById("modal").style.display="block";
-}
-
-function closeModal(){
-  document.getElementById("overlay").style.display="none";
-  document.getElementById("modal").style.display="none";
-  pendingReaction = { itemId:null, type:null };
-}
-
 /* ---------------- CREATE ---------------- */
+
 function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
 
-  items.push({
+  nodes.push({
     id:id++,
-    text:t,
-    user:currentUser,
-    parent:null,
-    type:"proclaim"
+    rootId:id,
+    parentId:null,
+    type:"proclaim",
+    user:"alice",
+    text:t
   });
 
   document.getElementById("composer").value="";
-  log("create",t);
   render();
 }
 
-/* ---------------- REACTIONS (DEFERRED) ---------------- */
-function setReaction(itemId,type){
+/* ---------------- REACTIONS (FIXED) ---------------- */
 
-  const node=find(itemId);
-  if(!node) return;
-  if(node.user===currentUser) return;
+function react(nodeId,type){
+
+  const node=nodes.find(n=>n.id===nodeId);
+  if(!node || node.user==="alice") return;
 
   if(type==="agree"){
-    if(!reactions[itemId]) reactions[itemId]={};
-    if(reactions[itemId][currentUser]==="disagree") return;
-
-    reactions[itemId][currentUser]="agree";
-    log("agree",itemId);
+    if(!reactions[nodeId]) reactions[nodeId]={};
+    reactions[nodeId]["bob"]="agree";
     render();
     return;
   }
 
   if(type==="disagree"){
-    pendingReaction = { itemId, type:"disagree" };
+    pendingDisagree=nodeId;
     openModal();
-    render();
   }
 }
 
-/* ---------------- DISPUTE (TRUE FORK) ---------------- */
+/* commit only on submit */
+function commitDisagree(){
+  if(pendingDisagree!==null){
+    if(!reactions[pendingDisagree]) reactions[pendingDisagree]={};
+    reactions[pendingDisagree]["bob"]="disagree";
+    pendingDisagree=null;
+  }
+}
+
+/* ---------------- DISPUTE (RESTORED + FORK) ---------------- */
+
 function submitDispute(){
 
-  /* commit deferred disagreement first */
-  if(pendingReaction.itemId !== null && pendingReaction.type==="disagree"){
-
-    const rid = pendingReaction.itemId;
-
-    if(!reactions[rid]) reactions[rid]={};
-    reactions[rid][currentUser]="disagree";
-
-    log("disagree",rid);
-
-    pendingReaction={itemId:null,type:null};
+  if(pendingDisagree!==null){
+    commitDisagree();
     closeModal();
     render();
     return;
   }
 
-  const target=stack[stack.length-1];
-  const parentNode=find(target);
-  if(!parentNode) return;
+  const target=nodes[stack[stack.length-1]];
+  if(!target) return;
 
-  const q=document.getElementById("challenge").value.trim();
-  const c=document.getElementById("counter").value.trim();
-
-  /* TRUE BRANCH */
   const forkId=id++;
 
-  items.push({
+  nodes.push({
     id:forkId,
-    text:parentNode.text,
-    user:parentNode.user,
-    parent:parentNode.id,
+    rootId:forkId,
+    parentId:target.id,
     type:"dispute_root",
-    lane:"fork"
+    user:target.user,
+    text:target.text
   });
 
-  log("fork",forkId);
+  const q=document.getElementById("q").value.trim();
+  const c=document.getElementById("c").value.trim();
 
   if(q){
-    const qid=id++;
-    items.push({
-      id:qid,
-      text:q,
-      user:currentUser,
-      parent:forkId,
+    nodes.push({
+      id:id++,
+      rootId:forkId,
+      parentId:forkId,
       type:"question",
+      user:"bob",
+      text:q,
       lane:"left"
     });
   }
 
   if(c){
-    items.push({
+    nodes.push({
       id:id++,
-      text:c,
-      user:currentUser,
-      parent:forkId,
+      rootId:forkId,
+      parentId:forkId,
       type:"proclaim",
+      user:"alice",
+      text:c,
       lane:"right"
     });
   }
-
-  document.getElementById("challenge").value="";
-  document.getElementById("counter").value="";
 
   closeModal();
   render();
 }
 
+/* ---------------- MODAL ---------------- */
+
+function openModal(){
+  document.getElementById("modal").style.display="block";
+}
+
+function closeModal(){
+  document.getElementById("modal").style.display="none";
+  pendingDisagree=null;
+}
+
+/* ---------------- Q/A RULE ---------------- */
+
+function answer(qid){
+  const q=nodes.find(n=>n.id===qid);
+  if(!q) return;
+
+  if(q.answered) return;
+
+  const t=prompt("Answer:");
+  if(!t) return;
+
+  nodes.push({
+    id:id++,
+    rootId:q.rootId,
+    parentId:q.id,
+    type:"answer",
+    user:"alice",
+    text:t,
+    lane:"left"
+  });
+
+  q.answered=true;
+  render();
+}
+
 /* ---------------- LANES ---------------- */
-function buildLane(rootId,lane){
 
+function lane(rootId,lane){
   const out=[];
-
   function walk(pid){
-    items.filter(x=>x.parent===pid).forEach(c=>{
-      if(c.lane!==lane) return;
-      out.push(c);
-
-      if(c.type==="question"){
-        const ans=items.find(x=>x.parent===c.id && x.type==="answer");
-        if(ans){
-          out.push(ans);
-          walk(ans.id);
-        }
-      } else walk(c.id);
+    nodes.filter(n=>n.parentId===pid).forEach(n=>{
+      if(n.lane!==lane && n.lane) return;
+      out.push(n);
+      walk(n.id);
     });
   }
-
   walk(rootId);
   return out;
 }
 
-/* ---------------- NODE ---------------- */
+/* ---------------- RENDER ---------------- */
+
 function renderNode(n){
 
-  const r=reactions[n.id]?.[currentUser];
-  const agreeActive=r==="agree";
-  const disagreeActive=r==="disagree";
-
-  const hasAnswer=n.type==="question"
-    ? items.some(x=>x.parent===n.id && x.type==="answer")
-    : false;
+  const r=reactions[n.id]?.["bob"];
 
   return `
-    <div class="card">
+    <div class="card" onclick="enter(${n.id})">
 
-      <div>
-        <span class="icon">${n.type==="question"?"?":n.type==="answer"?"✓":"!"}</span>
-        ${n.text}
-        <span class="meta">@${n.user}</span>
-      </div>
+      <div><b>${n.type}</b>: ${n.text}</div>
 
-      ${n.user!==currentUser ? `
+      ${n.user!=="alice" ? `
       <div class="reactionRow">
-        <button class="reactionBtn ${agreeActive?'activeAgree':''}"
-          onclick="setReaction(${n.id},'agree')">👍</button>
+        <button class="reactionBtn ${r==='agree'?'activeAgree':''}"
+          onclick="event.stopPropagation(); react(${n.id},'agree')">👍</button>
 
-        <button class="reactionBtn ${disagreeActive?'activeDisagree':''}"
-          onclick="setReaction(${n.id},'disagree')">👎</button>
+        <button class="reactionBtn ${r==='disagree'?'activeDisagree':''}"
+          onclick="event.stopPropagation(); react(${n.id},'disagree')">👎</button>
       </div>
       ` : ""}
 
@@ -462,19 +358,13 @@ function renderNode(n){
   `;
 }
 
-/* ---------------- DISPUTE VIEW ---------------- */
 function renderDispute(root){
 
-  const left=buildLane(root.id,"left");
-  const right=buildLane(root.id,"right");
+  const left=lane(root.rootId||root.id,"left");
+  const right=lane(root.rootId||root.id,"right");
 
   return `
-    <div class="card">
-      <span class="icon">!</span>
-      ${root.text}
-      <span class="meta">@${root.user}</span>
-    </div>
-
+    <div class="card"><b>${root.text}</b></div>
     <div class="disputeWrap">
       <div class="lane">${left.map(renderNode).join("")}</div>
       <div class="lane">${right.map(renderNode).join("")}</div>
@@ -482,7 +372,8 @@ function renderDispute(root){
   `;
 }
 
-/* ---------------- RENDER ---------------- */
+/* ---------------- MAIN RENDER ---------------- */
+
 function render(){
 
   const view=document.getElementById("view");
@@ -493,40 +384,42 @@ function render(){
 
   if(stack.length===0){
 
-    items.filter(x=>x.parent===null).forEach(r=>{
-      view.innerHTML+=`
-        <div class="card" onclick="enter(${r.id})">
-          <span class="icon">!</span>
-          ${r.text}
-        </div>
-      `;
+    nodes.filter(n=>n.parentId===null).forEach(n=>{
+      view.innerHTML+=renderNode(n);
     });
 
   } else {
 
-    const cur=find(stack[stack.length-1]);
+    const cur=nodes[stack[stack.length-1]];
     nav.innerHTML=`<button id="backBtn" onclick="back()">⬅ back</button>`;
     view.innerHTML=renderDispute(cur);
 
   }
 
   document.getElementById("log").innerHTML=
-    logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
+    logs.slice(-100).map(l=>JSON.stringify(l)).join("<br>");
 }
 
 /* ---------------- TEST DATA ---------------- */
 
-items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null,type:"proclaim"});
+nodes.push({
+  id:id++,
+  rootId:0,
+  parentId:null,
+  type:"proclaim",
+  user:"alice",
+  text:"Truth exists independent of consensus"
+});
 
-items.push({id:id++,text:"Does truth require agreement?",user:"bob",parent:0,type:"question",lane:"left"});
-openQuestions[1]="alice";
-
-items.push({id:id++,text:"No, truth stands regardless",user:"alice",parent:1,type:"answer",lane:"left"});
-
-items.push({id:id++,text:"Truth depends on shared understanding",user:"bob",parent:0,type:"proclaim"});
-
-renderUsers();
-render();
+nodes.push({
+  id:id++,
+  rootId:0,
+  parentId:0,
+  type:"question",
+  user:"bob",
+  text:"Does truth require agreement?",
+  lane:"left"
+});
 
 </script>
 

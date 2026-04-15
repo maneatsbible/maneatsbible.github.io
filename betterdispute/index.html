@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Better Dispute v11</title>
+<title>Better Dispute v12</title>
 
 <style>
 body {
@@ -21,9 +21,21 @@ body {
   border-bottom: 1px solid #222;
 }
 
+.left {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .home {
   cursor: pointer;
   font-size: 18px;
+}
+
+.back {
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.8;
 }
 
 .right {
@@ -31,6 +43,7 @@ body {
   opacity: 0.6;
 }
 
+/* USER BAR */
 .userBar {
   display: flex;
   gap: 6px;
@@ -48,8 +61,27 @@ body {
   padding: 10px;
 }
 
-/* SUMMARY CARD (HOME ONLY) */
-.summary {
+/* HOME COMPOSE */
+.compose {
+  background: #141416;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 70px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: 1px solid #2a2a2d;
+  padding: 10px;
+  background: #1a1a1c;
+  color: #fff;
+}
+
+/* COMPACT DISPUTE CARD (IMPORTANT CHANGE) */
+.disputeCard {
   background: #1a1a1c;
   border-radius: 10px;
   padding: 10px;
@@ -57,30 +89,20 @@ body {
   cursor: pointer;
 }
 
-.summary small {
-  display: block;
+.meta {
+  font-size: 11px;
   opacity: 0.6;
-  margin-top: 4px;
 }
 
-.actions {
-  margin-top: 8px;
-}
-
-button {
-  border: none;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  background: #2a2a2d;
-  color: #fff;
-}
-
-button.primary {
-  background: #3a6df0;
+.preview {
+  margin-top: 6px;
+  font-size: 13px;
+  opacity: 0.95;
 }
 
 /* FOCUS MODE */
+.hidden { display: none; }
+
 .focus {
   display: none;
 }
@@ -89,24 +111,9 @@ button.primary {
   display: block;
 }
 
-.homeView {
-  display: block;
-}
-
 .homeView.hidden {
   display: none;
 }
-
-/* TURN DISPLAY */
-.turn {
-  padding: 10px;
-  border-radius: 8px;
-  margin-bottom: 8px;
-  background: #141416;
-}
-
-.turn.q { background: #2c2c2f; }
-.turn.a { background: #1f3a2c; }
 
 /* INPUT */
 .inputBar {
@@ -118,27 +125,18 @@ button.primary {
   border-top: 1px solid #222;
   padding: 10px;
 }
-
-textarea {
-  width: 100%;
-  min-height: 80px;
-  font-size: 16px;
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px solid #2a2a2d;
-  background: #1a1a1c;
-  color: #fff;
-}
-
-.hidden { display: none; }
 </style>
 </head>
 
 <body>
 
 <div class="header">
-  <div class="home" onclick="goHome()">⚖️ Better Dispute</div>
-  <div class="right">v11</div>
+  <div class="left">
+    <div class="home" onclick="goHome()">⚖️</div>
+    <div class="back hidden" id="backBtn" onclick="goBack()">← Back</div>
+    <div><b>Better Dispute</b></div>
+  </div>
+  <div class="right">v12</div>
 </div>
 
 <div class="userBar">
@@ -147,7 +145,7 @@ textarea {
   <button id="u-charlie" onclick="switchUser('charlie')">Charlie</button>
 </div>
 
-<div class="container homeView" id="home"></div>
+<div class="container" id="home"></div>
 
 <div class="container focus" id="focus"></div>
 
@@ -177,13 +175,20 @@ posts[0].chains.push({
 });
 
 // STATE
-let activePost = null;
-let activeChain = null;
+let focusStack = []; // FIX: proper nesting model
 
-// TRACK USER PARTICIPATION (CRITICAL FIX FOR CHALLENGE RULE)
-let userParticipation = {}; // key: postId -> true if user started chain
+// HELPERS
+function currentChain() {
+  return focusStack.length ? focusStack[focusStack.length - 1] : null;
+}
 
-// SWITCH USER
+function currentPost() {
+  return posts.find(p =>
+    p.chains.some(c => focusStack.includes(c))
+  ) || null;
+}
+
+/* SWITCH USER */
 function switchUser(u) {
   currentUser = u;
 
@@ -192,29 +197,44 @@ function switchUser(u) {
 
   document.getElementById("u-" + u).classList.add("active");
 
-  renderHome();
+  render();
 }
 
-// HOME ONLY VIEW
+/* HOME */
 function goHome() {
-  activePost = null;
-  activeChain = null;
+  focusStack = [];
+  document.getElementById("backBtn").classList.add("hidden");
   hideInput();
-
-  document.getElementById("home").classList.remove("hidden");
-  document.getElementById("focus").classList.remove("active");
-
-  renderHome();
+  render();
 }
 
-// CHALLENGE RULE FIXED
-function canChallenge(post) {
-  if (post.user === currentUser) return false;
-  return !userParticipation[post.id + ":" + currentUser];
+/* BACK */
+function goBack() {
+  focusStack.pop();
+  render();
+  updateInput();
 }
 
-// CREATE CHALLENGE
+/* COMPOSE */
+function createPost() {
+  const ta = document.getElementById("composeInput");
+  if (!ta.value.trim()) return;
+
+  posts.unshift({
+    id: Date.now(),
+    user: currentUser,
+    text: ta.value.trim(),
+    chains: []
+  });
+
+  ta.value = "";
+  render();
+}
+
+/* CHALLENGE */
 function challenge(post) {
+  if (post.user === currentUser) return;
+
   const chain = {
     id: Date.now(),
     a: post.user,
@@ -225,25 +245,17 @@ function challenge(post) {
   };
 
   post.chains.push(chain);
-
-  userParticipation[post.id + ":" + currentUser] = true;
-
-  openFocus(post, chain);
+  focusStack = [chain];
+  render();
 }
 
-// DRILL FIXED (CRITICAL)
-function openFocus(post, chain) {
-  activePost = post;
-  activeChain = chain;
-
-  document.getElementById("home").classList.add("hidden");
-  document.getElementById("focus").classList.add("active");
-
-  renderFocus();
-  updateInput();
+/* DRILL (ANYWHERE CLICK) */
+function openChain(chain) {
+  focusStack.push(chain);
+  render();
 }
 
-// SUMMARY (BRIEF + SCALABLE)
+/* SUMMARY (COMPRESSED CARD) */
 function summarize(chain) {
   return chain.turns
     .slice(-3)
@@ -251,28 +263,39 @@ function summarize(chain) {
     .join(" → ") || "New dispute";
 }
 
-// HOME RENDER (SUMMARIES ONLY)
+/* RENDER */
+function render() {
+  renderHome();
+  renderFocus();
+  updateUI();
+}
+
+/* HOME RENDER */
 function renderHome() {
   const home = document.getElementById("home");
 
-  let html = "";
+  let html = `
+    <div class="compose">
+      <textarea id="composeInput" placeholder="Start a fire..."></textarea>
+      <button onclick="createPost()">Post</button>
+    </div>
+  `;
 
   posts.forEach(post => {
     html += `
-      <div class="summary">
+      <div class="disputeCard">
         <div><b>${post.text}</b></div>
-        <small>@${post.user}</small>
+        <div class="meta">@${post.user}</div>
     `;
 
-    if (canChallenge(post)) {
-      html += `<div class="actions"><button class="primary" onclick="challenge(posts.find(p=>p.id===${post.id}))">Challenge</button></div>`;
+    if (post.user !== currentUser) {
+      html += `<button onclick='challenge(posts.find(p=>p.id===${post.id}))'>Challenge</button>`;
     }
 
     post.chains.forEach(chain => {
       html += `
-        <div class="summary" onclick="openFocus(posts.find(p=>p.id===${post.id}), posts.find(p=>p.id===${post.id}).chains.find(c=>c.id===${chain.id}))">
+        <div class="preview" onclick='openChain(posts.find(p=>p.id===${post.id}).chains.find(c=>c.id===${chain.id}))'>
           ${summarize(chain)}
-          <small>tap to enter dispute</small>
         </div>
       `;
     });
@@ -283,22 +306,30 @@ function renderHome() {
   home.innerHTML = html;
 }
 
-// FOCUS VIEW
+/* FOCUS RENDER */
 function renderFocus() {
   const focus = document.getElementById("focus");
+  const chain = currentChain();
+
+  if (!chain) {
+    focus.classList.remove("active");
+    return;
+  }
+
+  focus.classList.add("active");
 
   let html = `
-    <div class="summary">
-      <b>${activePost.text}</b>
-      <small>@${activePost.user}</small>
+    <div class="disputeCard">
+      <b>Focus Mode</b>
+      <div class="meta">${chain.a} vs ${chain.b}</div>
     </div>
   `;
 
-  activeChain.turns.forEach(t => {
+  chain.turns.forEach(t => {
     html += `
-      <div class="turn ${t.type === "question" ? "q" : "a"}">
+      <div class="disputeCard">
         ${t.text}
-        <small>@${t.user}</small>
+        <div class="meta">@${t.user}</div>
       </div>
     `;
   });
@@ -306,49 +337,57 @@ function renderFocus() {
   focus.innerHTML = html;
 }
 
-// INPUT RULE (STRICT)
-function updateInput() {
-  const bar = document.getElementById("inputBar");
-  const input = document.getElementById("input");
+/* UI STATE */
+function updateUI() {
+  const chain = currentChain();
 
-  if (activeChain && activeChain.active_user === currentUser) {
-    bar.classList.remove("hidden");
+  const back = document.getElementById("backBtn");
+  const input = document.getElementById("inputBar");
 
-    input.placeholder =
-      activeChain.turn_state === "question"
+  if (focusStack.length > 0) back.classList.remove("hidden");
+  else back.classList.add("hidden");
+
+  if (chain && chain.active_user === currentUser) {
+    input.classList.remove("hidden");
+    document.getElementById("input").placeholder =
+      chain.turn_state === "question"
         ? "Ask a question..."
-        : "Answer directly...";
-
-    input.onkeydown = (e) => {
-      if (e.key !== "Enter") return;
-      if (!input.value.trim()) return;
-      if (activeChain.active_user !== currentUser) return;
-
-      activeChain.turns.push({
-        type: activeChain.turn_state,
-        user: currentUser,
-        text: input.value.trim()
-      });
-
-      activeChain.turn_state =
-        activeChain.turn_state === "question" ? "answer" : "question";
-
-      activeChain.active_user =
-        currentUser === activeChain.a ? activeChain.b : activeChain.a;
-
-      input.value = "";
-      renderFocus();
-      updateInput();
-    };
-
+        : "Answer...";
   } else {
-    bar.classList.add("hidden");
+    input.classList.add("hidden");
   }
 }
 
-// INIT
+/* INPUT */
+document.getElementById("input").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+
+  const chain = currentChain();
+  if (!chain || chain.active_user !== currentUser) return;
+
+  const val = e.target.value.trim();
+  if (!val) return;
+
+  chain.turns.push({
+    type: chain.turn_state,
+    user: currentUser,
+    text: val
+  });
+
+  chain.turn_state =
+    chain.turn_state === "question" ? "answer" : "question";
+
+  chain.active_user =
+    currentUser === chain.a ? chain.b : chain.a;
+
+  e.target.value = "";
+
+  render();
+});
+
+/* INIT */
 switchUser(currentUser);
-renderHome();
+render();
 </script>
 
 </body>

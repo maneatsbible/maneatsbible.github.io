@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Better Dispute v1.1</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Better Dispute v2</title>
 
 <style>
 body {
@@ -13,6 +13,7 @@ body {
   color: #fff;
 }
 
+/* HEADER */
 .header {
   position: sticky;
   top: 0;
@@ -20,18 +21,31 @@ body {
   padding: 12px;
   border-bottom: 1px solid #222;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home {
+  font-size: 20px;
+  cursor: pointer;
 }
 
 .title { font-weight: bold; }
 .version { font-size: 12px; opacity: 0.6; }
-.balance { font-size: 18px; }
 
 .userSwitch button {
-  margin-right: 4px;
+  margin-left: 4px;
 }
 
+.balance { font-size: 18px; }
+
+/* FEED */
 .container {
   max-width: 600px;
   margin: 0 auto;
@@ -45,7 +59,10 @@ body {
   margin-bottom: 12px;
 }
 
-.message { font-size: 16px; }
+.message {
+  font-size: 16px;
+  line-height: 1.4;
+}
 
 .meta {
   font-size: 12px;
@@ -66,6 +83,7 @@ button {
   padding: 8px 12px;
   background: #2a2a2d;
   color: #fff;
+  font-size: 14px;
 }
 
 button.primary { background: #3a6df0; }
@@ -78,6 +96,7 @@ button.primary { background: #3a6df0; }
   font-size: 14px;
 }
 
+/* CHAIN */
 .turn {
   margin-bottom: 10px;
   padding: 12px;
@@ -91,10 +110,11 @@ button.primary { background: #3a6df0; }
 
 .status {
   font-size: 13px;
-  opacity: 0.8;
+  opacity: 0.85;
   margin-top: 8px;
 }
 
+/* INPUT */
 .inputBar {
   position: fixed;
   bottom: 0;
@@ -107,12 +127,17 @@ button.primary { background: #3a6df0; }
 
 textarea {
   width: 100%;
-  min-height: 80px;
+  min-height: 90px;
   border-radius: 12px;
   border: none;
   padding: 12px;
-  font-size: 15px;
+  font-size: 16px;
   resize: none;
+}
+
+.sendBtn {
+  margin-top: 8px;
+  width: 100%;
 }
 
 .hidden { display: none; }
@@ -122,14 +147,18 @@ textarea {
 <body>
 
 <div class="header">
-  <div>
-    <div class="title">Better Dispute</div>
-    <div class="version">v1.1</div>
+  <div class="left">
+    <div class="home" onclick="goHome()">🏠</div>
+    <div>
+      <div class="title">Better Dispute</div>
+      <div class="version">v2</div>
+    </div>
   </div>
 
   <div class="userSwitch">
     <button onclick="switchUser('alice')">Alice</button>
     <button onclick="switchUser('bob')">Bob</button>
+    <button onclick="switchUser('charlie')">Charlie</button>
   </div>
 
   <div class="balance">⚖️</div>
@@ -140,27 +169,61 @@ textarea {
 
 <div class="inputBar hidden" id="inputBar">
   <textarea id="inputField"></textarea>
+  <button class="primary sendBtn" onclick="submitTurn()">Send</button>
 </div>
 
 <script>
 let currentUser = "bob";
-
-// Demo timeout for crickets (10s instead of hours)
-const CRICKET_TIMEOUT = 10000;
+const CRICKET_TIMEOUT = 15000;
 
 let posts = [
   {
     id: 1,
     user: "alice",
-    text: "This claim can be challenged.",
+    text: "Faith alone is sufficient for salvation.",
+    chains: []
+  },
+  {
+    id: 2,
+    user: "charlie",
+    text: "AI will replace most human jobs.",
     chains: []
   }
 ];
 
-// SWITCH USER
+// PRELOAD DATA
+posts[0].chains.push({
+  id: 101,
+  user_a: "alice",
+  user_b: "bob",
+  turns: [
+    { type: "question", user: "bob", text: "Where is that stated?" },
+    { type: "answer", user: "alice", text: "Ephesians 2:8-9." }
+  ],
+  turn_state: "question",
+  active_user: "bob",
+  status: "active",
+  last_action: Date.now()
+});
+
+posts[1].chains.push({
+  id: 102,
+  user_a: "charlie",
+  user_b: "alice",
+  turns: [
+    { type: "question", user: "alice", text: "Which industries first?" }
+  ],
+  turn_state: "answer",
+  active_user: "charlie",
+  status: "active",
+  last_action: Date.now() - 20000
+});
+
+// USER SWITCH
 function switchUser(u) {
   currentUser = u;
   renderFeed();
+  if (activeChain) renderChain();
 }
 
 // START CHALLENGE
@@ -180,12 +243,12 @@ function startChallenge(postId) {
 
   post.chains.push(chain);
   openChain(postId, chain.id);
-
   setInput("Ask a precise question...");
 }
 
-// OPEN CHAIN
-let activePost, activeChain;
+// NAV
+let activePost = null;
+let activeChain = null;
 
 function openChain(postId, chainId) {
   activePost = posts.find(p => p.id === postId);
@@ -197,14 +260,13 @@ function openChain(postId, chainId) {
   renderChain();
 }
 
-// BACK
 function goHome() {
   document.getElementById("feed").classList.remove("hidden");
   document.getElementById("chainView").classList.add("hidden");
   hideInput();
 }
 
-// RENDER FEED
+// FEED
 function renderFeed() {
   const feed = document.getElementById("feed");
   feed.innerHTML = "";
@@ -214,13 +276,13 @@ function renderFeed() {
       <div class="card">
         <div class="message">${post.text}</div>
         <div class="meta">@${post.user}</div>
-
         <div class="actions">
           <button class="primary" onclick="startChallenge(${post.id})">Challenge</button>
         </div>
     `;
 
     post.chains.forEach(chain => {
+      updateCrickets(chain);
       const last = chain.turns[chain.turns.length - 1];
       if (!last) return;
 
@@ -237,14 +299,13 @@ function renderFeed() {
   });
 }
 
-// RENDER CHAIN
+// CHAIN
 function renderChain() {
   updateCrickets(activeChain);
 
   const view = document.getElementById("chainView");
 
   let html = `
-    <button onclick="goHome()">← Back</button>
     <div class="card">
       <div class="message">${activePost.text}</div>
     </div>
@@ -268,37 +329,33 @@ function renderChain() {
     html += activeChain.turn_state === "question"
       ? "Your turn to ask"
       : "Your turn to answer";
-    showInput();
+
+    setInput(activeChain.turn_state === "question"
+      ? "Ask a precise question..."
+      : "Answer directly...");
   } else {
     html += "Waiting on them";
-    showInput();
+
     html += `
       <div class="actions">
         <button onclick="markDodged()">Dodged</button>
         <button onclick="endChain()">End</button>
       </div>
     `;
+
+    hideInput();
   }
 
   html += `</div>`;
-
   view.innerHTML = html;
 }
 
 // INPUT
 const input = document.getElementById("inputField");
 
-input.addEventListener("keydown", e => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    submitTurn();
-  }
-});
-
 function setInput(ph) {
   input.placeholder = ph;
   showInput();
-  input.focus();
 }
 
 function showInput() {
@@ -309,8 +366,9 @@ function hideInput() {
   document.getElementById("inputBar").classList.add("hidden");
 }
 
-// SUBMIT TURN
+// SUBMIT
 function submitTurn() {
+  if (!activeChain || activeChain.active_user !== currentUser) return;
   if (!input.value.trim()) return;
 
   const type = activeChain.turn_state;
@@ -330,7 +388,6 @@ function submitTurn() {
       : activeChain.user_a;
 
   input.value = "";
-
   renderChain();
 }
 
@@ -352,21 +409,19 @@ function endChain() {
 function updateCrickets(chain) {
   if (chain.status !== "active") return;
 
-  const now = Date.now();
-  if (now - chain.last_action > CRICKET_TIMEOUT) {
+  if (Date.now() - chain.last_action > CRICKET_TIMEOUT) {
     chain.status = "crickets";
-    chain.statusLabel = "🐦 No response (crickets)";
+    chain.statusLabel = "No response";
   }
 }
 
-// INIT
+// LOOP
 setInterval(() => {
-  posts.forEach(p =>
-    p.chains.forEach(updateCrickets)
-  );
+  posts.forEach(p => p.chains.forEach(updateCrickets));
   renderFeed();
-}, 2000);
+}, 3000);
 
+// INIT
 renderFeed();
 </script>
 

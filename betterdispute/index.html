@@ -1,458 +1,297 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Better Dispute v19</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Better Dispute v20</title>
 
 <style>
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #0f0f10;
-  color: #fff;
+  margin:0;
+  font-family:-apple-system, sans-serif;
+  background:#0f0f10;
+  color:#fff;
 }
 
 .header {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border-bottom: 1px solid #222;
+  display:flex;
+  justify-content:space-between;
+  padding:10px;
+  border-bottom:1px solid #222;
 }
 
-.left {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.home {
-  cursor: pointer;
-  font-size: 18px;
-}
-
-.right {
-  font-size: 11px;
-  opacity: 0.6;
-}
-
-/* USER */
-.userBar {
-  display: flex;
-  gap: 6px;
-  padding: 8px 12px;
-}
-
-.userBar button {
-  background: #2a2a2d;
-  border: 1px solid #333;
-  color: #ccc;
-  padding: 6px 10px;
-  border-radius: 6px;
-}
-
-.userBar button.active {
-  background: #3a6df0;
-  color: #fff;
-}
-
-/* LAYOUT */
 .container {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 10px;
+  max-width:600px;
+  margin:auto;
+  padding:10px;
 }
 
-/* COMPOSE */
-.compose {
-  background: #141416;
-  padding: 10px;
-  border-radius: 10px;
-  margin-bottom: 10px;
+.card {
+  background:#1a1a1c;
+  padding:10px;
+  border-radius:10px;
+  margin-bottom:10px;
+  cursor:pointer;
 }
+
+.meta { opacity:0.6; font-size:12px; }
+
+.turn {
+  padding:10px;
+  border-radius:8px;
+  margin:6px 0;
+}
+
+.q { background:#2c2c2f; }
+.a { background:#1f3a2c; }
+
+.inputBar {
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  padding:10px;
+  background:#0f0f10;
+  border-top:1px solid #222;
+}
+
+.hidden { display:none; }
 
 textarea {
-  width: 100%;
-  min-height: 70px;
-  font-size: 16px;
-  background: #1a1a1c;
-  color: #fff;
-  border: 1px solid #2a2a2d;
-  border-radius: 10px;
-  padding: 10px;
+  width:100%;
+  min-height:70px;
+  background:#1a1a1c;
+  color:#fff;
+  border:1px solid #333;
+  border-radius:8px;
+  padding:10px;
 }
-
 button {
-  margin-top: 6px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid #333;
-  background: #2a2a2d;
-  color: #fff;
-  cursor: pointer;
+  margin-top:6px;
+  padding:6px 10px;
 }
-
-/* CARD */
-.card {
-  background: #1a1a1c;
-  padding: 10px;
-  border-radius: 10px;
-  margin-bottom: 10px;
-  cursor: pointer;
-}
-
-.meta {
-  font-size: 11px;
-  opacity: 0.6;
-  margin-top: 4px;
-}
-
-/* TURN */
-.turn {
-  padding: 10px;
-  border-radius: 8px;
-  margin-bottom: 6px;
-}
-
-.q { background: #2c2c2f; }
-.a { background: #1f3a2c; }
-
-/* NESTING */
-.nested {
-  margin-left: 14px;
-  border-left: 2px solid #333;
-  padding-left: 10px;
-}
-
-/* DISPUTE HEADER */
-.disputeTop {
-  margin-bottom: 10px;
-}
-
-/* BACK BUTTON (MOVED HERE AS REQUESTED) */
-.backBar {
-  margin-bottom: 10px;
-  cursor: pointer;
-  opacity: 0.8;
-}
-
-/* INPUT */
-.inputBar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: #0f0f10;
-  border-top: 1px solid #222;
-  padding: 10px;
-  display: flex;
-  gap: 6px;
-}
-
-.hidden { display: none; }
 </style>
 </head>
 
 <body>
 
 <div class="header">
-  <div class="left">
-    <div class="home" onclick="goHome()">⚖️</div>
-    <div><b>Better Dispute</b></div>
-  </div>
-  <div class="right">v19</div>
-</div>
-
-<div class="userBar">
-  <button id="u-alice" onclick="switchUser('alice')">Alice</button>
-  <button id="u-bob" onclick="switchUser('bob')">Bob</button>
-  <button id="u-charlie" onclick="switchUser('charlie')">Charlie</button>
+  <div><b>Better Dispute</b></div>
+  <div>v20</div>
 </div>
 
 <div class="container" id="home"></div>
-<div class="container" id="dispute"></div>
+<div class="container" id="view"></div>
 
-<div class="inputBar hidden">
+<div class="inputBar hidden" id="inputBar">
   <textarea id="input"></textarea>
-  <button onclick="submitInput()">Send</button>
+  <button onclick="submit()">Send</button>
 </div>
 
 <script>
 
-/* ---------------- STATE ---------------- */
+/* ---------------- USERS ---------------- */
 
 let currentUser = "bob";
-let mode = "home";
 
-let activePostId = null;
-let activeChainId = null;
+/* ---------------- STATE STACK (KEY FIX) ---------------- */
 
-/* ---------------- STORAGE ---------------- */
-
-const posts = new Map();
-const chains = new Map();
-
-/* ---------------- IDS ---------------- */
-
-const uid = () => String(Date.now() + Math.random());
+let stack = []; 
+// [ {type:"post", id}, {type:"chain", id}, ... ]
 
 /* ---------------- DATA ---------------- */
 
-function makePost(user, text) {
-  const p = { id: uid(), user, text, chains: [] };
-  posts.set(p.id, p);
-  return p;
-}
+const posts = {
+  p1: {
+    id:"p1",
+    user:"alice",
+    text:"Faith alone is sufficient for salvation.",
+    chains:["c1"]
+  }
+};
 
-function makeChain(a, b) {
-  const c = {
-    id: uid(),
-    a,
-    b,
-    active_user: b,
-    turn_state: "question",
-    turns: []
-  };
-  chains.set(c.id, c);
-  return c;
-}
-
-function makeTurn(type, user, text) {
-  return { id: uid(), type, user, text, nested: [] };
-}
-
-/* ---------------- TEST DATA (RICH + NESTED) ---------------- */
-
-const p1 = makePost("alice", "Faith alone is sufficient for salvation.");
-const p2 = makePost("charlie", "AI will replace most jobs.");
-const p3 = makePost("bob", "Truth requires questioning authority.");
-
-const c1 = makeChain("alice","bob");
-c1.turns.push(makeTurn("question","bob","Where is that stated?"));
-c1.turns.push(makeTurn("answer","alice","Ephesians 2:8-9"));
-
-const c1nested = makeChain("bob","alice");
-c1.turns[0].nested.push(c1nested);
-c1nested.turns.push(makeTurn("question","bob","Define 'faith' precisely."));
-c1nested.turns.push(makeTurn("answer","alice","Trust in divine promise."));
-
-p1.chains.push(c1);
-
-const c2 = makeChain("charlie","alice");
-c2.turns.push(makeTurn("question","alice","Which jobs specifically?"));
-c2.turns.push(makeTurn("answer","charlie","Knowledge work."));
-p2.chains.push(c2);
+const chains = {
+  c1: {
+    id:"c1",
+    a:"alice",
+    b:"bob",
+    state:"awaiting_answer",
+    turns:[
+      {id:"t1", type:"question", user:"bob", text:"Where is that stated?", status:"awaiting_answer", nested:[]}
+    ]
+  }
+};
 
 /* ---------------- NAV ---------------- */
 
-function switchUser(u) {
-  currentUser = u;
-
-  document.querySelectorAll(".userBar button")
-    .forEach(b => b.classList.remove("active"));
-
-  document.getElementById("u-" + u).classList.add("active");
-
+function openPost(id){
+  stack = [{type:"post", id}];
   render();
 }
 
-function goHome() {
-  mode = "home";
-  activePostId = null;
-  activeChainId = null;
+function drillChain(id){
+  stack.push({type:"chain", id});
   render();
 }
 
-/* ---------------- OPEN ---------------- */
-
-function openChain(postId, chainId) {
-  mode = "dispute";
-  activePostId = postId;
-  activeChainId = chainId;
+function back(){
+  stack.pop();
   render();
 }
 
-/* ---------------- BACK (FIXED LOCATION) ---------------- */
+/* ---------------- RESOLVE ---------------- */
 
-function goBack() {
-  mode = "home";
-  activePostId = null;
-  activeChainId = null;
+function currentPost(){
+  return posts[stack[0].id];
+}
+
+function currentChain(){
+  const c = stack.findLast(s=>s.type==="chain");
+  return c ? chains[c.id] : null;
+}
+
+/* ---------------- CHALLENGE ---------------- */
+
+function challenge(turn){
+  const c = {
+    id:"c"+Math.random(),
+    a:currentUser,
+    b:"other",
+    state:"awaiting_answer",
+    turns:[
+      {id:"x"+Math.random(), type:"question", user:currentUser, text:"Challenge opened", status:"awaiting_answer", nested:[]}
+    ]
+  };
+
+  chains[c.id]=c;
+  turn.nested.push(c);
+
+  stack.push({type:"chain", id:c.id});
   render();
-}
-
-/* ---------------- LOOKUP ---------------- */
-
-function getPost() {
-  return posts.get(activePostId);
-}
-
-function getChain() {
-  return chains.get(activeChainId);
-}
-
-/* ---------------- CHALLENGE (FIXED) ---------------- */
-
-function challenge(turn) {
-  if (!turn) return;
-
-  const chain = makeChain(currentUser, "opponent");
-
-  turn.nested.push(chain);
-
-  openChain(activePostId, chain.id);
 }
 
 /* ---------------- INPUT ---------------- */
 
-function submitInput() {
-  const chain = getChain();
-  const box = document.getElementById("input");
+function submit(){
+  const chain = currentChain();
+  if(!chain) return;
 
-  if (!chain || chain.active_user !== currentUser) return;
+  const text = document.getElementById("input").value.trim();
+  if(!text) return;
 
-  const text = box.value.trim();
-  if (!text) return;
+  const lastTurn = chain.turns[chain.turns.length-1];
 
-  chain.turns.push(makeTurn(chain.turn_state, currentUser, text));
+  if(lastTurn.status === "awaiting_answer"){
+    lastTurn.answer = text;
+    lastTurn.status = "answered";
+    chain.state = "ready_to_challenge";
+  } else {
+    chain.turns.push({
+      id:"t"+Math.random(),
+      type:"question",
+      user:currentUser,
+      text,
+      status:"awaiting_answer",
+      nested:[]
+    });
+    chain.state = "awaiting_answer";
+  }
 
-  chain.turn_state =
-    chain.turn_state === "question" ? "answer" : "question";
-
-  chain.active_user =
-    currentUser === chain.a ? chain.b : chain.a;
-
-  box.value = "";
+  document.getElementById("input").value="";
   render();
 }
 
 /* ---------------- RENDER HOME ---------------- */
 
-function renderHome() {
-  const el = document.getElementById("home");
+function renderHome(){
+  let html="";
 
-  let html = `
-    <div class="compose">
-      <textarea id="composeBox"></textarea>
-      <button onclick="createPost()">Post</button>
-    </div>
-  `;
-
-  posts.forEach(p => {
+  Object.values(posts).forEach(p=>{
     html += `
-      <div class="card" onclick="openChain('${p.id}','${p.chains[0]?.id || ""}')">
+      <div class="card" onclick="openPost('${p.id}')">
         <b>${p.text}</b>
         <div class="meta">@${p.user}</div>
       </div>
     `;
   });
 
-  el.innerHTML = html;
+  document.getElementById("home").innerHTML = html;
 }
 
-function createPost() {
-  const box = document.getElementById("composeBox");
-  if (!box.value.trim()) return;
+/* ---------------- RENDER VIEW ---------------- */
 
-  const p = makePost(currentUser, box.value.trim());
-  box.value = "";
-  render();
-}
+function renderView(){
 
-/* ---------------- RENDER DISPUTE ---------------- */
-
-function renderTurns(chain) {
-  let html = "";
-
-  chain.turns.forEach(t => {
-    html += `
-      <div class="turn ${t.type === "question" ? "q" : "a"}"
-           onclick="challenge(getTurn('${t.id}'))">
-        ${t.text}
-        <div class="meta">@${t.user}</div>
-      </div>
-    `;
-
-    if (t.nested.length) {
-      html += `<div class="nested">`;
-      t.nested.forEach(n => {
-        html += `
-          <div class="card" onclick="openChain('${activePostId}','${n.id}')">
-            ${n.turns[0]?.text || "Nested dispute"}
-          </div>
-        `;
-      });
-      html += `</div>`;
-    }
-  });
-
-  return html;
-}
-
-function getTurn(id) {
-  for (let c of chains.values()) {
-    for (let t of c.turns) {
-      if (t.id === id) return t;
-    }
-  }
-  return null;
-}
-
-function renderDispute() {
-  const el = document.getElementById("dispute");
-
-  if (mode !== "dispute") {
-    el.innerHTML = "";
+  if(stack.length===0){
+    document.getElementById("view").innerHTML="";
     return;
   }
 
-  const post = getPost();
-  const chain = getChain();
+  const post = currentPost();
+  const chain = currentChain();
 
-  if (!post || !chain) return;
+  let html = "";
 
-  let html = `
-    <div class="disputeTop">
-      <div class="backBar" onclick="goBack()">← Back</div>
-      <div class="card">
-        <b>${post.text}</b>
-        <div class="meta">@${post.user}</div>
-      </div>
-    </div>
-  `;
+  if(stack.length>1){
+    html += `<div onclick="back()" class="meta">← Back (level ${stack.length})</div>`;
+  }
 
-  html += renderTurns(chain);
+  if(post){
+    html += `<div class="card"><b>${post.text}</b><div class="meta">@${post.user}</div></div>`;
+  }
 
-  el.innerHTML = html;
+  if(chain){
+    chain.turns.forEach(t=>{
+      html += `
+        <div class="turn ${t.type==="question"?"q":"a"}">
+          <b>${t.text}</b>
+          <div class="meta">@${t.user}</div>
+          ${t.status==="awaiting_answer" ? "<div class='meta'>Awaiting answer…</div>" : ""}
+          ${t.status==="answered" ? "<div class='meta'>Answered ✓</div>" : ""}
+        </div>
+      `;
+
+      if(t.nested.length){
+        t.nested.forEach(n=>{
+          html += `<div class="card" onclick="drillChain('${n.id}')">Nested dispute →</div>`;
+        });
+      }
+    });
+
+    if(chain.state==="ready_to_challenge"){
+      html += `<div class="meta">You may challenge again or drill deeper.</div>`;
+    }
+
+    document.getElementById("inputBar").classList.remove("hidden");
+  } else {
+    document.getElementById("inputBar").classList.add("hidden");
+  }
+
+  document.getElementById("view").innerHTML = html;
 }
 
 /* ---------------- INPUT RULE ---------------- */
 
-function updateInput() {
-  const bar = document.querySelector(".inputBar");
-  const chain = getChain();
-
-  if (mode === "dispute" && chain && chain.active_user === currentUser) {
-    bar.classList.remove("hidden");
-  } else {
-    bar.classList.add("hidden");
+function updateInput(){
+  const chain = currentChain();
+  if(!chain) {
+    document.getElementById("inputBar").classList.add("hidden");
   }
 }
 
-/* ---------------- MAIN ---------------- */
+/* ---------------- RENDER ---------------- */
 
-function render() {
-  document.getElementById("home").style.display = mode === "home" ? "block" : "none";
-  document.getElementById("dispute").style.display = mode === "dispute" ? "block" : "none";
+function render(){
+  document.getElementById("home").style.display = stack.length ? "none":"block";
+  document.getElementById("view").style.display = stack.length ? "block":"none";
 
   renderHome();
-  renderDispute();
+  renderView();
   updateInput();
 }
 
 /* INIT */
 
-switchUser(currentUser);
 render();
 
 </script>

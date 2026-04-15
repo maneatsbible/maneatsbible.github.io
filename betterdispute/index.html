@@ -17,19 +17,11 @@ body {
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   padding: 10px 12px;
   border-bottom: 1px solid #222;
 }
 
-.left {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.home { font-size: 18px; cursor: pointer; }
-
+.home { cursor: pointer; font-size: 18px; }
 .right { font-size: 11px; opacity: 0.6; }
 
 .userBar {
@@ -40,7 +32,6 @@ body {
 
 .userBar button.active { background: #3a6df0; }
 
-/* LAYOUT */
 .container {
   max-width: 600px;
   margin: 0 auto;
@@ -59,9 +50,6 @@ body {
 
 .actions {
   margin-top: 8px;
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
 }
 
 button {
@@ -75,37 +63,33 @@ button {
 
 button.primary { background: #3a6df0; }
 
-/* SUMMARY */
+/* BRIEF SUMMARY (FIXED REQUIREMENT) */
 .summary {
   margin-top: 8px;
-  padding: 8px;
+  padding: 6px 8px;
   background: #141416;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
+  line-height: 1.3;
+  opacity: 0.95;
 }
 
-/* COMPOSE (RESTORED HOME ONLY) */
-.compose {
-  background: #141416;
-  border-radius: 10px;
-  padding: 10px;
-  margin-bottom: 12px;
+.summary:hover {
+  background: #1b1b1e;
 }
 
 textarea {
   width: 100%;
-  min-height: 70px;
+  min-height: 80px;
   font-size: 16px;
   border-radius: 10px;
   border: 1px solid #2a2a2d;
   padding: 10px;
-
   background: #1a1a1c;
   color: #fff;
 }
 
-/* INPUT BAR (ONLY ACTIVE IN DRILL) */
 .inputBar {
   position: fixed;
   bottom: 0;
@@ -123,10 +107,7 @@ textarea {
 <body>
 
 <div class="header">
-  <div class="left">
-    <div class="home" onclick="goHome()">⚖️</div>
-    <div><b>Better Dispute</b></div>
-  </div>
+  <div class="home" onclick="goHome()">⚖️ Better Dispute</div>
   <div class="right">v10</div>
 </div>
 
@@ -150,14 +131,15 @@ let posts = [
   { id: 2, user: "charlie", text: "AI will replace most jobs.", chains: [] }
 ];
 
-// SAMPLE CHAIN
+// SAMPLE
 posts[0].chains.push({
   id: 101,
   a: "alice",
   b: "bob",
   turns: [
     { type: "question", user: "bob", text: "Where is that stated?" },
-    { type: "answer", user: "alice", text: "Ephesians 2:8-9." }
+    { type: "answer", user: "alice", text: "Ephesians 2:8-9." },
+    { type: "question", user: "bob", text: "Does that exclude works?" }
   ],
   turn_state: "question",
   active_user: "bob"
@@ -182,80 +164,50 @@ function switchUser(u) {
 function goHome() {
   activePost = null;
   activeChain = null;
-  document.getElementById("inputBar").classList.add("hidden");
+  hideInput();
   renderFeed();
 }
 
-/* CREATE POST (RESTORED COMPOSE) */
-function createPost() {
-  const ta = document.getElementById("composeInput");
-  if (!ta.value.trim()) return;
-
-  posts.unshift({
-    id: Date.now(),
-    user: currentUser,
-    text: ta.value.trim(),
-    chains: []
-  });
-
-  ta.value = "";
-  renderFeed();
-}
-
-// CHALLENGE (STABLE)
+// CHALLENGE (FIXED STABLE)
 function challenge(postId) {
   const post = posts.find(p => p.id === postId);
   if (!post || post.user === currentUser) return;
 
-  post.chains.push({
+  const chain = {
     id: Date.now(),
     a: post.user,
     b: currentUser,
     turns: [],
     turn_state: "question",
     active_user: currentUser
-  });
+  };
 
-  openThread(post, post.chains[post.chains.length - 1]);
+  post.chains.push(chain);
+  openChain(post, chain);
 }
 
-// DRILL FIXED
-function openThread(post, chain = null) {
+// DRILL FIXED (NO BROKEN REFERENCES)
+function openChain(post, chain) {
   activePost = post;
   activeChain = chain;
 
   renderFeed();
-  updateInputVisibility();
+  updateInput();
 }
 
-// INPUT VISIBILITY RULE (FIXED)
-function updateInputVisibility() {
-  const bar = document.getElementById("inputBar");
-
-  if (
-    activeChain &&
-    activeChain.active_user === currentUser
-  ) {
-    bar.classList.remove("hidden");
-    document.getElementById("input").placeholder =
-      activeChain.turn_state === "question"
-        ? "Ask a question..."
-        : "Answer directly...";
-  } else {
-    bar.classList.add("hidden");
-  }
+// BRIEF SUMMARY (FIXED + SAFE)
+function summarize(chain) {
+  return chain.turns
+    .slice(-3)
+    .map(t => (t.type === "question" ? "Q" : "A") + ": " + t.text)
+    .join(" → ") || "New dispute";
 }
 
 // FEED
 function renderFeed() {
   const feed = document.getElementById("feed");
 
-  let html = `
-    <div class="compose">
-      <textarea id="composeInput" placeholder="Start a fire..."></textarea>
-      <button class="primary" onclick="createPost()">Post</button>
-    </div>
-  `;
+  let html = "";
 
   posts.forEach(post => {
     const self = post.user === currentUser;
@@ -272,8 +224,9 @@ function renderFeed() {
 
     post.chains.forEach(chain => {
       html += `
-        <div class="summary" onclick="openThread(post, posts.find(p=>p.id===${post.id}).chains.find(c=>c.id===${chain.id}))">
-          ${chain.turns.map(t => `${t.type === "question" ? "Q" : "A"}: ${t.text}`).join(" → ") || "New dispute"}
+        <div class="summary"
+             onclick="openChain(posts.find(p=>p.id===${post.id}), posts.find(p=>p.id===${post.id}).chains.find(c=>c.id===${chain.id}))">
+          ${summarize(chain)}
         </div>
       `;
     });
@@ -284,32 +237,47 @@ function renderFeed() {
   feed.innerHTML = html;
 }
 
-// INPUT SUBMIT (ENTER)
-document.addEventListener("keydown", (e) => {
-  if (e.key !== "Enter") return;
-  if (!activeChain) return;
-  if (activeChain.active_user !== currentUser) return;
-
+// INPUT CONTROL (FIXED)
+function updateInput() {
+  const bar = document.getElementById("inputBar");
   const input = document.getElementById("input");
-  if (!input.value.trim()) return;
 
-  activeChain.turns.push({
-    type: activeChain.turn_state,
-    user: currentUser,
-    text: input.value.trim()
-  });
+  if (
+    activeChain &&
+    activeChain.active_user === currentUser
+  ) {
+    bar.classList.remove("hidden");
+    input.placeholder =
+      activeChain.turn_state === "question"
+        ? "Ask a question..."
+        : "Answer directly...";
+  } else {
+    bar.classList.add("hidden");
+  }
 
-  activeChain.turn_state =
-    activeChain.turn_state === "question" ? "answer" : "question";
+  input.onkeydown = (e) => {
+    if (e.key !== "Enter") return;
+    if (!activeChain) return;
+    if (activeChain.active_user !== currentUser) return;
+    if (!input.value.trim()) return;
 
-  activeChain.active_user =
-    currentUser === activeChain.a ? activeChain.b : activeChain.a;
+    activeChain.turns.push({
+      type: activeChain.turn_state,
+      user: currentUser,
+      text: input.value.trim()
+    });
 
-  input.value = "";
+    activeChain.turn_state =
+      activeChain.turn_state === "question" ? "answer" : "question";
 
-  updateInputVisibility();
-  renderFeed();
-});
+    activeChain.active_user =
+      currentUser === activeChain.a ? activeChain.b : activeChain.a;
+
+    input.value = "";
+    updateInput();
+    renderFeed();
+  };
+}
 
 // INIT
 switchUser(currentUser);

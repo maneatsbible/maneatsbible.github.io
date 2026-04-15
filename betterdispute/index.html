@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Better Dispute v8 (fixed)</title>
+<title>Better Dispute v8.2</title>
 
 <style>
 body {
@@ -13,32 +13,46 @@ body {
   color: #fff;
 }
 
-/* HEADER */
+/* HEADER FIXED INTO SINGLE BAR */
 .header {
-  position: sticky;
-  top: 0;
-  background: #0f0f10;
-  padding: 10px 12px;
-  border-bottom: 1px solid #222;
-}
-
-.topRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  padding: 10px 12px;
+  border-bottom: 1px solid #222;
+  background: #0f0f10;
 }
 
-.home { cursor: pointer; font-size: 18px; }
+.left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
-.right { font-size: 11px; opacity: 0.6; }
+.home {
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.right {
+  font-size: 11px;
+  opacity: 0.6;
+}
 
 .userBar {
-  margin-top: 8px;
   display: flex;
   gap: 6px;
+  padding: 8px 12px;
 }
 
-.userBar button.active { background: #3a6df0; }
+.userBar button.active {
+  background: #3a6df0;
+}
 
 .container {
   max-width: 600px;
@@ -74,40 +88,46 @@ button {
 
 button.primary { background: #3a6df0; }
 
-/* CHAIN */
-.chainPreview {
+/* HOME SUMMARY */
+.summary {
   margin-top: 8px;
   padding: 8px;
   background: #141416;
   border-radius: 8px;
   font-size: 13px;
+  cursor: pointer;
+}
+
+/* DISPUTE BLOCK */
+.block {
+  margin-top: 8px;
+  padding: 10px;
+  background: #141416;
+  border-radius: 10px;
 }
 
 .turn {
-  margin-bottom: 8px;
-  padding: 10px;
+  padding: 8px;
   border-radius: 8px;
+  margin-bottom: 6px;
 }
 
 .question { background: #2c2c2f; }
 .answer { background: #1f3a2c; }
 
-.you { outline: 1.5px solid #3a6df0; }
+.hidden { display: none; }
 
-.status {
-  font-size: 12px;
-  margin-top: 6px;
-  opacity: 0.85;
-}
-
-.tailBox {
-  margin-top: 10px;
+/* INPUT (ONLY WHEN ACTIVE TURN) */
+.inputBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #0f0f10;
   padding: 10px;
-  background: #141416;
-  border-radius: 8px;
+  border-top: 1px solid #222;
 }
 
-/* FIX: ALL INPUTS DARK */
 textarea {
   width: 100%;
   min-height: 80px;
@@ -119,56 +139,30 @@ textarea {
 
   background: #1a1a1c;
   color: #fff;
-  outline: none;
 }
-
-textarea::placeholder {
-  color: #777;
-}
-
-.inputBar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: #0f0f10;
-  padding: 10px;
-  border-top: 1px solid #222;
-}
-
-.sendBtn {
-  margin-top: 6px;
-  width: 100%;
-}
-
-.hidden { display: none; }
 </style>
 </head>
 
 <body>
 
 <div class="header">
-  <div class="topRow">
-    <div class="left">
-      <div class="home" onclick="goHome()">⚖️</div>
-      <div>Better Dispute</div>
-    </div>
-    <div class="right">v8</div>
+  <div class="left">
+    <div class="home" onclick="goHome()">⚖️</div>
+    <div class="title">Better Dispute</div>
   </div>
+  <div class="right">v8.2</div>
+</div>
 
-  <div class="userBar">
-    <button id="u-alice" onclick="switchUser('alice')">Alice</button>
-    <button id="u-bob" onclick="switchUser('bob')">Bob</button>
-    <button id="u-charlie" onclick="switchUser('charlie')">Charlie</button>
-  </div>
+<div class="userBar">
+  <button id="u-alice" onclick="switchUser('alice')">Alice</button>
+  <button id="u-bob" onclick="switchUser('bob')">Bob</button>
+  <button id="u-charlie" onclick="switchUser('charlie')">Charlie</button>
 </div>
 
 <div class="container" id="feed"></div>
-<div class="container hidden" id="chainView"></div>
 
 <div class="inputBar hidden" id="inputBar">
-  <textarea id="inputField"></textarea>
-  <button class="primary sendBtn" onclick="submitTurn()">Send</button>
+  <textarea id="input"></textarea>
 </div>
 
 <script>
@@ -182,20 +176,15 @@ let posts = [
 // SAMPLE CHAIN
 posts[0].chains.push({
   id: 101,
-  user_a: "alice",
-  user_b: "bob",
+  a: "alice",
+  b: "bob",
   turns: [
     { type: "question", user: "bob", text: "Where is that stated?" },
     { type: "answer", user: "alice", text: "Ephesians 2:8-9." }
   ],
   turn_state: "question",
-  active_user: "bob",
-  status: "active",
-  last_action: Date.now()
+  active_user: "bob"
 });
-
-let activePost = null;
-let activeChain = null;
 
 // SWITCH USER
 function switchUser(u) {
@@ -207,162 +196,105 @@ function switchUser(u) {
   document.getElementById("u-" + u).classList.add("active");
 
   renderFeed();
-  if (activeChain) renderChain();
 }
 
 // HOME
 function goHome() {
-  activePost = null;
-  activeChain = null;
-  document.getElementById("feed").classList.remove("hidden");
-  document.getElementById("chainView").classList.add("hidden");
-  hideInput();
+  renderFeed();
 }
 
-// START CHALLENGE (FIXED: stable target resolution)
-function startChallenge(postId) {
+// CHALLENGE (FIXED: always creates new 1v1 chain)
+function challenge(postId) {
   const post = posts.find(p => p.id === postId);
+  if (!post || post.user === currentUser) return;
 
-  if (post.user === currentUser) return;
-
-  const chain = {
+  post.chains.push({
     id: Date.now(),
-    user_a: post.user,
-    user_b: currentUser,
+    a: post.user,
+    b: currentUser,
     turns: [],
     turn_state: "question",
-    active_user: currentUser,
-    status: "active",
-    last_action: Date.now()
-  };
+    active_user: currentUser
+  });
 
-  post.chains.push(chain);
-  openChain(postId, chain.id);
-}
-
-// OPEN CHAIN
-function openChain(postId, chainId) {
-  activePost = posts.find(p => p.id === postId);
-  activeChain = activePost.chains.find(c => c.id === chainId);
-
-  document.getElementById("feed").classList.add("hidden");
-  document.getElementById("chainView").classList.remove("hidden");
-
-  renderChain();
+  renderFeed();
 }
 
 // FEED
 function renderFeed() {
   const feed = document.getElementById("feed");
-  feed.innerHTML = "";
+
+  let html = "";
 
   posts.forEach(post => {
     const self = post.user === currentUser;
 
-    let html = `
+    html += `
       <div class="card">
         <div class="message">${post.text}</div>
         <div class="meta">@${post.user}</div>
-
-        <div class="actions">
-          <button class="${self ? '' : 'primary'}"
-            ${self ? 'disabled' : `onclick="startChallenge(${post.id})"`}>
-            Challenge
-          </button>
-        </div>
     `;
 
+    // SUMMARY (STACKED, SCALABLE)
     post.chains.forEach(chain => {
       html += `
-        <div class="chainPreview" onclick="openChain(${post.id}, ${chain.id})">
-          ${chain.turns.map(t => `${t.type === "question" ? "Q" : "A"}: ${t.text}`).join(" → ")}
+        <div class="summary" onclick="openChain(${post.id}, ${chain.id})">
+          ${chain.turns.map(t => `${t.type === "question" ? "Q" : "A"}: ${t.text}`).join(" → ") || "New dispute"}
         </div>
       `;
     });
 
-    html += `</div>`;
-    feed.innerHTML += html;
-  });
-}
-
-// CHAIN
-function renderChain() {
-  const view = document.getElementById("chainView");
-
-  let html = `
-    <div class="card">
-      <div class="message">${activePost.text}</div>
-      <div class="meta">@${activePost.user}</div>
-    </div>
-  `;
-
-  activeChain.turns.forEach(t => {
     html += `
-      <div class="turn ${t.type} ${t.user === currentUser ? 'you' : ''}">
-        ${t.text}
-        <div class="meta">@${t.user}</div>
+      <div class="actions">
+        ${self ? "" : `<button class="primary" onclick="challenge(${post.id})">Challenge</button>`}
       </div>
+    </div>
     `;
   });
 
-  html += `<div class="tailBox">`;
+  feed.innerHTML = html;
+}
 
-  if (activeChain.status !== "active") {
-    html += activeChain.statusLabel || "Closed";
-  } else if (activeChain.active_user === currentUser) {
-    html += "Your turn";
-    setInput(activeChain.turn_state === "question"
-      ? "Ask a precise question..."
-      : "Answer directly...");
+// OPEN CHAIN
+function openChain(postId, chainId) {
+  const post = posts.find(p => p.id === postId);
+  const chain = post.chains.find(c => c.id === chainId);
+
+  const input = document.getElementById("input");
+  const bar = document.getElementById("inputBar");
+
+  renderFeed(); // keep simple (no full view split in this version)
+
+  // INPUT RULE (CRITICAL FIX)
+  if (chain.active_user === currentUser) {
+    bar.classList.remove("hidden");
+    input.placeholder = chain.turn_state === "question"
+      ? "Ask a question..."
+      : "Answer directly...";
   } else {
-    html += "Waiting on @" + activeChain.active_user;
+    bar.classList.add("hidden");
   }
 
-  html += `</div>`;
+  input.onkeydown = (e) => {
+    if (e.key !== "Enter") return;
+    if (!input.value.trim()) return;
+    if (chain.active_user !== currentUser) return;
 
-  view.innerHTML = html;
-}
+    chain.turns.push({
+      type: chain.turn_state,
+      user: currentUser,
+      text: input.value.trim()
+    });
 
-// INPUT
-const input = document.getElementById("inputField");
+    chain.turn_state =
+      chain.turn_state === "question" ? "answer" : "question";
 
-function setInput(ph) {
-  input.placeholder = ph;
-  document.getElementById("inputBar").classList.remove("hidden");
-}
+    chain.active_user =
+      currentUser === chain.a ? chain.b : chain.a;
 
-function hideInput() {
-  document.getElementById("inputBar").classList.add("hidden");
-}
-
-// SUBMIT (FIXED STABILITY)
-function submitTurn() {
-  if (!activeChain) return;
-  if (activeChain.active_user !== currentUser) return;
-  if (!input.value.trim()) return;
-
-  activeChain.turns.push({
-    type: activeChain.turn_state,
-    user: currentUser,
-    text: input.value.trim()
-  });
-
-  activeChain.last_action = Date.now();
-
-  activeChain.turn_state =
-    activeChain.turn_state === "question" ? "answer" : "question";
-
-  activeChain.active_user =
-    currentUser === activeChain.user_a
-      ? activeChain.user_b
-      : activeChain.user_a;
-
-  input.value = "";
-
-  // prevent mobile “zoom feel”
-  input.blur();
-
-  renderChain();
+    input.value = "";
+    openChain(postId, chainId);
+  };
 }
 
 // INIT

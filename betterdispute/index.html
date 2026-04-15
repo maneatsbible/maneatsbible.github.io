@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v35.8</title>
+<title>Better Dispute v35.9</title>
 
 <style>
 body{
@@ -135,7 +135,7 @@ textarea{
     cursor:pointer;
   ">⚖️</button>
 
-  <div>Better Dispute v35.8</div>
+  <div>Better Dispute v35.9</div>
 </header>
 
 <div id="users"></div>
@@ -172,10 +172,8 @@ let stack=[];
 let reactions={};
 let logs=[];
 
-let userState={
-  lockedNode:null,
-  awaitingAnswer:false
-};
+/* pending dispute intent (IMPORTANT FIX) */
+let pendingDispute=null;
 
 function log(e,d){
   logs.push({t:Date.now(),u:currentUser,e,d});
@@ -220,14 +218,7 @@ function create(){
   render();
 }
 
-/* QUESTION CHECK */
-function isQuestionUnanswered(id){
-  const n=find(id);
-  const children=items.filter(x=>x.parent===id);
-  return n && n.type==="question" && children.length===0;
-}
-
-/* REACT */
+/* REACT (FIXED: no commit on down) */
 function react(id,type){
 
   const n=find(id);
@@ -236,14 +227,13 @@ function react(id,type){
   const k=key(currentUser,id);
   if(reactions[k]) return;
 
-  reactions[k]=type;
-
   if(type==="down"){
-    userState.lockedNode=id;
-    userState.awaitingAnswer=isQuestionUnanswered(id);
+    pendingDispute={id,type};
     openDispute(id);
+    return; // ❗ NO COMMIT HERE
   }
 
+  reactions[k]=type;
   log(type,id);
   render();
 }
@@ -256,31 +246,56 @@ function openDispute(id){
   document.getElementById("popup").style.display="block";
 }
 
+/* FIX: cancel discards everything */
 function closePopup(){
+  pendingDispute=null;
   activeDisputeNode=null;
   document.getElementById("popup").style.display="none";
 }
 
+/* FIX: submit is ONLY commit point */
 function submitDispute(){
+
+  if(!pendingDispute) return;
+
+  const target=pendingDispute.id;
+
+  const k=key(currentUser,target);
+  if(!reactions[k]){
+    reactions[k]="down";
+  }
 
   const c=document.getElementById("counter").value.trim();
   const q=document.getElementById("challenge").value.trim();
 
   if(c){
-    items.push({id:id++,text:c,user:currentUser,parent:activeDisputeNode,side:"right"});
+    items.push({
+      id:id++,
+      text:c,
+      user:currentUser,
+      parent:target,
+      side:"right"
+    });
   }
+
   if(q){
-    items.push({id:id++,text:q,user:currentUser,parent:activeDisputeNode,side:"left"});
+    items.push({
+      id:id++,
+      text:q,
+      user:currentUser,
+      parent:target,
+      side:"left"
+    });
   }
 
   document.getElementById("counter").value="";
   document.getElementById("challenge").value="";
-  closePopup();
 
-  userState.lockedNode=null;
-  userState.awaitingAnswer=false;
+  log("dispute",target);
 
-  log("dispute",activeDisputeNode);
+  pendingDispute=null;
+  activeDisputeNode=null;
+
   render();
 }
 
@@ -300,6 +315,7 @@ let chat={};
 
 function renderSidebar(id){
   chat[id]=chat[id]||[];
+
   document.getElementById("sidebar").innerHTML=`
     <div>Chat</div>
     ${chat[id].map(m=>`<div class="chatMsg"><b>${m.u}</b>: ${m.m}</div>`).join("")}
@@ -315,23 +331,18 @@ function sendChat(id){
   renderSidebar(id);
 }
 
-/* ACTION RULE (FIXED) */
-function canReact(node){
-  return node && node.user!==currentUser;
-}
-
-/* NODE RENDER (FIXED: ALWAYS SHOW ACTIONS IN DRILL + ROOT) */
+/* NODE */
 function renderNode(node){
 
   const r=reactions[key(currentUser,node.id)];
-  const showActions = canReact(node);
+  const show=node.user!==currentUser;
 
   return `
     <div class="card" onclick="enter(${node.id})">
 
       <div>${node.text} <span class="meta">@${node.user}</span></div>
 
-      ${showActions ? `
+      ${show ? `
         <div class="actions">
 
           <span class="icon ${r==='up'?'active':'dim'}"
@@ -411,30 +422,19 @@ function render(){
     logs.slice(-200).reverse().map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* SEED DATA (ENRICHED) */
-items.push({id:id++,text:"Truth is independent of observers",user:"alice",parent:null});
-items.push({id:id++,text:"Truth is consensus-based",user:"bob",parent:null});
-items.push({id:id++,text:"Logic is language-bound",user:"charlie",parent:null});
+/* SEED DATA */
+items.push({id:id++,text:"Truth exists independent of belief",user:"alice",parent:null});
+items.push({id:id++,text:"Reality is socially constructed",user:"bob",parent:null});
+items.push({id:id++,text:"Logic depends on language",user:"charlie",parent:null});
 items.push({id:id++,text:"Meaning evolves over time",user:"dana",parent:null});
 items.push({id:id++,text:"Some truths cannot be known",user:"eve",parent:null});
 
-/* QUESTIONS */
 items.push({id:id++,text:"What grounds truth?",user:"bob",parent:0,side:"left",type:"question"});
-items.push({id:id++,text:"Can language define logic fully?",user:"charlie",parent:2,side:"left",type:"question"});
+items.push({id:id++,text:"Empirical consistency",user:"charlie",parent:5});
 
-/* ANSWERS */
-items.push({id:id++,text:"Empirical consistency",user:"dana",parent:5});
-items.push({id:id++,text:"No, it constrains it",user:"alice",parent:6});
-
-/* DISPUTES */
 items.push({id:id++,text:"Truth emerges socially",user:"bob",parent:1,side:"right"});
-items.push({id:id++,text:"Emergence is not truth",user:"alice",parent:8,side:"left"});
-items.push({id:id++,text:"But stability matters",user:"charlie",parent:9,side:"right"});
-
-/* UNCHALLENGED */
-items.push({id:id++,text:"Not all disagreements resolve",user:"eve",parent:null});
-items.push({id:id++,text:"Perspective shifts outcomes",user:"dana",parent:null});
-items.push({id:id++,text:"Reason evolves historically",user:"charlie",parent:null});
+items.push({id:id++,text:"Emergence is not truth",user:"alice",parent:7,side:"left"});
+items.push({id:id++,text:"But stability matters",user:"charlie",parent:8,side:"right"});
 
 renderUsers();
 render();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v36.1</title>
+<title>Better Dispute v36</title>
 
 <style>
 body{
@@ -59,8 +59,7 @@ textarea{
 .icon.dim{opacity:.25}
 .icon.active{opacity:1}
 
-#nav{padding:10px}
-
+/* DISPUTE LAYOUT (ALWAYS VERTICAL + TWO LANES) */
 .disputeWrap{
   display:flex;
   flex-direction:column;
@@ -80,15 +79,20 @@ textarea{
   border-radius:8px;
 }
 
+/* NAV */
+#nav{padding:10px}
+
+/* LOG ALWAYS VISIBLE */
 #log{
   border-top:1px solid #222;
   padding:10px;
   font-size:11px;
   color:#7f7;
-  max-height:160px;
+  max-height:180px;
   overflow:auto;
 }
 
+/* POPUP */
 #popup{
   display:none;
   position:fixed;
@@ -110,15 +114,16 @@ textarea{
 
 <header>
   <button onclick="home()" style="
-    background:#1f1f1f;
+    background:#222;
     border:1px solid #333;
-    color:#eee;
-    padding:6px 10px;
-    border-radius:8px;
+    color:#aaa;
+    padding:5px 8px;
+    border-radius:6px;
     cursor:pointer;
-  ">⚖️</button>
+    font-size:12px;
+  ">back</button>
 
-  <div>Better Dispute v36.1</div>
+  <div>v36</div>
 </header>
 
 <div id="users"></div>
@@ -152,17 +157,18 @@ let stack=[];
 let reactions={};
 let pending=null;
 
-/* ---------- core ---------- */
+/* LOG */
+let logs=[];
 
+function log(e,d){
+  logs.push({t:Date.now(),u:currentUser,e,d});
+}
+
+/* HELPERS */
 function find(i){return items.find(x=>x.id===i);}
 function key(u,id){return u+"|"+id;}
 
-function log(e,d){
-  console.log(e,d);
-}
-
-/* ---------- users ---------- */
-
+/* USERS */
 function renderUsers(){
   const el=document.getElementById("users");
   el.innerHTML="";
@@ -175,25 +181,28 @@ function renderUsers(){
   });
 }
 
-/* ---------- nav ---------- */
-
+/* NAV */
 function home(){stack=[];render();}
-function enter(i){stack=[i];render();}
-function back(){stack=[];render();}
 
-/* ---------- create ---------- */
-
+/* CREATE */
 function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
 
-  items.push({id:id++,text:t,user:currentUser,parent:null});
+  items.push({
+    id:id++,
+    text:t,
+    user:currentUser,
+    parent:null,
+    type:"statement"
+  });
+
   document.getElementById("composer").value="";
+  log("create",t);
   render();
 }
 
-/* ---------- reactions ---------- */
-
+/* REACT (DEFER DOWN) */
 function react(id,type){
 
   const n=find(id);
@@ -209,10 +218,15 @@ function react(id,type){
   }
 
   reactions[k]="up";
+  log("up",id);
   render();
 }
 
-/* ---------- submit dispute ---------- */
+/* DISPUTE */
+function closePopup(){
+  pending=null;
+  document.getElementById("popup").style.display="none";
+}
 
 function submitDispute(){
 
@@ -223,20 +237,38 @@ function submitDispute(){
   const c=document.getElementById("counter").value.trim();
   const q=document.getElementById("challenge").value.trim();
 
-  if(c) items.push({id:id++,text:c,user:currentUser,parent:target,side:"right"});
-  if(q) items.push({id:id++,text:q,user:currentUser,parent:target,side:"left"});
+  if(c){
+    items.push({
+      id:id++,
+      text:c,
+      user:currentUser,
+      parent:target,
+      side:"right"
+    });
+  }
+
+  if(q){
+    items.push({
+      id:id++,
+      text:q,
+      user:currentUser,
+      parent:target,
+      side:"left"
+    });
+  }
 
   document.getElementById("counter").value="";
   document.getElementById("challenge").value="";
 
+  log("dispute",target);
+
   pending=null;
-  document.getElementById("popup").style.display="none";
+  closePopup();
 
   render();
 }
 
-/* ---------- NODE ---------- */
-
+/* NODE (ALWAYS SHOW UP/DOWN IF NOT OWNER, INCLUDING DRILL) */
 function node(n){
 
   const r=reactions[key(currentUser,n.id)];
@@ -259,48 +291,59 @@ function node(n){
   `;
 }
 
-/* ---------- FULL 2-LANE DRILL VIEW (FIXED) ---------- */
-
+/* DRILL VIEW: VERTICAL + ALL CHILDREN + TWO LANES FOR DISPUTES */
 function renderDispute(root){
 
   const children=items.filter(x=>x.parent===root.id);
 
-  const left=children.filter(x=>x.side==="left");
-  const right=children.filter(x=>x.side==="right");
+  const answers = children.filter(c=>!c.side);
+  const left = children.filter(c=>c.side==="left");
+  const right = children.filter(c=>c.side==="right");
 
   return `
     <div>
 
-      <!-- TOP NODE ALWAYS -->
+      <!-- TOP -->
       <div class="card">
         ${root.text} <span class="meta">@${root.user}</span>
       </div>
 
-      <!-- ALWAYS SHOW FULL 2 LANES -->
+      <!-- ANSWERS UNDER QUESTIONS (VERTICAL) -->
+      ${answers.length ? `
+        <div class="disputeWrap">
+          <div class="laneTitle">Answers</div>
+          <div class="lane">
+            ${answers.map(node).join("")}
+          </div>
+        </div>
+      ` : ""}
+
+      <!-- DISPUTE LANES -->
+      ${(left.length || right.length) ? `
       <div class="disputeWrap">
 
         <div>
-          <div class="laneTitle">Left (Challenge)</div>
+          <div class="laneTitle">Left / Challenge</div>
           <div class="lane">
             ${left.map(node).join("")}
           </div>
         </div>
 
         <div>
-          <div class="laneTitle">Right (Counter)</div>
+          <div class="laneTitle">Right / Counter</div>
           <div class="lane">
             ${right.map(node).join("")}
           </div>
         </div>
 
       </div>
+      ` : ""}
 
     </div>
   `;
 }
 
-/* ---------- RENDER ---------- */
-
+/* RENDER */
 function render(){
 
   const view=document.getElementById("view");
@@ -318,32 +361,35 @@ function render(){
 
     const cur=find(stack[0]);
 
-    nav.innerHTML=`
-      <button onclick="back()" style="
-        background:#1f1f1f;
-        border:1px solid #333;
-        color:#eee;
-        padding:6px 10px;
-        border-radius:8px;
-        cursor:pointer;
-      ">🔙</button>
-    `;
+    nav.innerHTML="";
 
     view.innerHTML=renderDispute(cur);
   }
+
+  /* ALWAYS SHOW LOG */
+  document.getElementById("log").innerHTML =
+    logs.slice(-200).reverse().map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------- SEED DATA ---------- */
-
+/* TEST DATA */
 items.push({id:id++,text:"Truth exists independent of belief",user:"alice",parent:null});
 items.push({id:id++,text:"Truth is consensus-based",user:"bob",parent:null});
 items.push({id:id++,text:"Logic depends on language",user:"charlie",parent:null});
+items.push({id:id++,text:"Meaning evolves over time",user:"dana",parent:null});
+items.push({id:id++,text:"Some truths cannot be known",user:"eve",parent:null});
 
-items.push({id:id++,text:"Consensus is unstable",user:"alice",parent:1,side:"left"});
+/* ANSWER FLOW */
+items.push({id:id++,text:"Empirical grounding",user:"bob",parent:0});
+items.push({id:id++,text:"Consensus stability matters",user:"charlie",parent:1});
+
+/* DISPUTES */
+items.push({id:id++,text:"Consensus is fragile",user:"alice",parent:1,side:"left"});
 items.push({id:id++,text:"Consensus is functional",user:"bob",parent:1,side:"right"});
+items.push({id:id++,text:"Function ≠ truth",user:"dana",parent:7,side:"left"});
 
-items.push({id:id++,text:"Language limits logic",user:"charlie",parent:2,side:"left"});
-items.push({id:id++,text:"Language enables logic",user:"dana",parent:2,side:"right"});
+/* MORE BRANCHING */
+items.push({id:id++,text:"Language shapes logic",user:"charlie",parent:2,side:"left"});
+items.push({id:id++,text:"Logic constrains language",user:"eve",parent:2,side:"right"});
 
 renderUsers();
 render();

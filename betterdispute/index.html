@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Better Dispute v17</title>
+<title>Better Dispute v18</title>
 
 <style>
 body {
@@ -13,7 +13,6 @@ body {
   color: #fff;
 }
 
-/* HEADER (UNCHANGED) */
 .header {
   display: flex;
   justify-content: space-between;
@@ -31,7 +30,6 @@ body {
   opacity: 0.6;
 }
 
-/* USER */
 .userBar {
   display: flex;
   gap: 6px;
@@ -51,14 +49,12 @@ body {
   color: #fff;
 }
 
-/* LAYOUT */
 .container {
   max-width: 600px;
   margin: 0 auto;
   padding: 10px;
 }
 
-/* COMPOSE */
 .compose {
   background: #141416;
   padding: 10px;
@@ -77,7 +73,6 @@ textarea {
   padding: 10px;
 }
 
-/* CARDS */
 .card {
   background: #1a1a1c;
   padding: 10px;
@@ -92,7 +87,6 @@ textarea {
   margin-top: 4px;
 }
 
-/* TURN */
 .turn {
   padding: 10px;
   border-radius: 8px;
@@ -102,14 +96,12 @@ textarea {
 .q { background: #2c2c2f; }
 .a { background: #1f3a2c; }
 
-/* NESTED */
 .nested {
   margin-left: 14px;
   border-left: 2px solid #333;
   padding-left: 10px;
 }
 
-/* INPUT */
 .inputBar {
   position: fixed;
   bottom: 0;
@@ -132,7 +124,7 @@ textarea {
     <div class="back hidden" id="backBtn" onclick="goBack()">←</div>
     <div><b>Better Dispute</b></div>
   </div>
-  <div class="right">v17</div>
+  <div class="right">v18</div>
 </div>
 
 <div class="userBar">
@@ -144,7 +136,7 @@ textarea {
 <div class="container" id="home"></div>
 <div class="container" id="dispute"></div>
 
-<div class="inputBar hidden" id="inputBar">
+<div class="inputBar hidden">
   <textarea id="input"></textarea>
 </div>
 
@@ -158,64 +150,64 @@ let mode = "home";
 let activePostId = null;
 let activeChainId = null;
 
-/* ---------------- REGISTRY (FIX) ---------------- */
+/* ---------------- STORAGE ---------------- */
 
 const postsById = new Map();
 const chainsById = new Map();
 const turnsById = new Map();
 
-/* ---------------- TEST DATA (RICH) ---------------- */
+/* ---------------- HELPERS ---------------- */
 
-function createTurn(type, user, text) {
-  const id = Date.now() + Math.random();
-  const t = { id, type, user, text, nested: [] };
-  turnsById.set(id, t);
-  return t;
+function uid() {
+  return String(Date.now() + Math.random());
 }
 
-function createChain(a, b, seedTurns = []) {
-  const id = Date.now() + Math.random();
-  const c = {
-    id,
-    a,
-    b,
-    turns: seedTurns,
-    active_user: b,
-    turn_state: "question"
-  };
-  chainsById.set(id, c);
-  return c;
-}
+/* ---------------- DATA ---------------- */
 
 function createPost(user, text) {
-  const id = Date.now() + Math.random();
-  const p = { id, user, text, chains: [] };
-  postsById.set(id, p);
+  const p = {
+    id: uid(),
+    user,
+    text,
+    chains: []
+  };
+  postsById.set(p.id, p);
   return p;
 }
 
-/* USERS */
-const alice = "alice";
-const bob = "bob";
-const charlie = "charlie";
+function createChain(a, b) {
+  const c = {
+    id: uid(),
+    a,
+    b,
+    turns: [],
+    active_user: b,
+    turn_state: "question"
+  };
+  chainsById.set(c.id, c);
+  return c;
+}
 
-/* POSTS */
-const p1 = createPost(alice, "Faith alone is sufficient for salvation.");
-const p2 = createPost(charlie, "AI will replace most jobs.");
-const p3 = createPost(bob, "Truth requires questioning authority.");
+function createTurn(type, user, text) {
+  const t = { id: uid(), type, user, text, nested: [] };
+  turnsById.set(t.id, t);
+  return t;
+}
 
-/* CHAINS */
-const c1 = createChain(alice, bob, [
-  createTurn("question", bob, "Where is that stated?"),
-  createTurn("answer", alice, "Ephesians 2:8-9."),
-]);
+/* ---------------- TEST DATA (RICH) ---------------- */
 
-const c2 = createChain(charlie, alice, [
-  createTurn("question", alice, "Which jobs specifically?"),
-  createTurn("answer", charlie, "Most knowledge work."),
-]);
+const p1 = createPost("alice", "Faith alone is sufficient for salvation.");
+const p2 = createPost("charlie", "AI will replace most jobs.");
+const p3 = createPost("bob", "Truth requires questioning authority.");
 
+const c1 = createChain("alice", "bob");
+c1.turns.push(createTurn("question","bob","Where is that stated?"));
+c1.turns.push(createTurn("answer","alice","Ephesians 2:8-9."));
 p1.chains.push(c1);
+
+const c2 = createChain("charlie","alice");
+c2.turns.push(createTurn("question","alice","Which jobs specifically?"));
+c2.turns.push(createTurn("answer","charlie","Knowledge work."));
 p2.chains.push(c2);
 
 /* ---------------- NAV ---------------- */
@@ -236,72 +228,61 @@ function goHome() {
   activePostId = null;
   activeChainId = null;
   render();
-  updateInput();
-}
-
-function goBack() {
-  goHome();
 }
 
 /* ---------------- RESOLVE ---------------- */
 
-function getActiveChain() {
-  return chainsById.get(activeChainId) || null;
+function getPost(id) {
+  return postsById.get(id);
 }
 
-function getActivePost() {
-  return postsById.get(activePostId) || null;
+function getChain(id) {
+  return chainsById.get(id);
 }
 
 /* ---------------- DRILL ---------------- */
 
 function openChain(postId, chainId) {
+  if (!postId) return;
+
   mode = "dispute";
   activePostId = postId;
-  activeChainId = chainId;
+  activeChainId = chainId || null;
+
   render();
-  updateInput();
 }
 
-/* ---------------- CHALLENGE ---------------- */
+/* ---------------- CREATE POST (FIXED NAME COLLISION BUG) ---------------- */
 
-function challenge(turn) {
-  const chain = getActiveChain();
-  if (!chain) return;
+function submitPost() {
+  const box = document.getElementById("composeBox");
+  if (!box.value.trim()) return;
 
-  const nested = createChain(currentUser, "other", []);
+  const p = createPost(currentUser, box.value.trim());
+  box.value = "";
 
-  turn.nested.push(nested);
-
-  openChain(activePostId, nested.id);
+  render();
 }
 
-/* ---------------- INPUT ---------------- */
+/* ---------------- CHALLENGE (SAFE) ---------------- */
 
-document.getElementById("input").addEventListener("keydown", (e) => {
-  if (e.key !== "Enter") return;
+function challenge(target) {
+  if (!target) return;
 
-  const chain = getActiveChain();
-  if (!chain || chain.active_user !== currentUser) return;
+  const chain = createChain(currentUser, "opponent");
 
-  const val = e.target.value.trim();
-  if (!val) return;
+  if (target.turns) {
+    target.turns.push(createTurn("question", currentUser, "Challenge opened"));
+  }
 
-  const turn = createTurn(chain.turn_state, currentUser, val);
-  chain.turns.push(turn);
+  if (getPost(activePostId)) {
+    getPost(activePostId).chains.push(chain);
+  }
 
-  chain.turn_state =
-    chain.turn_state === "question" ? "answer" : "question";
+  openChain(activePostId, chain.id);
+}
 
-  chain.active_user =
-    currentUser === chain.a ? chain.b : chain.a;
-
-  e.target.value = "";
-  render();
-  updateInput();
-});
-
-/* ---------------- RENDER HOME ---------------- */
+/* ---------------- RENDER HOME (FIXED) ---------------- */
 
 function renderHome() {
   const el = document.getElementById("home");
@@ -309,15 +290,23 @@ function renderHome() {
   let html = `
     <div class="compose">
       <textarea id="composeBox" placeholder="Start a fire..."></textarea>
-      <button onclick="createPost()">Post</button>
+      <button onclick="submitPost()">Post</button>
     </div>
   `;
 
   postsById.forEach(post => {
+    const chainPreview =
+      (post.chains?.length && post.chains[0].turns.length)
+        ? post.chains[0].turns.slice(-2)
+            .map(t => (t.type === "question" ? "Q" : "A") + ": " + t.text)
+            .join(" → ")
+        : "No disputes yet";
+
     html += `
       <div class="card" onclick="openChain('${post.id}','${post.chains[0]?.id || ""}')">
         <b>${post.text}</b>
         <div class="meta">@${post.user}</div>
+        <div class="meta">${chainPreview}</div>
       </div>
     `;
   });
@@ -325,55 +314,7 @@ function renderHome() {
   el.innerHTML = html;
 }
 
-function createPost() {
-  const box = document.getElementById("composeBox");
-  if (!box.value.trim()) return;
-
-  const p = createPost(currentUser, box.value.trim());
-  box.value = "";
-  render();
-}
-
 /* ---------------- RENDER DISPUTE ---------------- */
-
-function renderChain(chain) {
-  let html = "";
-
-  chain.turns.forEach(t => {
-    html += `
-      <div class="turn ${t.type === "question" ? "q" : "a"}">
-        <div onclick="challenge(getTurn('${t.id}'))">
-          ${t.text}
-        </div>
-        <div class="meta">@${t.user}</div>
-      </div>
-    `;
-
-    if (t.nested.length) {
-      html += `<div class="nested">`;
-      t.nested.forEach(n => {
-        html += `
-          <div class="card"
-               onclick="openChain('${activePostId}','${n.id}')">
-            ${n.turns[0]?.text || "Nested dispute"}
-          </div>
-        `;
-      });
-      html += `</div>`;
-    }
-  });
-
-  return html;
-}
-
-function getTurn(id) {
-  for (let c of chainsById.values()) {
-    for (let t of c.turns) {
-      if (String(t.id) === String(id)) return t;
-    }
-  }
-  return null;
-}
 
 function renderDispute() {
   const el = document.getElementById("dispute");
@@ -383,37 +324,60 @@ function renderDispute() {
     return;
   }
 
-  const post = getActivePost();
-  const chain = getActiveChain();
+  const post = getPost(activePostId);
+  const chain = getChain(activeChainId);
 
-  if (!post || !chain) return;
+  if (!post) return;
 
   let html = `
     <div class="card">
       <b>${post.text}</b>
       <div class="meta">@${post.user}</div>
+      <button onclick="challenge(${JSON.stringify(post.id)})">Challenge</button>
     </div>
   `;
 
-  html += renderChain(chain);
+  if (!chain) {
+    el.innerHTML = html;
+    return;
+  }
+
+  chain.turns.forEach(t => {
+    html += `
+      <div class="turn ${t.type === "question" ? "q" : "a"}">
+        ${t.text}
+        <div class="meta">@${t.user}</div>
+      </div>
+    `;
+  });
 
   el.innerHTML = html;
 }
 
-/* ---------------- INPUT RULE ---------------- */
+/* ---------------- INPUT ---------------- */
 
-function updateInput() {
-  const bar = document.getElementById("inputBar");
-  const chain = getActiveChain();
+document.getElementById("input").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
 
-  if (mode === "dispute" && chain && chain.active_user === currentUser) {
-    bar.classList.remove("hidden");
-  } else {
-    bar.classList.add("hidden");
-  }
-}
+  const chain = getChain(activeChainId);
+  if (!chain || chain.active_user !== currentUser) return;
 
-/* ---------------- MAIN RENDER ---------------- */
+  const val = e.target.value.trim();
+  if (!val) return;
+
+  chain.turns.push(createTurn(chain.turn_state, currentUser, val));
+
+  chain.turn_state =
+    chain.turn_state === "question" ? "answer" : "question";
+
+  chain.active_user =
+    currentUser === chain.a ? chain.b : chain.a;
+
+  e.target.value = "";
+  render();
+});
+
+/* ---------------- RENDER ---------------- */
 
 function render() {
   document.getElementById("home").style.display = mode === "home" ? "block" : "none";
@@ -421,10 +385,18 @@ function render() {
 
   renderHome();
   renderDispute();
-  updateInput();
 
   document.getElementById("backBtn")
     .classList.toggle("hidden", mode === "home");
+
+  const chain = getChain(activeChainId);
+  const bar = document.querySelector(".inputBar");
+
+  if (mode === "dispute" && chain && chain.active_user === currentUser) {
+    bar.classList.remove("hidden");
+  } else {
+    bar.classList.add("hidden");
+  }
 }
 
 /* INIT */

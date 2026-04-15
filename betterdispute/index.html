@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Better Dispute v18</title>
+<title>Better Dispute v19</title>
 
 <style>
 body {
@@ -20,9 +20,15 @@ body {
   border-bottom: 1px solid #222;
 }
 
-.home, .back {
+.left {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.home {
   cursor: pointer;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .right {
@@ -30,6 +36,7 @@ body {
   opacity: 0.6;
 }
 
+/* USER */
 .userBar {
   display: flex;
   gap: 6px;
@@ -49,12 +56,14 @@ body {
   color: #fff;
 }
 
+/* LAYOUT */
 .container {
   max-width: 600px;
   margin: 0 auto;
   padding: 10px;
 }
 
+/* COMPOSE */
 .compose {
   background: #141416;
   padding: 10px;
@@ -73,6 +82,17 @@ textarea {
   padding: 10px;
 }
 
+button {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  background: #2a2a2d;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* CARD */
 .card {
   background: #1a1a1c;
   padding: 10px;
@@ -87,6 +107,7 @@ textarea {
   margin-top: 4px;
 }
 
+/* TURN */
 .turn {
   padding: 10px;
   border-radius: 8px;
@@ -96,20 +117,36 @@ textarea {
 .q { background: #2c2c2f; }
 .a { background: #1f3a2c; }
 
+/* NESTING */
 .nested {
   margin-left: 14px;
   border-left: 2px solid #333;
   padding-left: 10px;
 }
 
+/* DISPUTE HEADER */
+.disputeTop {
+  margin-bottom: 10px;
+}
+
+/* BACK BUTTON (MOVED HERE AS REQUESTED) */
+.backBar {
+  margin-bottom: 10px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+/* INPUT */
 .inputBar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 10px;
   background: #0f0f10;
   border-top: 1px solid #222;
+  padding: 10px;
+  display: flex;
+  gap: 6px;
 }
 
 .hidden { display: none; }
@@ -119,12 +156,11 @@ textarea {
 <body>
 
 <div class="header">
-  <div style="display:flex;gap:10px;align-items:center;">
+  <div class="left">
     <div class="home" onclick="goHome()">⚖️</div>
-    <div class="back hidden" id="backBtn" onclick="goBack()">←</div>
     <div><b>Better Dispute</b></div>
   </div>
-  <div class="right">v18</div>
+  <div class="right">v19</div>
 </div>
 
 <div class="userBar">
@@ -138,6 +174,7 @@ textarea {
 
 <div class="inputBar hidden">
   <textarea id="input"></textarea>
+  <button onclick="submitInput()">Send</button>
 </div>
 
 <script>
@@ -152,62 +189,58 @@ let activeChainId = null;
 
 /* ---------------- STORAGE ---------------- */
 
-const postsById = new Map();
-const chainsById = new Map();
-const turnsById = new Map();
+const posts = new Map();
+const chains = new Map();
 
-/* ---------------- HELPERS ---------------- */
+/* ---------------- IDS ---------------- */
 
-function uid() {
-  return String(Date.now() + Math.random());
-}
+const uid = () => String(Date.now() + Math.random());
 
 /* ---------------- DATA ---------------- */
 
-function createPost(user, text) {
-  const p = {
-    id: uid(),
-    user,
-    text,
-    chains: []
-  };
-  postsById.set(p.id, p);
+function makePost(user, text) {
+  const p = { id: uid(), user, text, chains: [] };
+  posts.set(p.id, p);
   return p;
 }
 
-function createChain(a, b) {
+function makeChain(a, b) {
   const c = {
     id: uid(),
     a,
     b,
-    turns: [],
     active_user: b,
-    turn_state: "question"
+    turn_state: "question",
+    turns: []
   };
-  chainsById.set(c.id, c);
+  chains.set(c.id, c);
   return c;
 }
 
-function createTurn(type, user, text) {
-  const t = { id: uid(), type, user, text, nested: [] };
-  turnsById.set(t.id, t);
-  return t;
+function makeTurn(type, user, text) {
+  return { id: uid(), type, user, text, nested: [] };
 }
 
-/* ---------------- TEST DATA (RICH) ---------------- */
+/* ---------------- TEST DATA (RICH + NESTED) ---------------- */
 
-const p1 = createPost("alice", "Faith alone is sufficient for salvation.");
-const p2 = createPost("charlie", "AI will replace most jobs.");
-const p3 = createPost("bob", "Truth requires questioning authority.");
+const p1 = makePost("alice", "Faith alone is sufficient for salvation.");
+const p2 = makePost("charlie", "AI will replace most jobs.");
+const p3 = makePost("bob", "Truth requires questioning authority.");
 
-const c1 = createChain("alice", "bob");
-c1.turns.push(createTurn("question","bob","Where is that stated?"));
-c1.turns.push(createTurn("answer","alice","Ephesians 2:8-9."));
+const c1 = makeChain("alice","bob");
+c1.turns.push(makeTurn("question","bob","Where is that stated?"));
+c1.turns.push(makeTurn("answer","alice","Ephesians 2:8-9"));
+
+const c1nested = makeChain("bob","alice");
+c1.turns[0].nested.push(c1nested);
+c1nested.turns.push(makeTurn("question","bob","Define 'faith' precisely."));
+c1nested.turns.push(makeTurn("answer","alice","Trust in divine promise."));
+
 p1.chains.push(c1);
 
-const c2 = createChain("charlie","alice");
-c2.turns.push(createTurn("question","alice","Which jobs specifically?"));
-c2.turns.push(createTurn("answer","charlie","Knowledge work."));
+const c2 = makeChain("charlie","alice");
+c2.turns.push(makeTurn("question","alice","Which jobs specifically?"));
+c2.turns.push(makeTurn("answer","charlie","Knowledge work."));
 p2.chains.push(c2);
 
 /* ---------------- NAV ---------------- */
@@ -230,83 +263,86 @@ function goHome() {
   render();
 }
 
-/* ---------------- RESOLVE ---------------- */
-
-function getPost(id) {
-  return postsById.get(id);
-}
-
-function getChain(id) {
-  return chainsById.get(id);
-}
-
-/* ---------------- DRILL ---------------- */
+/* ---------------- OPEN ---------------- */
 
 function openChain(postId, chainId) {
-  if (!postId) return;
-
   mode = "dispute";
   activePostId = postId;
-  activeChainId = chainId || null;
-
+  activeChainId = chainId;
   render();
 }
 
-/* ---------------- CREATE POST (FIXED NAME COLLISION BUG) ---------------- */
+/* ---------------- BACK (FIXED LOCATION) ---------------- */
 
-function submitPost() {
-  const box = document.getElementById("composeBox");
-  if (!box.value.trim()) return;
-
-  const p = createPost(currentUser, box.value.trim());
-  box.value = "";
-
+function goBack() {
+  mode = "home";
+  activePostId = null;
+  activeChainId = null;
   render();
 }
 
-/* ---------------- CHALLENGE (SAFE) ---------------- */
+/* ---------------- LOOKUP ---------------- */
 
-function challenge(target) {
-  if (!target) return;
+function getPost() {
+  return posts.get(activePostId);
+}
 
-  const chain = createChain(currentUser, "opponent");
+function getChain() {
+  return chains.get(activeChainId);
+}
 
-  if (target.turns) {
-    target.turns.push(createTurn("question", currentUser, "Challenge opened"));
-  }
+/* ---------------- CHALLENGE (FIXED) ---------------- */
 
-  if (getPost(activePostId)) {
-    getPost(activePostId).chains.push(chain);
-  }
+function challenge(turn) {
+  if (!turn) return;
+
+  const chain = makeChain(currentUser, "opponent");
+
+  turn.nested.push(chain);
 
   openChain(activePostId, chain.id);
 }
 
-/* ---------------- RENDER HOME (FIXED) ---------------- */
+/* ---------------- INPUT ---------------- */
+
+function submitInput() {
+  const chain = getChain();
+  const box = document.getElementById("input");
+
+  if (!chain || chain.active_user !== currentUser) return;
+
+  const text = box.value.trim();
+  if (!text) return;
+
+  chain.turns.push(makeTurn(chain.turn_state, currentUser, text));
+
+  chain.turn_state =
+    chain.turn_state === "question" ? "answer" : "question";
+
+  chain.active_user =
+    currentUser === chain.a ? chain.b : chain.a;
+
+  box.value = "";
+  render();
+}
+
+/* ---------------- RENDER HOME ---------------- */
 
 function renderHome() {
   const el = document.getElementById("home");
 
   let html = `
     <div class="compose">
-      <textarea id="composeBox" placeholder="Start a fire..."></textarea>
-      <button onclick="submitPost()">Post</button>
+      <textarea id="composeBox"></textarea>
+      <button onclick="createPost()">Post</button>
     </div>
   `;
 
-  postsById.forEach(post => {
-    const chainPreview =
-      (post.chains?.length && post.chains[0].turns.length)
-        ? post.chains[0].turns.slice(-2)
-            .map(t => (t.type === "question" ? "Q" : "A") + ": " + t.text)
-            .join(" → ")
-        : "No disputes yet";
-
+  posts.forEach(p => {
     html += `
-      <div class="card" onclick="openChain('${post.id}','${post.chains[0]?.id || ""}')">
-        <b>${post.text}</b>
-        <div class="meta">@${post.user}</div>
-        <div class="meta">${chainPreview}</div>
+      <div class="card" onclick="openChain('${p.id}','${p.chains[0]?.id || ""}')">
+        <b>${p.text}</b>
+        <div class="meta">@${p.user}</div>
       </div>
     `;
   });
@@ -314,7 +350,53 @@ function renderHome() {
   el.innerHTML = html;
 }
 
+function createPost() {
+  const box = document.getElementById("composeBox");
+  if (!box.value.trim()) return;
+
+  const p = makePost(currentUser, box.value.trim());
+  box.value = "";
+  render();
+}
+
 /* ---------------- RENDER DISPUTE ---------------- */
+
+function renderTurns(chain) {
+  let html = "";
+
+  chain.turns.forEach(t => {
+    html += `
+      <div class="turn ${t.type === "question" ? "q" : "a"}"
+           onclick="challenge(getTurn('${t.id}'))">
+        ${t.text}
+        <div class="meta">@${t.user}</div>
+      </div>
+    `;
+
+    if (t.nested.length) {
+      html += `<div class="nested">`;
+      t.nested.forEach(n => {
+        html += `
+          <div class="card" onclick="openChain('${activePostId}','${n.id}')">
+            ${n.turns[0]?.text || "Nested dispute"}
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+  });
+
+  return html;
+}
+
+function getTurn(id) {
+  for (let c of chains.values()) {
+    for (let t of c.turns) {
+      if (t.id === id) return t;
+    }
+  }
+  return null;
+}
 
 function renderDispute() {
   const el = document.getElementById("dispute");
@@ -324,73 +406,31 @@ function renderDispute() {
     return;
   }
 
-  const post = getPost(activePostId);
-  const chain = getChain(activeChainId);
+  const post = getPost();
+  const chain = getChain();
 
-  if (!post) return;
+  if (!post || !chain) return;
 
   let html = `
-    <div class="card">
-      <b>${post.text}</b>
-      <div class="meta">@${post.user}</div>
-      <button onclick="challenge(${JSON.stringify(post.id)})">Challenge</button>
+    <div class="disputeTop">
+      <div class="backBar" onclick="goBack()">← Back</div>
+      <div class="card">
+        <b>${post.text}</b>
+        <div class="meta">@${post.user}</div>
+      </div>
     </div>
   `;
 
-  if (!chain) {
-    el.innerHTML = html;
-    return;
-  }
-
-  chain.turns.forEach(t => {
-    html += `
-      <div class="turn ${t.type === "question" ? "q" : "a"}">
-        ${t.text}
-        <div class="meta">@${t.user}</div>
-      </div>
-    `;
-  });
+  html += renderTurns(chain);
 
   el.innerHTML = html;
 }
 
-/* ---------------- INPUT ---------------- */
+/* ---------------- INPUT RULE ---------------- */
 
-document.getElementById("input").addEventListener("keydown", (e) => {
-  if (e.key !== "Enter") return;
-
-  const chain = getChain(activeChainId);
-  if (!chain || chain.active_user !== currentUser) return;
-
-  const val = e.target.value.trim();
-  if (!val) return;
-
-  chain.turns.push(createTurn(chain.turn_state, currentUser, val));
-
-  chain.turn_state =
-    chain.turn_state === "question" ? "answer" : "question";
-
-  chain.active_user =
-    currentUser === chain.a ? chain.b : chain.a;
-
-  e.target.value = "";
-  render();
-});
-
-/* ---------------- RENDER ---------------- */
-
-function render() {
-  document.getElementById("home").style.display = mode === "home" ? "block" : "none";
-  document.getElementById("dispute").style.display = mode === "dispute" ? "block" : "none";
-
-  renderHome();
-  renderDispute();
-
-  document.getElementById("backBtn")
-    .classList.toggle("hidden", mode === "home");
-
-  const chain = getChain(activeChainId);
+function updateInput() {
   const bar = document.querySelector(".inputBar");
+  const chain = getChain();
 
   if (mode === "dispute" && chain && chain.active_user === currentUser) {
     bar.classList.remove("hidden");
@@ -399,7 +439,19 @@ function render() {
   }
 }
 
+/* ---------------- MAIN ---------------- */
+
+function render() {
+  document.getElementById("home").style.display = mode === "home" ? "block" : "none";
+  document.getElementById("dispute").style.display = mode === "dispute" ? "block" : "none";
+
+  renderHome();
+  renderDispute();
+  updateInput();
+}
+
 /* INIT */
+
 switchUser(currentUser);
 render();
 

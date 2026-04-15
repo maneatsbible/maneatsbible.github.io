@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v54</title>
+<title>Better Dispute v55</title>
 
 <style>
 body{
@@ -64,8 +64,6 @@ textarea{
 }
 
 .meta{font-size:11px;color:#888}
-
-/* ICONS */
 .icon{margin-right:6px}
 
 /* LANES */
@@ -111,7 +109,7 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v54</div>
+  <div id="title">Better Dispute v55</div>
 </header>
 
 <div id="users"></div>
@@ -214,7 +212,6 @@ function submitDispute(){
   const parentNode=find(target);
   if(!parentNode) return;
 
-  /* FIX: prevent self-dispute */
   if(parentNode.user === currentUser){
     alert("Cannot dispute your own statement.");
     return;
@@ -267,7 +264,11 @@ function closePopup(){
 function answer(qid){
 
   const q=find(qid);
-  if(!q || q.answerBy) return;
+  if(!q) return;
+
+  /* FIX: derive answer existence from actual data */
+  const hasAnswer = items.some(x => x.parent === qid && x.type === "answer");
+  if(hasAnswer) return; // hides action completely if already answered
 
   const expected=openQuestions[qid];
   if(currentUser!==expected){
@@ -288,7 +289,6 @@ function answer(qid){
     participants:q.participants
   });
 
-  q.answerBy=currentUser;
   delete openQuestions[qid];
 
   log("answer",qid);
@@ -334,9 +334,12 @@ function renderNode(n){
   if(n.type==="question") icon="?";
   if(n.type==="answer") icon="✓";
 
+  const hasAnswer = n.type==="question"
+    ? items.some(x => x.parent === n.id && x.type === "answer")
+    : false;
+
   return `
     <div class="card">
-
       <div>
         <span class="icon">${icon}</span>
         ${n.text}
@@ -345,12 +348,11 @@ function renderNode(n){
 
       ${
         n.type==="question" &&
-        !n.answerBy && /* FIX: hide if answered */
+        !hasAnswer &&
         openQuestions[n.id]===currentUser
-        ? `<button onclick="answer(${n.id})">Answer</button>`
-        : ""
+          ? `<button onclick="answer(${n.id})">Answer</button>`
+          : ""
       }
-
     </div>
   `;
 }
@@ -408,25 +410,24 @@ function render(){
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (NO SELF INTERACTION) ---------------- */
+/* ---------------- TEST DATA (CLEAN + CONSISTENT) ---------------- */
 
+/* Top level */
 items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null,type:"proclaim"});
 
 /* Bob challenges Alice */
 items.push({id:id++,text:"Does truth require agreement?",user:"bob",parent:0,type:"question",lane:"left",participants:["alice","bob"]});
 openQuestions[1]="alice";
 
-/* Alice answers */
-items.push({id:id++,text:"No, truth stands regardless of belief",user:"alice",parent:1,type:"answer",lane:"left",participants:["alice","bob"]});
+items.push({id:id++,text:"No, truth stands regardless",user:"alice",parent:1,type:"answer",lane:"left",participants:["alice","bob"]});
 
-/* Bob counters */
+/* Bob counter lane */
 items.push({id:id++,text:"Truth depends on shared understanding",user:"bob",parent:0,type:"proclaim",lane:"right",participants:["alice","bob"]});
 
-/* Alice challenges Bob's counter */
+/* Alice challenges Bob */
 items.push({id:id++,text:"Can shared understanding be wrong?",user:"alice",parent:3,type:"question",lane:"left",participants:["alice","bob"]});
 openQuestions[4]="bob";
 
-/* Bob answers */
 items.push({id:id++,text:"Yes, consensus can still be mistaken",user:"bob",parent:4,type:"answer",lane:"left",participants:["alice","bob"]});
 
 renderUsers();

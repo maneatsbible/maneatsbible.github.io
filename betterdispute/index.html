@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Better Dispute v9</title>
+<title>Better Dispute v8 (fixed)</title>
 
 <style>
 body {
@@ -13,6 +13,7 @@ body {
   color: #fff;
 }
 
+/* HEADER */
 .header {
   position: sticky;
   top: 0;
@@ -73,42 +74,74 @@ button {
 
 button.primary { background: #3a6df0; }
 
-/* STACKED DISPUTE BLOCK (scales better than flat threads) */
-.block {
+/* CHAIN */
+.chainPreview {
   margin-top: 8px;
-  padding: 10px;
+  padding: 8px;
   background: #141416;
-  border-radius: 10px;
+  border-radius: 8px;
+  font-size: 13px;
 }
 
 .turn {
-  padding: 8px;
+  margin-bottom: 8px;
+  padding: 10px;
   border-radius: 8px;
-  margin-bottom: 6px;
 }
 
 .question { background: #2c2c2f; }
 .answer { background: #1f3a2c; }
 
-.hidden { display: none; }
+.you { outline: 1.5px solid #3a6df0; }
 
-/* FIRE */
-.fireBox {
-  background: #141416;
-  border-radius: 10px;
-  padding: 10px;
-  margin-bottom: 12px;
+.status {
+  font-size: 12px;
+  margin-top: 6px;
+  opacity: 0.85;
 }
 
+.tailBox {
+  margin-top: 10px;
+  padding: 10px;
+  background: #141416;
+  border-radius: 8px;
+}
+
+/* FIX: ALL INPUTS DARK */
 textarea {
   width: 100%;
-  min-height: 70px;
+  min-height: 80px;
   font-size: 16px;
   border-radius: 10px;
-  border: none;
+  border: 1px solid #2a2a2d;
   padding: 10px;
   resize: none;
+
+  background: #1a1a1c;
+  color: #fff;
+  outline: none;
 }
+
+textarea::placeholder {
+  color: #777;
+}
+
+.inputBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #0f0f10;
+  padding: 10px;
+  border-top: 1px solid #222;
+}
+
+.sendBtn {
+  margin-top: 6px;
+  width: 100%;
+}
+
+.hidden { display: none; }
 </style>
 </head>
 
@@ -116,8 +149,11 @@ textarea {
 
 <div class="header">
   <div class="topRow">
-    <div class="home" onclick="goHome()">⚖️</div>
-    <div class="right">v9</div>
+    <div class="left">
+      <div class="home" onclick="goHome()">⚖️</div>
+      <div>Better Dispute</div>
+    </div>
+    <div class="right">v8</div>
   </div>
 
   <div class="userBar">
@@ -128,136 +164,205 @@ textarea {
 </div>
 
 <div class="container" id="feed"></div>
+<div class="container hidden" id="chainView"></div>
+
+<div class="inputBar hidden" id="inputBar">
+  <textarea id="inputField"></textarea>
+  <button class="primary sendBtn" onclick="submitTurn()">Send</button>
+</div>
 
 <script>
 let currentUser = "bob";
 
 let posts = [
-  { id: 1, user: "alice", text: "Faith alone is sufficient for salvation.", chains: [] }
+  { id: 1, user: "alice", text: "Faith alone is sufficient for salvation.", chains: [] },
+  { id: 2, user: "charlie", text: "AI will replace most jobs.", chains: [] }
 ];
 
 // SAMPLE CHAIN
 posts[0].chains.push({
   id: 101,
-  a: "alice",
-  b: "bob",
+  user_a: "alice",
+  user_b: "bob",
   turns: [
     { type: "question", user: "bob", text: "Where is that stated?" },
     { type: "answer", user: "alice", text: "Ephesians 2:8-9." }
-  ]
+  ],
+  turn_state: "question",
+  active_user: "bob",
+  status: "active",
+  last_action: Date.now()
 });
+
+let activePost = null;
+let activeChain = null;
 
 // SWITCH USER
 function switchUser(u) {
   currentUser = u;
+
   document.querySelectorAll(".userBar button")
     .forEach(b => b.classList.remove("active"));
+
   document.getElementById("u-" + u).classList.add("active");
 
   renderFeed();
-}
-
-// SAFE CHALLENGE (FIXED CORE BUG)
-function challenge(postId, targetUser) {
-  const post = posts.find(p => p.id === postId);
-  if (!post || targetUser === currentUser) return;
-
-  post.chains.push({
-    id: Date.now(),
-    a: targetUser,
-    b: currentUser,
-    turns: []
-  });
-
-  renderFeed();
+  if (activeChain) renderChain();
 }
 
 // HOME
 function goHome() {
-  renderFeed();
+  activePost = null;
+  activeChain = null;
+  document.getElementById("feed").classList.remove("hidden");
+  document.getElementById("chainView").classList.add("hidden");
+  hideInput();
+}
+
+// START CHALLENGE (FIXED: stable target resolution)
+function startChallenge(postId) {
+  const post = posts.find(p => p.id === postId);
+
+  if (post.user === currentUser) return;
+
+  const chain = {
+    id: Date.now(),
+    user_a: post.user,
+    user_b: currentUser,
+    turns: [],
+    turn_state: "question",
+    active_user: currentUser,
+    status: "active",
+    last_action: Date.now()
+  };
+
+  post.chains.push(chain);
+  openChain(postId, chain.id);
+}
+
+// OPEN CHAIN
+function openChain(postId, chainId) {
+  activePost = posts.find(p => p.id === postId);
+  activeChain = activePost.chains.find(c => c.id === chainId);
+
+  document.getElementById("feed").classList.add("hidden");
+  document.getElementById("chainView").classList.remove("hidden");
+
+  renderChain();
 }
 
 // FEED
 function renderFeed() {
   const feed = document.getElementById("feed");
-
-  let html = `
-    <div class="fireBox">
-      <textarea id="fireInput" placeholder="Start a fire..."></textarea>
-      <button class="primary" onclick="createPost()">Post</button>
-    </div>
-  `;
+  feed.innerHTML = "";
 
   posts.forEach(post => {
     const self = post.user === currentUser;
 
-    html += `
+    let html = `
       <div class="card">
         <div class="message">${post.text}</div>
         <div class="meta">@${post.user}</div>
 
         <div class="actions">
-          <button class="primary"
-            ${self ? 'disabled' : `onclick="challenge(${post.id}, '${post.user}')"`}>
+          <button class="${self ? '' : 'primary'}"
+            ${self ? 'disabled' : `onclick="startChallenge(${post.id})"`}>
             Challenge
           </button>
         </div>
     `;
 
     post.chains.forEach(chain => {
-      html += renderBlock(chain, post);
+      html += `
+        <div class="chainPreview" onclick="openChain(${post.id}, ${chain.id})">
+          ${chain.turns.map(t => `${t.type === "question" ? "Q" : "A"}: ${t.text}`).join(" → ")}
+        </div>
+      `;
     });
 
     html += `</div>`;
+    feed.innerHTML += html;
   });
-
-  feed.innerHTML = html;
 }
 
-// SCALABLE BLOCK RENDER (NO FLAT THREADS)
-function renderBlock(chain, post) {
-  let html = `<div class="block">`;
+// CHAIN
+function renderChain() {
+  const view = document.getElementById("chainView");
 
-  chain.turns.forEach(t => {
+  let html = `
+    <div class="card">
+      <div class="message">${activePost.text}</div>
+      <div class="meta">@${activePost.user}</div>
+    </div>
+  `;
+
+  activeChain.turns.forEach(t => {
     html += `
-      <div class="turn ${t.type}">
+      <div class="turn ${t.type} ${t.user === currentUser ? 'you' : ''}">
         ${t.text}
         <div class="meta">@${t.user}</div>
       </div>
     `;
   });
 
-  const opponent = (chain.a === currentUser) ? chain.b : chain.a;
-  const canChallenge = opponent !== currentUser;
+  html += `<div class="tailBox">`;
 
-  html += `
-    <div class="actions">
-      <button class="primary"
-        ${!canChallenge ? 'disabled' : ''}
-        onclick="challenge(${post.id}, '${opponent}')">
-        Challenge
-      </button>
-    </div>
-  `;
+  if (activeChain.status !== "active") {
+    html += activeChain.statusLabel || "Closed";
+  } else if (activeChain.active_user === currentUser) {
+    html += "Your turn";
+    setInput(activeChain.turn_state === "question"
+      ? "Ask a precise question..."
+      : "Answer directly...");
+  } else {
+    html += "Waiting on @" + activeChain.active_user;
+  }
 
   html += `</div>`;
-  return html;
+
+  view.innerHTML = html;
 }
 
-// POST
-function createPost() {
-  const input = document.getElementById("fireInput");
+// INPUT
+const input = document.getElementById("inputField");
+
+function setInput(ph) {
+  input.placeholder = ph;
+  document.getElementById("inputBar").classList.remove("hidden");
+}
+
+function hideInput() {
+  document.getElementById("inputBar").classList.add("hidden");
+}
+
+// SUBMIT (FIXED STABILITY)
+function submitTurn() {
+  if (!activeChain) return;
+  if (activeChain.active_user !== currentUser) return;
   if (!input.value.trim()) return;
 
-  posts.unshift({
-    id: Date.now(),
+  activeChain.turns.push({
+    type: activeChain.turn_state,
     user: currentUser,
-    text: input.value.trim(),
-    chains: []
+    text: input.value.trim()
   });
 
+  activeChain.last_action = Date.now();
+
+  activeChain.turn_state =
+    activeChain.turn_state === "question" ? "answer" : "question";
+
+  activeChain.active_user =
+    currentUser === activeChain.user_a
+      ? activeChain.user_b
+      : activeChain.user_a;
+
   input.value = "";
-  renderFeed();
+
+  // prevent mobile “zoom feel”
+  input.blur();
+
+  renderChain();
 }
 
 // INIT

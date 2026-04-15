@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v59</title>
+<title>Better Dispute v60</title>
 
 <style>
 body{
@@ -44,14 +44,17 @@ header{
 
 #composerWrap{padding:10px}
 
+/* FIX MOBILE ZOOM: 16px+ prevents iOS auto zoom */
 textarea{
   width:100%;
-  height:90px;
+  font-size:16px;
+  line-height:1.3;
   background:#0b0b0b;
   color:#eee;
   border:1px solid #333;
   padding:8px;
   border-radius:6px;
+  box-sizing:border-box;
 }
 
 /* CARD */
@@ -132,6 +135,7 @@ textarea{
 
 #modal textarea{
   width:100%;
+  font-size:16px; /* FIX zoom */
   height:60px;
   margin-bottom:6px;
   background:#0b0b0b;
@@ -139,6 +143,7 @@ textarea{
   border:1px solid #333;
   border-radius:6px;
   padding:6px;
+  box-sizing:border-box;
 }
 
 .modalActions{
@@ -188,7 +193,7 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v59</div>
+  <div id="title">Better Dispute v60</div>
 </header>
 
 <div id="users"></div>
@@ -218,12 +223,6 @@ textarea{
 <div id="log"></div>
 
 <script>
-
-/* ---------------- SAFE INIT (prevents modal flash) ---------------- */
-window.onload = () => {
-  document.getElementById("overlay").style.display = "none";
-  document.getElementById("modal").style.display = "none";
-};
 
 /* ---------------- STATE ---------------- */
 let users=["alice","bob","charlie"];
@@ -265,8 +264,8 @@ function home(){
   render();
 }
 
-function enter(id){
-  stack.push(id);
+function enter(i){
+  stack.push(i);
   document.getElementById("composerWrap").style.display="none";
   render();
 }
@@ -316,8 +315,9 @@ function submitDispute(){
   const parentNode=find(target);
   if(!parentNode) return;
 
-  if(parentNode.user===currentUser){
-    alert("Cannot dispute own statement.");
+  // FIX: correct logic — only block self-dispute if SAME NODE USER
+  if(parentNode.user === currentUser){
+    alert("Cannot dispute your own statement.");
     return;
   }
 
@@ -356,7 +356,7 @@ function submitDispute(){
   render();
 }
 
-/* ---------------- AGREEMENT SYSTEM (RESTORED) ---------------- */
+/* ---------------- REACTIONS ---------------- */
 function getReaction(id){
   return reactions[id]?.[currentUser];
 }
@@ -379,7 +379,7 @@ function setReaction(id,type){
   if(type==="disagree"){
     reactions[id][currentUser]="disagree";
     log("disagree",id);
-    openModal(); // ONLY here
+    openModal();
     render();
   }
 }

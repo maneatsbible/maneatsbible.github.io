@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v49</title>
+<title>Better Dispute v50</title>
 
 <style>
 body{
@@ -13,7 +13,6 @@ body{
   color:#eee;
 }
 
-/* HEADER */
 header{
   display:flex;
   justify-content:space-between;
@@ -33,7 +32,6 @@ header{
 
 #title{font-weight:600}
 
-/* USERS */
 #users{display:flex;gap:6px;padding:8px}
 .user{
   padding:4px 8px;
@@ -44,7 +42,6 @@ header{
 }
 .user.active{opacity:1;border-color:#fff}
 
-/* COMPOSER */
 #composerWrap{padding:10px}
 
 textarea{
@@ -63,33 +60,12 @@ textarea{
   padding:10px;
   margin-bottom:8px;
   border-radius:8px;
-  cursor:pointer;
 }
 
 .meta{font-size:11px;color:#888}
 
 /* ICONS */
-.icon{
-  font-size:16px;
-  margin-right:6px;
-}
-
-/* TYPE COLORS */
-.proclaim{color:#7f7}
-.question{color:#ffd24a}
-.answer{color:#6ab7ff}
-
-/* ACTIONS */
-.actions{margin-top:6px}
-.btn{
-  background:#222;
-  border:1px solid #333;
-  color:#ddd;
-  padding:3px 6px;
-  border-radius:6px;
-  cursor:pointer;
-  font-size:12px;
-}
+.icon{margin-right:6px}
 
 /* TWO LANE */
 .disputeWrap{
@@ -134,7 +110,7 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v49</div>
+  <div id="title">Better Dispute v50</div>
 </header>
 
 <div id="users"></div>
@@ -147,11 +123,10 @@ textarea{
 <div id="nav"></div>
 <div id="view"></div>
 
-<!-- DISPUTE POPUP -->
 <div id="popup" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#111;border:1px solid #333;padding:10px;width:320px;z-index:20;">
   <div>Dispute</div>
-  <textarea id="challenge" placeholder="Question / Challenge"></textarea>
-  <textarea id="counter" placeholder="Counter Proclamation"></textarea>
+  <textarea id="challenge" placeholder="Question"></textarea>
+  <textarea id="counter" placeholder="Counter"></textarea>
   <button onclick="submitDispute()">✓</button>
   <button onclick="closePopup()">✕</button>
 </div>
@@ -167,12 +142,10 @@ let currentUser="alice";
 let id=0;
 let items=[];
 let stack=[];
-let reactions={};
-let pending=null;
 let logs=[];
 
-/* answer tracking FIXED */
-let openQuestions={}; // questionId -> expected answerer (user)
+/* question -> expected answerer */
+let openQuestions={};
 
 /* ---------------- LOG ---------------- */
 function log(e,d){
@@ -181,7 +154,6 @@ function log(e,d){
 
 /* ---------------- HELPERS ---------------- */
 function find(i){return items.find(x=>x.id===i);}
-function key(u,id){return u+"|"+id;}
 
 /* ---------------- USERS ---------------- */
 function renderUsers(){
@@ -236,65 +208,32 @@ function create(){
   render();
 }
 
-/* ---------------- REACTIONS ---------------- */
-function react(id,type){
-
-  const n=find(id);
-  if(!n || n.user===currentUser) return;
-
-  const k=key(currentUser,id);
-  if(reactions[k]) return;
-
-  if(type==="down"){
-    pending=id;
-    document.getElementById("popup").style.display="block";
-    return;
-  }
-
-  reactions[k]="up";
-  log("up",id);
-  render();
-}
-
 /* ---------------- DISPUTE ---------------- */
-function closePopup(){
-  pending=null;
-  document.getElementById("popup").style.display="none";
-}
-
 function submitDispute(){
 
-  if(!pending) return;
-
-  const target=pending;
+  const target=stack[stack.length-1];
 
   const q=document.getElementById("challenge").value.trim();
   const c=document.getElementById("counter").value.trim();
 
-  /* QUESTION */
   if(q){
-    let qid=id++;
+    const qid=id++;
     items.push({
       id:qid,
       text:q,
       user:currentUser,
       parent:target,
-      side:"left",
       type:"question"
     });
-
-    /* FIXED: assign expected responder explicitly */
-    openQuestions[qid] = find(target)?.user || null;
+    openQuestions[qid]=find(target)?.user;
   }
 
-  /* COUNTER */
   if(c){
     items.push({
       id:id++,
       text:c,
       user:currentUser,
       parent:target,
-      side:"right",
       type:"proclaim"
     });
   }
@@ -303,13 +242,15 @@ function submitDispute(){
   document.getElementById("counter").value="";
 
   log("dispute",target);
-
-  pending=null;
   closePopup();
   render();
 }
 
-/* ---------------- ANSWER (FIXED LOGIC) ---------------- */
+function closePopup(){
+  document.getElementById("popup").style.display="none";
+}
+
+/* ---------------- ANSWER ---------------- */
 function answer(qid){
 
   const q=find(qid);
@@ -317,9 +258,8 @@ function answer(qid){
 
   const expected=openQuestions[qid];
 
-  /* HARD ENFORCEMENT: only intended recipient can answer */
-  if(expected && currentUser !== expected){
-    alert("Only the targeted user can answer this question.");
+  if(expected && currentUser!==expected){
+    alert("Only the assigned respondent can answer.");
     return;
   }
 
@@ -341,75 +281,86 @@ function answer(qid){
   render();
 }
 
-/* ---------------- NODE ---------------- */
-function node(n){
+/* ---------------- BUILD TREE ---------------- */
+function buildTree(parentId){
+  const nodes = items.filter(x=>x.parent===parentId);
 
-  let icon="!";
-  if(n.type==="question") icon="?";
-  if(n.type==="answer") icon="✓";
+  const grouped = nodes.map(n=>{
+    if(n.type==="question"){
+      return {
+        ...n,
+        children: buildTree(n.id)
+      };
+    }
+    if(n.type==="answer"){
+      return n;
+    }
+    return {
+      ...n,
+      children: buildTree(n.id)
+    };
+  });
 
-  let cls=n.type;
-
-  const isForeign = n.user !== currentUser;
-
-  return `
-    <div class="card" onclick="enter(${n.id})">
-
-      <div>
-        <span class="icon ${cls}">${icon}</span>
-        ${n.text}
-        <span class="meta">@${n.user}</span>
-      </div>
-
-      ${n.type==="question" ? `
-        <button class="btn" onclick="event.stopPropagation();answer(${n.id})">Answer</button>
-      `:""}
-
-      ${isForeign ? `
-        <div class="actions">
-          <span onclick="event.stopPropagation();react(${n.id},'up')">👍</span>
-          <span onclick="event.stopPropagation();react(${n.id},'down')">👎</span>
-        </div>
-      `:""}
-
-    </div>
-  `;
+  return grouped;
 }
 
-/* ---------------- DISPUTE VIEW ---------------- */
-function renderDispute(root){
+/* ---------------- RENDER NESTED LINEAR (NO FORK INSIDE LANE) ---------------- */
+function renderChain(nodes,depth=0){
 
-  const chain=[];
-  let cur=root;
+  let html="";
 
-  while(cur){
-    chain.unshift(cur);
-    cur=find(cur.parent);
+  for(const n of nodes){
+
+    let icon="!";
+    if(n.type==="question") icon="?";
+    if(n.type==="answer") icon="✓";
+
+    html+=`
+      <div class="card" style="margin-left:${depth*12}px">
+
+        <div>
+          <span class="icon">${icon}</span>
+          ${n.text}
+          <span class="meta">@${n.user}</span>
+        </div>
+
+        ${n.type==="question" && (!n.answerBy) && (openQuestions[n.id]===currentUser || true) ? `
+          ${openQuestions[n.id]===currentUser ? `
+            <button onclick="answer(${n.id})">Answer</button>
+          `:""}
+        `:""}
+
+      </div>
+    `;
+
+    if(n.children && n.children.length){
+      html+=renderChain(n.children, depth+1);
+    }
   }
 
-  const children=items.filter(x=>x.parent===root.id);
-  const left=children.filter(x=>x.side==="left");
-  const right=children.filter(x=>x.side==="right");
+  return html;
+}
+
+/* ---------------- VIEW ---------------- */
+function renderDispute(root){
+
+  const tree = buildTree(root.id);
 
   return `
-    <div>
+    <div class="card">
+      <span class="icon">!</span>
+      ${root.text}
+      <span class="meta">@${root.user}</span>
+    </div>
 
-      <div class="card">
-        <span class="icon proclaim">!</span>
-        ${root.text}
-        <span class="meta">@${root.user}</span>
-      </div>
-
-      <div class="disputeWrap">
-        <div class="lane">${left.map(node).join("")}</div>
-        <div class="lane">${right.map(node).join("")}</div>
-      </div>
-
+    <div class="disputeWrap">
+      <div class="lane">${renderChain(tree.filter(n=>n.user))}</div>
+      <div class="lane">${renderChain(tree.filter(n=>n.user))}</div>
     </div>
   `;
 }
 
-/* ---------------- RENDER ---------------- */
+/* ---------------- MAIN RENDER ---------------- */
 function render(){
 
   const view=document.getElementById("view");
@@ -419,35 +370,48 @@ function render(){
   nav.innerHTML="";
 
   if(stack.length===0){
-    items.filter(x=>x.parent===null)
-      .forEach(n=>view.innerHTML+=node(n));
+
+    const roots=items.filter(x=>x.parent===null);
+
+    roots.forEach(r=>{
+      view.innerHTML+=`
+        <div class="card" onclick="enter(${r.id})">
+          <span class="icon">!</span>
+          ${r.text}
+          <span class="meta">@${r.user}</span>
+        </div>
+      `;
+    });
+
   } else {
+
     const cur=find(stack[stack.length-1]);
     nav.innerHTML=`<button id="backBtn" onclick="back()">⬅ back</button>`;
     view.innerHTML=renderDispute(cur);
+
   }
 
   document.getElementById("log").innerHTML =
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (FIXED Q/A MODEL) ---------------- */
+/* ---------------- TEST DATA (CORRECT Q → A STRUCTURE) ---------------- */
 
 items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null,type:"proclaim"});
 items.push({id:id++,text:"Meaning is shaped by agreement",user:"bob",parent:null,type:"proclaim"});
 items.push({id:id++,text:"Reality constrains interpretation",user:"charlie",parent:null,type:"proclaim"});
 
-/* QUESTION (BOB → ALICE) */
-items.push({id:id++,text:"Does truth require consensus?",user:"bob",parent:0,side:"left",type:"question"});
+/* QUESTION ON ALICE */
+items.push({id:id++,text:"Does truth require consensus?",user:"bob",parent:0,type:"question"});
 
-/* ANSWER (ALICE ONLY VALID RESPONDER) */
-items.push({id:id++,text:"No, truth exists regardless",user:"alice",parent:3,side:"right",type:"answer"});
+/* ANSWER (ONLY ALICE) */
+items.push({id:id++,text:"No, truth exists regardless",user:"alice",parent:3,type:"answer"});
 
 /* FOLLOWUP QUESTION */
-items.push({id:id++,text:"How is truth verified then?",user:"charlie",parent:3,side:"left",type:"question"});
+items.push({id:id++,text:"Then how is truth verified?",user:"charlie",parent:3,type:"question"});
 
 /* ANSWER */
-items.push({id:id++,text:"Through stable external consistency",user:"bob",parent:5,side:"right",type:"answer"});
+items.push({id:id++,text:"Through stable external consistency",user:"bob",parent:5,type:"answer"});
 
 renderUsers();
 render();

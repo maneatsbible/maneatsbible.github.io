@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v39</title>
+<title>Better Dispute v40</title>
 
 <style>
 body{
@@ -13,23 +13,31 @@ body{
   color:#eee;
 }
 
+/* HEADER */
 header{
   display:flex;
   justify-content:space-between;
   padding:10px;
+  align-items:center;
   border-bottom:1px solid #222;
 }
 
 #title{font-weight:600}
-#homeBtn{
+
+/* HOME / BACK */
+#homeBtn, #backBtn{
   background:#1c1c1c;
   border:1px solid #333;
   color:#aaa;
-  padding:5px 8px;
-  border-radius:6px;
+  padding:6px 10px;
+  border-radius:8px;
   cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:6px;
 }
 
+/* USERS */
 #users{display:flex;gap:6px;padding:8px}
 .user{
   padding:4px 8px;
@@ -40,6 +48,10 @@ header{
 }
 .user.active{opacity:1;border-color:#fff}
 
+/* INPUT */
+#composerWrap{
+  padding:10px;
+}
 textarea{
   width:100%;
   height:90px;
@@ -47,8 +59,10 @@ textarea{
   color:#eee;
   border:1px solid #333;
   padding:8px;
+  border-radius:6px;
 }
 
+/* CARD */
 .card{
   background:#1a1a1a;
   padding:10px;
@@ -69,7 +83,7 @@ textarea{
 .icon.dim{opacity:.25}
 .icon.active{opacity:1}
 
-/* 2-LANE ALWAYS */
+/* TWO LANE */
 .disputeWrap{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -81,6 +95,16 @@ textarea{
   background:#141414;
   padding:8px;
   border-radius:8px;
+}
+
+/* LOG */
+#log{
+  border-top:1px solid #222;
+  padding:10px;
+  font-size:11px;
+  color:#7f7;
+  max-height:180px;
+  overflow:auto;
 }
 
 /* POPUP */
@@ -96,37 +120,6 @@ textarea{
   width:300px;
   z-index:20;
 }
-
-/* SIDEBAR */
-#overlay{
-  display:none;
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.5);
-  z-index:40;
-}
-
-#sidebar{
-  position:fixed;
-  right:0;
-  top:0;
-  width:260px;
-  height:100%;
-  background:#0c0c0c;
-  border-left:1px solid #333;
-  padding:10px;
-  display:none;
-  z-index:50;
-}
-
-#log{
-  border-top:1px solid #222;
-  padding:10px;
-  font-size:11px;
-  color:#7f7;
-  max-height:180px;
-  overflow:auto;
-}
 </style>
 </head>
 
@@ -134,12 +127,13 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">v39</div>
+  <div id="title">Better Dispute v40</div>
 </header>
 
 <div id="users"></div>
 
-<div>
+<!-- TOP INPUT (HIDDEN IN DRILL) -->
+<div id="composerWrap">
   <textarea id="composer" placeholder="Start a fire..."></textarea>
   <button onclick="create()">Proclaim</button>
 </div>
@@ -155,9 +149,6 @@ textarea{
   <button onclick="closePopup()">✕</button>
 </div>
 
-<div id="overlay" onclick="closeSidebar()"></div>
-<div id="sidebar"></div>
-
 <div id="log"></div>
 
 <script>
@@ -171,10 +162,9 @@ let items=[];
 let stack=[];
 let reactions={};
 let pending=null;
-let chat={};
 let logs=[];
 
-/* ---------------- LOG (APPEND ONLY) ---------------- */
+/* ---------------- LOG ---------------- */
 function log(e,d){
   logs.push({t:Date.now(),u:currentUser,e,d});
 }
@@ -197,8 +187,24 @@ function renderUsers(){
 }
 
 /* ---------------- NAV ---------------- */
-function home(){ stack=[]; render(); }
-function enter(id){ stack=[id]; render(); }
+function home(){
+  stack=[];
+  document.getElementById("composerWrap").style.display="block";
+  render();
+}
+
+function enter(id){
+  stack=[id];
+  document.getElementById("composerWrap").style.display="none"; // REQUIRED FIX
+  render();
+}
+
+/* BACK BUTTON */
+function back(){
+  stack=[];
+  document.getElementById("composerWrap").style.display="block";
+  render();
+}
 
 /* ---------------- CREATE ---------------- */
 function create(){
@@ -211,7 +217,7 @@ function create(){
   render();
 }
 
-/* ---------------- REACTIONS ---------------- */
+/* ---------------- REACT ---------------- */
 function react(id,type){
 
   const n=find(id);
@@ -243,8 +249,8 @@ function submitDispute(){
 
   const target=pending;
 
-  const q=document.getElementById("challenge").value.trim(); // QUESTION
-  const c=document.getElementById("counter").value.trim();   // PROCLAMATION
+  const q=document.getElementById("challenge").value.trim();
+  const c=document.getElementById("counter").value.trim();
 
   if(q){
     items.push({
@@ -278,34 +284,6 @@ function submitDispute(){
   render();
 }
 
-/* ---------------- SIDEBAR ---------------- */
-function openSidebar(id){
-  chat[id]=chat[id]||[];
-  document.getElementById("sidebar").style.display="block";
-  document.getElementById("overlay").style.display="block";
-
-  document.getElementById("sidebar").innerHTML=`
-    <div style="color:#888;margin-bottom:8px">thread chat</div>
-
-    ${chat[id].map(m=>`<div><b>${m.u}</b>: ${m.m}</div>`).join("")}
-
-    <input id="chatIn" style="width:100%;margin-top:8px">
-    <button onclick="sendChat(${id})">send</button>
-  `;
-}
-
-function closeSidebar(){
-  document.getElementById("sidebar").style.display="none";
-  document.getElementById("overlay").style.display="none";
-}
-
-function sendChat(id){
-  const v=document.getElementById("chatIn").value.trim();
-  if(!v) return;
-  chat[id].push({u:currentUser,m:v});
-  openSidebar(id);
-}
-
 /* ---------------- NODE ---------------- */
 function node(n){
 
@@ -323,9 +301,6 @@ function node(n){
 
           <span class="icon ${r==='down'?'active':'dim'}"
             onclick="event.stopPropagation();react(${n.id},'down')">👎</span>
-
-          <span class="icon"
-            onclick="event.stopPropagation();openSidebar(${n.id})">💬</span>
         </div>
       `:""}
     </div>
@@ -370,6 +345,11 @@ function render(){
       .forEach(n=>view.innerHTML+=node(n));
   } else {
     const cur=find(stack[0]);
+
+    nav.innerHTML=`
+      <button id="backBtn" onclick="back()">⬅ back</button>
+    `;
+
     view.innerHTML=renderDispute(cur);
   }
 
@@ -377,24 +357,29 @@ function render(){
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (CLEAN + CONSISTENT) ---------------- */
+/* ---------------- TEST DATA (FULL RESET, CONSISTENT DISPUTES) ---------------- */
 
-/* PROCLAMATIONS */
-items.push({id:id++,text:"Truth exists beyond belief",user:"alice",parent:null});
-items.push({id:id++,text:"Consensus defines meaning",user:"bob",parent:null});
-items.push({id:id++,text:"Language shapes thought",user:"charlie",parent:null});
+/* ROOT PROCLAMATIONS */
+items.push({id:id++,text:"Truth is independent of belief",user:"alice",parent:null});
+items.push({id:id++,text:"Meaning is consensus-based",user:"bob",parent:null});
+items.push({id:id++,text:"Language shapes reality",user:"charlie",parent:null});
+items.push({id:id++,text:"Logic is human constructed",user:"dana",parent:null});
 
-/* QUESTIONS (CHALLENGES) */
-items.push({id:id++,text:"Is truth independent of agreement?",user:"dana",parent:1,type:"question",side:"left"});
-items.push({id:id++,text:"Does consensus define reality?",user:"eve",parent:2,type:"question",side:"left"});
+/* DISPUTE 1 */
+items.push({id:id++,text:"Is truth dependent on agreement?",user:"bob",parent:0,type:"question",side:"left"});
+items.push({id:id++,text:"Truth exists without observers",user:"charlie",parent:0,type:"statement",side:"right"});
 
-/* COUNTERS (PROCLAMATIONS) */
-items.push({id:id++,text:"Truth is not voted into existence",user:"bob",parent:3,type:"statement",side:"right"});
-items.push({id:id++,text:"Consensus stabilizes interpretation",user:"charlie",parent:4,type:"statement",side:"right"});
+/* DISPUTE 2 */
+items.push({id:id++,text:"Does consensus define meaning?",user:"alice",parent:1,type:"question",side:"left"});
+items.push({id:id++,text:"Consensus stabilizes language",user:"dana",parent:1,type:"statement",side:"right"});
 
-/* Q&A EXPANSION */
-items.push({id:id++,text:"What grounds meaning if not consensus?",user:"alice",parent:3,type:"question",side:"left"});
-items.push({id:id++,text:"Reality constrains interpretation",user:"dana",parent:6,type:"statement",side:"right"});
+/* DISPUTE 3 */
+items.push({id:id++,text:"Can logic exist without language?",user:"bob",parent:2,type:"question",side:"left"});
+items.push({id:id++,text:"Logic precedes language structure",user:"charlie",parent:2,type:"statement",side:"right"});
+
+/* SECONDARY NESTING */
+items.push({id:id++,text:"What defines truth then?",user:"eve",parent:5,type:"question",side:"left"});
+items.push({id:id++,text:"Reality constrains interpretation",user:"alice",parent:5,type:"statement",side:"right"});
 
 renderUsers();
 render();

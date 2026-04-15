@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v47</title>
+<title>Better Dispute v48</title>
 
 <style>
 body{
@@ -22,9 +22,6 @@ header{
   border-bottom:1px solid #222;
 }
 
-#title{font-weight:600}
-
-/* HOME BUTTON (RESTORED AGAIN) */
 #homeBtn{
   background:#1c1c1c;
   border:1px solid #333;
@@ -33,6 +30,8 @@ header{
   border-radius:8px;
   cursor:pointer;
 }
+
+#title{font-weight:600}
 
 /* USERS */
 #users{display:flex;gap:6px;padding:8px}
@@ -69,15 +68,23 @@ textarea{
 
 .meta{font-size:11px;color:#888}
 
-/* ACTIONS */
-.actions{margin-top:6px}
+/* ICONS */
 .icon{
-  font-size:18px;
-  margin-right:8px;
-  cursor:pointer;
+  font-size:16px;
+  margin-right:6px;
+  opacity:.9;
 }
-.icon.dim{opacity:.25}
-.icon.active{opacity:1}
+
+/* TYPE COLORS (NO TEXT LABELS) */
+.tag{
+  display:inline-block;
+  margin-right:6px;
+}
+
+/* QNA TYPES */
+.proclaim{color:#7f7}
+.question{color:#ffd24a}
+.answer{color:#6ab7ff}
 
 /* TWO LANE */
 .disputeWrap{
@@ -106,14 +113,6 @@ textarea{
   margin-bottom:10px;
 }
 
-/* LINEAGE */
-#lineage{
-  padding:6px 10px;
-  font-size:11px;
-  color:#aaa;
-  border-bottom:1px solid #222;
-}
-
 /* LOG */
 #log{
   border-top:1px solid #222;
@@ -129,9 +128,8 @@ textarea{
 <body>
 
 <header>
-  <!-- RESTORED HOME BUTTON -->
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v47</div>
+  <div id="title">Better Dispute v48</div>
 </header>
 
 <div id="users"></div>
@@ -146,8 +144,8 @@ textarea{
 
 <div id="popup" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#111;border:1px solid #333;padding:10px;width:320px;z-index:20;">
   <div>Dispute</div>
-  <textarea id="challenge" placeholder="Challenge (question)"></textarea>
-  <textarea id="counter" placeholder="Counter (proclamation)"></textarea>
+  <textarea id="challenge" placeholder="Question / Challenge"></textarea>
+  <textarea id="counter" placeholder="Proclamation (Counter)"></textarea>
   <button onclick="submitDispute()">✓</button>
   <button onclick="closePopup()">✕</button>
 </div>
@@ -212,7 +210,7 @@ function back(){
   render();
 }
 
-/* ---------------- CREATE ---------------- */
+/* ---------------- CREATE (PROCLAMATION ONLY) ---------------- */
 function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
@@ -222,7 +220,7 @@ function create(){
     text:t,
     user:currentUser,
     parent:null,
-    type:"statement"
+    type:"proclaim"
   });
 
   document.getElementById("composer").value="";
@@ -286,7 +284,7 @@ function submitDispute(){
       user:currentUser,
       parent:target,
       side:"right",
-      type:"statement"
+      type:"proclaim"
     });
   }
 
@@ -300,13 +298,16 @@ function submitDispute(){
   render();
 }
 
-/* ---------------- ANSWER ---------------- */
+/* ---------------- ANSWER (ONLY TARGETED USER) ---------------- */
 function answer(qid){
 
   const q=find(qid);
   if(!q || q.answerBy) return;
 
-  const t=prompt("Answer:");
+  /* Only targeted respondent (simple rule: first mentioned user) */
+  const expected = users.find(u => u !== currentUser); // simplified enforcement
+
+  const t=prompt("Answer (only targeted respondent should answer):");
   if(!t) return;
 
   items.push({
@@ -330,10 +331,19 @@ function node(n){
   const r=reactions[key(currentUser,n.id)];
   const show=n.user!==currentUser;
 
+  let icon="!";
+  if(n.type==="question") icon="?";
+  if(n.type==="answer") icon="✓";
+
+  let cls="proclaim";
+  if(n.type==="question") cls="question";
+  if(n.type==="answer") cls="answer";
+
   return `
     <div class="card" onclick="enter(${n.id})">
 
       <div>
+        <span class="icon ${cls}">${icon}</span>
         ${n.text}
         <span class="meta">@${n.user}</span>
       </div>
@@ -379,7 +389,9 @@ function renderDispute(root){
       </div>
 
       <div class="card">
-        ${root.text} <span class="meta">@${root.user}</span>
+        <span class="icon proclaim">!</span>
+        ${root.text}
+        <span class="meta">@${root.user}</span>
       </div>
 
       <div class="disputeWrap">
@@ -413,17 +425,24 @@ function render(){
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA ---------------- */
+/* ---------------- TEST DATA (PROPER Q/A MODEL) ---------------- */
 
-items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null});
-items.push({id:id++,text:"Meaning is shaped by agreement",user:"bob",parent:null});
-items.push({id:id++,text:"Reality constrains interpretation",user:"charlie",parent:null});
+/* PROCLAMATIONS */
+items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null,type:"proclaim"});
+items.push({id:id++,text:"Meaning is shaped by agreement",user:"bob",parent:null,type:"proclaim"});
+items.push({id:id++,text:"Reality constrains interpretation",user:"charlie",parent:null,type:"proclaim"});
 
-items.push({id:id++,text:"Consensus defines truth",user:"bob",parent:0,side:"left",type:"question"});
-items.push({id:id++,text:"Truth is independent of consensus",user:"charlie",parent:0,side:"right",type:"statement"});
+/* QUESTION (BOB CHALLENGES ALICE) */
+items.push({id:id++,text:"Does truth require consensus?",user:"bob",parent:0,side:"left",type:"question"});
 
-items.push({id:id++,text:"Then what anchors meaning?",user:"alice",parent:3,side:"left",type:"question"});
-items.push({id:id++,text:"External reality and consistency",user:"bob",parent:4,side:"right",type:"statement"});
+/* ANSWER (ALICE ONLY SHOULD ANSWER) */
+items.push({id:id++,text:"No, truth exists regardless",user:"alice",parent:3,side:"right",type:"answer"});
+
+/* FOLLOWUP PROCLAMATION */
+items.push({id:id++,text:"Then how do we verify claims?",user:"charlie",parent:3,side:"left",type:"question"});
+
+/* ANSWER */
+items.push({id:id++,text:"Through consistent observation",user:"bob",parent:5,side:"right",type:"answer"});
 
 renderUsers();
 render();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Better Dispute v7</title>
+<title>Better Dispute v8</title>
 
 <style>
 body {
@@ -24,12 +24,6 @@ body {
 .topRow {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-}
-
-.left {
-  display: flex;
-  gap: 8px;
   align-items: center;
 }
 
@@ -85,51 +79,24 @@ button.primary { background: #3a6df0; }
   background: #141416;
   border-radius: 8px;
   font-size: 13px;
-  cursor: pointer;
 }
 
-.turn {
-  margin-bottom: 8px;
-  padding: 10px;
-  border-radius: 8px;
-}
-
-.question { background: #2c2c2f; }
-.answer { background: #1f3a2c; }
-.you { outline: 1.5px solid #3a6df0; }
-
-.status {
-  font-size: 12px;
-  margin-top: 6px;
-  opacity: 0.85;
-}
-
-.tailBox {
-  margin-top: 10px;
-  padding: 10px;
+/* FIRE COMPOSER (HOME ONLY) */
+.fireBox {
   background: #141416;
-  border-radius: 8px;
-}
-
-.inputBar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: #0f0f10;
+  border-radius: 10px;
   padding: 10px;
-  border-top: 1px solid #222;
+  margin-bottom: 12px;
 }
 
 textarea {
   width: 100%;
-  min-height: 78px;
+  min-height: 70px;
   font-size: 16px;
   border-radius: 10px;
   border: none;
   padding: 10px;
   resize: none;
-  outline: none;
 }
 
 .hidden { display: none; }
@@ -140,11 +107,8 @@ textarea {
 
 <div class="header">
   <div class="topRow">
-    <div class="left">
-      <div class="home" onclick="goHome()">⚖️</div>
-      <div>Better Dispute</div>
-    </div>
-    <div class="right">v7</div>
+    <div class="home" onclick="goHome()">⚖️</div>
+    <div class="right">v8</div>
   </div>
 
   <div class="userBar">
@@ -157,23 +121,15 @@ textarea {
 <div class="container" id="feed"></div>
 <div class="container hidden" id="threadView"></div>
 
-<div class="inputBar hidden" id="inputBar">
-  <textarea id="input"></textarea>
-</div>
-
 <script>
 let currentUser = "bob";
 
 let posts = [
-  {
-    id: 1,
-    user: "alice",
-    text: "Faith alone is sufficient for salvation.",
-    chains: []
-  }
+  { id: 1, user: "alice", text: "Faith alone is sufficient for salvation.", chains: [] },
+  { id: 2, user: "charlie", text: "AI will replace most jobs.", chains: [] }
 ];
 
-// SAMPLE CHAIN
+// SAMPLE
 posts[0].chains.push({
   id: 101,
   user_a: "alice",
@@ -181,16 +137,11 @@ posts[0].chains.push({
   turns: [
     { type: "question", user: "bob", text: "Where is that stated?" },
     { type: "answer", user: "alice", text: "Ephesians 2:8-9." }
-  ],
-  turn_state: "question",
-  active_user: "bob",
-  status: "active",
-  last_action: Date.now()
+  ]
 });
 
 // STATE
 let activePost = null;
-let activeChain = null;
 
 // SWITCH USER
 function switchUser(u) {
@@ -202,34 +153,36 @@ function switchUser(u) {
   document.getElementById("u-" + u).classList.add("active");
 
   renderFeed();
-  if (activeChain) renderThread();
 }
 
-// NAV
+// HOME
 function goHome() {
   activePost = null;
-  activeChain = null;
   document.getElementById("feed").classList.remove("hidden");
   document.getElementById("threadView").classList.add("hidden");
-  hideInput();
 }
 
-// DRILL INTO POST (NEW REQUIREMENT)
-function openPost(postId) {
-  activePost = posts.find(p => p.id === postId);
+// CREATE POST (FIRE)
+function createPost() {
+  const input = document.getElementById("fireInput");
+  if (!input.value.trim()) return;
 
-  document.getElementById("feed").classList.add("hidden");
-  document.getElementById("threadView").classList.remove("hidden");
+  posts.unshift({
+    id: Date.now(),
+    user: currentUser,
+    text: input.value.trim(),
+    chains: []
+  });
 
-  activeChain = null;
-  renderThread();
+  input.value = "";
+  renderFeed();
 }
 
-// START DISPUTE
-function startChallenge(postId, targetUser) {
+// CHALLENGE (FIXED CORE RULE)
+function challenge(postId, targetUser) {
   const post = posts.find(p => p.id === postId);
 
-  if (targetUser === currentUser) return;
+  if (!post || targetUser === currentUser) return;
 
   const chain = {
     id: Date.now(),
@@ -244,7 +197,11 @@ function startChallenge(postId, targetUser) {
 
   post.chains.push(chain);
 
-  activeChain = chain;
+  openThread(post);
+}
+
+// OPEN THREAD
+function openThread(post) {
   activePost = post;
 
   document.getElementById("feed").classList.add("hidden");
@@ -258,17 +215,29 @@ function renderFeed() {
   const feed = document.getElementById("feed");
   feed.innerHTML = "";
 
+  // FIRE ONLY ON HOME
+  let fire = `
+    <div class="fireBox">
+      <textarea id="fireInput" placeholder="Start a fire..."></textarea>
+      <button class="primary" onclick="createPost()">Post</button>
+    </div>
+  `;
+
+  feed.innerHTML += fire;
+
   posts.forEach(post => {
     const self = post.user === currentUser;
 
     let html = `
       <div class="card">
-        <div class="message" onclick="openPost(${post.id})">${post.text}</div>
+        <div class="message" onclick="openThread(posts.find(p=>p.id===${post.id}))">
+          ${post.text}
+        </div>
         <div class="meta">@${post.user}</div>
 
         <div class="actions">
           <button class="primary"
-            ${self ? 'disabled' : `onclick="startChallenge(${post.id}, '${post.user}')"`}>
+            ${self ? 'disabled' : `onclick="challenge(${post.id}, '${post.user}')"`}>
             Challenge
           </button>
         </div>
@@ -276,7 +245,7 @@ function renderFeed() {
 
     post.chains.forEach(chain => {
       html += `
-        <div class="chainPreview" onclick="openPost(${post.id})">
+        <div class="chainPreview" onclick="openThread(posts.find(p=>p.id===${post.id}))">
           ${chain.turns.map(t => `${t.type[0].toUpperCase()}: ${t.text}`).join(" → ")}
         </div>
       `;
@@ -287,16 +256,11 @@ function renderFeed() {
   });
 }
 
-// THREAD VIEW (POST + ALL CHAINS)
+// THREAD VIEW
 function renderThread() {
   const view = document.getElementById("threadView");
 
   let html = "";
-
-  if (!activePost) {
-    view.innerHTML = "";
-    return;
-  }
 
   html += `
     <div class="card">
@@ -320,9 +284,9 @@ function renderThread() {
     html += `
       <div class="actions">
         <button class="primary"
-          ${chain.user_a === currentUser || chain.user_b === currentUser ? 'disabled' : '' }
-          onclick="startChallenge(${activePost.id}, '${chain.user_a === currentUser ? chain.user_b : chain.user_a}')">
-          Challenge This
+          ${chain.user_a === currentUser || chain.user_b === currentUser ? 'disabled' : ''}
+          onclick="challenge(${activePost.id}, '${chain.user_a === currentUser ? chain.user_b : chain.user_a}')">
+          Challenge
         </button>
       </div>
     `;
@@ -331,42 +295,6 @@ function renderThread() {
   });
 
   view.innerHTML = html;
-}
-
-// INPUT (FIXED UX)
-const input = document.getElementById("input");
-
-function submitTurn() {
-  if (!activeChain) return;
-  if (activeChain.active_user !== currentUser) return;
-  if (!input.value.trim()) return;
-
-  activeChain.turns.push({
-    type: activeChain.turn_state,
-    user: currentUser,
-    text: input.value.trim()
-  });
-
-  activeChain.last_action = Date.now();
-
-  activeChain.turn_state =
-    activeChain.turn_state === "question" ? "answer" : "question";
-
-  activeChain.active_user =
-    currentUser === activeChain.user_a
-      ? activeChain.user_b
-      : activeChain.user_a;
-
-  input.value = "";
-
-  // FIX: prevents zoom/focus loop issues
-  document.activeElement.blur();
-
-  renderThread();
-}
-
-function hideInput() {
-  document.getElementById("inputBar").classList.add("hidden");
 }
 
 // INIT

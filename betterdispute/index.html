@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v36</title>
+<title>Better Dispute v36.2</title>
 
 <style>
 body{
@@ -59,18 +59,11 @@ textarea{
 .icon.dim{opacity:.25}
 .icon.active{opacity:1}
 
-/* DISPUTE LAYOUT (ALWAYS VERTICAL + TWO LANES) */
 .disputeWrap{
   display:flex;
   flex-direction:column;
   gap:12px;
   margin:10px;
-}
-
-.laneTitle{
-  font-size:11px;
-  color:#777;
-  margin-bottom:4px;
 }
 
 .lane{
@@ -79,16 +72,14 @@ textarea{
   border-radius:8px;
 }
 
-/* NAV */
 #nav{padding:10px}
 
-/* LOG ALWAYS VISIBLE */
 #log{
   border-top:1px solid #222;
   padding:10px;
   font-size:11px;
   color:#7f7;
-  max-height:180px;
+  max-height:160px;
   overflow:auto;
 }
 
@@ -107,6 +98,30 @@ textarea{
 }
 
 #popup textarea{height:70px}
+
+/* SIDEBAR RESTORED */
+#sidebar{
+  position:fixed;
+  right:0;
+  top:0;
+  width:260px;
+  height:100%;
+  background:#0c0c0c;
+  border-left:1px solid #333;
+  padding:10px;
+  display:none;
+  z-index:50;
+}
+
+#overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  z-index:40;
+}
+
+.chatMsg{font-size:12px;margin-bottom:4px}
 </style>
 </head>
 
@@ -120,10 +135,9 @@ textarea{
     padding:5px 8px;
     border-radius:6px;
     cursor:pointer;
-    font-size:12px;
   ">back</button>
 
-  <div>v36</div>
+  <div>v36.2</div>
 </header>
 
 <div id="users"></div>
@@ -144,6 +158,9 @@ textarea{
   <button onclick="closePopup()">✕</button>
 </div>
 
+<div id="overlay" onclick="closeSidebar()"></div>
+<div id="sidebar"></div>
+
 <div id="log"></div>
 
 <script>
@@ -157,18 +174,19 @@ let stack=[];
 let reactions={};
 let pending=null;
 
-/* LOG */
+/* ---------------- HELPERS ---------------- */
+
+function find(i){return items.find(x=>x.id===i);}
+function key(u,id){return u+"|"+id;}
+
 let logs=[];
 
 function log(e,d){
   logs.push({t:Date.now(),u:currentUser,e,d});
 }
 
-/* HELPERS */
-function find(i){return items.find(x=>x.id===i);}
-function key(u,id){return u+"|"+id;}
+/* ---------------- USERS ---------------- */
 
-/* USERS */
 function renderUsers(){
   const el=document.getElementById("users");
   el.innerHTML="";
@@ -181,10 +199,25 @@ function renderUsers(){
   });
 }
 
-/* NAV */
-function home(){stack=[];render();}
+/* ---------------- NAV FIXED ---------------- */
 
-/* CREATE */
+function home(){
+  stack=[];
+  render();
+}
+
+function enter(id){
+  stack=[id];   // FIX: single-focus drill (no corruption)
+  render();
+}
+
+function back(){
+  stack=[];
+  render();
+}
+
+/* ---------------- CREATE ---------------- */
+
 function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
@@ -193,8 +226,7 @@ function create(){
     id:id++,
     text:t,
     user:currentUser,
-    parent:null,
-    type:"statement"
+    parent:null
   });
 
   document.getElementById("composer").value="";
@@ -202,7 +234,8 @@ function create(){
   render();
 }
 
-/* REACT (DEFER DOWN) */
+/* ---------------- REACT ---------------- */
+
 function react(id,type){
 
   const n=find(id);
@@ -222,7 +255,8 @@ function react(id,type){
   render();
 }
 
-/* DISPUTE */
+/* ---------------- DISPUTE ---------------- */
+
 function closePopup(){
   pending=null;
   document.getElementById("popup").style.display="none";
@@ -238,23 +272,11 @@ function submitDispute(){
   const q=document.getElementById("challenge").value.trim();
 
   if(c){
-    items.push({
-      id:id++,
-      text:c,
-      user:currentUser,
-      parent:target,
-      side:"right"
-    });
+    items.push({id:id++,text:c,user:currentUser,parent:target,side:"right"});
   }
 
   if(q){
-    items.push({
-      id:id++,
-      text:q,
-      user:currentUser,
-      parent:target,
-      side:"left"
-    });
+    items.push({id:id++,text:q,user:currentUser,parent:target,side:"left"});
   }
 
   document.getElementById("counter").value="";
@@ -268,7 +290,47 @@ function submitDispute(){
   render();
 }
 
-/* NODE (ALWAYS SHOW UP/DOWN IF NOT OWNER, INCLUDING DRILL) */
+/* ---------------- SIDEBAR FIXED ---------------- */
+
+let chat={};
+
+function openSidebar(id){
+  document.getElementById("sidebar").style.display="block";
+  document.getElementById("overlay").style.display="block";
+  renderSidebar(id);
+}
+
+function closeSidebar(){
+  document.getElementById("sidebar").style.display="none";
+  document.getElementById("overlay").style.display="none";
+}
+
+function renderSidebar(id){
+
+  chat[id]=chat[id]||[];
+
+  document.getElementById("sidebar").innerHTML=`
+    <div style="color:#aaa;margin-bottom:8px">thread chat</div>
+
+    ${chat[id].map(m=>`
+      <div class="chatMsg"><b>${m.u}</b>: ${m.m}</div>
+    `).join("")}
+
+    <input id="chatIn" style="width:100%;margin-top:8px">
+    <button onclick="sendChat(${id})">send</button>
+  `;
+}
+
+function sendChat(id){
+  const v=document.getElementById("chatIn").value.trim();
+  if(!v) return;
+
+  chat[id].push({u:currentUser,m:v});
+  renderSidebar(id);
+}
+
+/* ---------------- NODE ---------------- */
+
 function node(n){
 
   const r=reactions[key(currentUser,n.id)];
@@ -276,74 +338,57 @@ function node(n){
 
   return `
     <div class="card" onclick="enter(${n.id})">
+
       <div>${n.text} <span class="meta">@${n.user}</span></div>
 
       ${show ? `
         <div class="actions">
+
           <span class="icon ${r==='up'?'active':'dim'}"
             onclick="event.stopPropagation();react(${n.id},'up')">👍</span>
 
           <span class="icon ${r==='down'?'active':'dim'}"
             onclick="event.stopPropagation();react(${n.id},'down')">👎</span>
+
+          <span class="icon"
+            onclick="event.stopPropagation();openSidebar(${n.id})">💬</span>
+
         </div>
       `:""}
+
     </div>
   `;
 }
 
-/* DRILL VIEW: VERTICAL + ALL CHILDREN + TWO LANES FOR DISPUTES */
+/* ---------------- VIEW ---------------- */
+
 function renderDispute(root){
 
   const children=items.filter(x=>x.parent===root.id);
 
-  const answers = children.filter(c=>!c.side);
-  const left = children.filter(c=>c.side==="left");
-  const right = children.filter(c=>c.side==="right");
+  const left=children.filter(x=>x.side==="left");
+  const right=children.filter(x=>x.side==="right");
 
   return `
     <div>
 
-      <!-- TOP -->
       <div class="card">
         ${root.text} <span class="meta">@${root.user}</span>
       </div>
 
-      <!-- ANSWERS UNDER QUESTIONS (VERTICAL) -->
-      ${answers.length ? `
-        <div class="disputeWrap">
-          <div class="laneTitle">Answers</div>
-          <div class="lane">
-            ${answers.map(node).join("")}
-          </div>
-        </div>
-      ` : ""}
-
-      <!-- DISPUTE LANES -->
-      ${(left.length || right.length) ? `
       <div class="disputeWrap">
 
-        <div>
-          <div class="laneTitle">Left / Challenge</div>
-          <div class="lane">
-            ${left.map(node).join("")}
-          </div>
-        </div>
-
-        <div>
-          <div class="laneTitle">Right / Counter</div>
-          <div class="lane">
-            ${right.map(node).join("")}
-          </div>
-        </div>
+        <div class="lane">${left.map(node).join("")}</div>
+        <div class="lane">${right.map(node).join("")}</div>
 
       </div>
-      ` : ""}
 
     </div>
   `;
 }
 
-/* RENDER */
+/* ---------------- RENDER FIXED ---------------- */
+
 function render(){
 
   const view=document.getElementById("view");
@@ -361,33 +406,32 @@ function render(){
 
     const cur=find(stack[0]);
 
-    nav.innerHTML="";
+    nav.innerHTML=`<button onclick="back()" style="
+      background:#222;
+      border:1px solid #333;
+      color:#aaa;
+      padding:5px 8px;
+      border-radius:6px;
+      cursor:pointer;
+    ">back</button>`;
 
     view.innerHTML=renderDispute(cur);
   }
 
-  /* ALWAYS SHOW LOG */
   document.getElementById("log").innerHTML =
     logs.slice(-200).reverse().map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* TEST DATA */
+/* ---------------- TEST DATA ---------------- */
+
 items.push({id:id++,text:"Truth exists independent of belief",user:"alice",parent:null});
 items.push({id:id++,text:"Truth is consensus-based",user:"bob",parent:null});
 items.push({id:id++,text:"Logic depends on language",user:"charlie",parent:null});
-items.push({id:id++,text:"Meaning evolves over time",user:"dana",parent:null});
-items.push({id:id++,text:"Some truths cannot be known",user:"eve",parent:null});
 
-/* ANSWER FLOW */
-items.push({id:id++,text:"Empirical grounding",user:"bob",parent:0});
-items.push({id:id++,text:"Consensus stability matters",user:"charlie",parent:1});
-
-/* DISPUTES */
 items.push({id:id++,text:"Consensus is fragile",user:"alice",parent:1,side:"left"});
 items.push({id:id++,text:"Consensus is functional",user:"bob",parent:1,side:"right"});
-items.push({id:id++,text:"Function ≠ truth",user:"dana",parent:7,side:"left"});
+items.push({id:id++,text:"Function does not equal truth",user:"dana",parent:1,side:"left"});
 
-/* MORE BRANCHING */
 items.push({id:id++,text:"Language shapes logic",user:"charlie",parent:2,side:"left"});
 items.push({id:id++,text:"Logic constrains language",user:"eve",parent:2,side:"right"});
 

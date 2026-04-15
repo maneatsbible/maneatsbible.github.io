@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v48</title>
+<title>Better Dispute v49</title>
 
 <style>
 body{
@@ -72,19 +72,24 @@ textarea{
 .icon{
   font-size:16px;
   margin-right:6px;
-  opacity:.9;
 }
 
-/* TYPE COLORS (NO TEXT LABELS) */
-.tag{
-  display:inline-block;
-  margin-right:6px;
-}
-
-/* QNA TYPES */
+/* TYPE COLORS */
 .proclaim{color:#7f7}
 .question{color:#ffd24a}
 .answer{color:#6ab7ff}
+
+/* ACTIONS */
+.actions{margin-top:6px}
+.btn{
+  background:#222;
+  border:1px solid #333;
+  color:#ddd;
+  padding:3px 6px;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:12px;
+}
 
 /* TWO LANE */
 .disputeWrap{
@@ -129,7 +134,7 @@ textarea{
 
 <header>
   <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v48</div>
+  <div id="title">Better Dispute v49</div>
 </header>
 
 <div id="users"></div>
@@ -142,10 +147,11 @@ textarea{
 <div id="nav"></div>
 <div id="view"></div>
 
+<!-- DISPUTE POPUP -->
 <div id="popup" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#111;border:1px solid #333;padding:10px;width:320px;z-index:20;">
   <div>Dispute</div>
   <textarea id="challenge" placeholder="Question / Challenge"></textarea>
-  <textarea id="counter" placeholder="Proclamation (Counter)"></textarea>
+  <textarea id="counter" placeholder="Counter Proclamation"></textarea>
   <button onclick="submitDispute()">✓</button>
   <button onclick="closePopup()">✕</button>
 </div>
@@ -163,8 +169,10 @@ let items=[];
 let stack=[];
 let reactions={};
 let pending=null;
-let mustAnswer={};
 let logs=[];
+
+/* answer tracking FIXED */
+let openQuestions={}; // questionId -> expected answerer (user)
 
 /* ---------------- LOG ---------------- */
 function log(e,d){
@@ -210,7 +218,7 @@ function back(){
   render();
 }
 
-/* ---------------- CREATE (PROCLAMATION ONLY) ---------------- */
+/* ---------------- CREATE ---------------- */
 function create(){
   const t=document.getElementById("composer").value.trim();
   if(!t) return;
@@ -228,12 +236,11 @@ function create(){
   render();
 }
 
-/* ---------------- REACTION ---------------- */
+/* ---------------- REACTIONS ---------------- */
 function react(id,type){
 
   const n=find(id);
   if(!n || n.user===currentUser) return;
-  if(mustAnswer[id]) return;
 
   const k=key(currentUser,id);
   if(reactions[k]) return;
@@ -264,6 +271,7 @@ function submitDispute(){
   const q=document.getElementById("challenge").value.trim();
   const c=document.getElementById("counter").value.trim();
 
+  /* QUESTION */
   if(q){
     let qid=id++;
     items.push({
@@ -274,9 +282,12 @@ function submitDispute(){
       side:"left",
       type:"question"
     });
-    mustAnswer[qid]=true;
+
+    /* FIXED: assign expected responder explicitly */
+    openQuestions[qid] = find(target)?.user || null;
   }
 
+  /* COUNTER */
   if(c){
     items.push({
       id:id++,
@@ -298,16 +309,21 @@ function submitDispute(){
   render();
 }
 
-/* ---------------- ANSWER (ONLY TARGETED USER) ---------------- */
+/* ---------------- ANSWER (FIXED LOGIC) ---------------- */
 function answer(qid){
 
   const q=find(qid);
   if(!q || q.answerBy) return;
 
-  /* Only targeted respondent (simple rule: first mentioned user) */
-  const expected = users.find(u => u !== currentUser); // simplified enforcement
+  const expected=openQuestions[qid];
 
-  const t=prompt("Answer (only targeted respondent should answer):");
+  /* HARD ENFORCEMENT: only intended recipient can answer */
+  if(expected && currentUser !== expected){
+    alert("Only the targeted user can answer this question.");
+    return;
+  }
+
+  const t=prompt("Answer:");
   if(!t) return;
 
   items.push({
@@ -319,7 +335,7 @@ function answer(qid){
   });
 
   q.answerBy=currentUser;
-  mustAnswer[qid]=false;
+  delete openQuestions[qid];
 
   log("answer",qid);
   render();
@@ -328,16 +344,13 @@ function answer(qid){
 /* ---------------- NODE ---------------- */
 function node(n){
 
-  const r=reactions[key(currentUser,n.id)];
-  const show=n.user!==currentUser;
-
   let icon="!";
   if(n.type==="question") icon="?";
   if(n.type==="answer") icon="✓";
 
-  let cls="proclaim";
-  if(n.type==="question") cls="question";
-  if(n.type==="answer") cls="answer";
+  let cls=n.type;
+
+  const isForeign = n.user !== currentUser;
 
   return `
     <div class="card" onclick="enter(${n.id})">
@@ -349,16 +362,13 @@ function node(n){
       </div>
 
       ${n.type==="question" ? `
-        <button onclick="event.stopPropagation();answer(${n.id})">Answer</button>
+        <button class="btn" onclick="event.stopPropagation();answer(${n.id})">Answer</button>
       `:""}
 
-      ${show ? `
+      ${isForeign ? `
         <div class="actions">
-          <span class="icon ${r==='up'?'active':'dim'}"
-            onclick="event.stopPropagation();react(${n.id},'up')">👍</span>
-
-          <span class="icon ${r==='down'?'active':'dim'}"
-            onclick="event.stopPropagation();react(${n.id},'down')">👎</span>
+          <span onclick="event.stopPropagation();react(${n.id},'up')">👍</span>
+          <span onclick="event.stopPropagation();react(${n.id},'down')">👎</span>
         </div>
       `:""}
 
@@ -383,10 +393,6 @@ function renderDispute(root){
 
   return `
     <div>
-
-      <div id="lineage">
-        ${chain.slice(0,-1).map(c=>c.text).join(" ➜ ")}
-      </div>
 
       <div class="card">
         <span class="icon proclaim">!</span>
@@ -425,24 +431,23 @@ function render(){
     logs.slice(-200).map(l=>JSON.stringify(l)).join("<br>");
 }
 
-/* ---------------- TEST DATA (PROPER Q/A MODEL) ---------------- */
+/* ---------------- TEST DATA (FIXED Q/A MODEL) ---------------- */
 
-/* PROCLAMATIONS */
 items.push({id:id++,text:"Truth exists independent of consensus",user:"alice",parent:null,type:"proclaim"});
 items.push({id:id++,text:"Meaning is shaped by agreement",user:"bob",parent:null,type:"proclaim"});
 items.push({id:id++,text:"Reality constrains interpretation",user:"charlie",parent:null,type:"proclaim"});
 
-/* QUESTION (BOB CHALLENGES ALICE) */
+/* QUESTION (BOB → ALICE) */
 items.push({id:id++,text:"Does truth require consensus?",user:"bob",parent:0,side:"left",type:"question"});
 
-/* ANSWER (ALICE ONLY SHOULD ANSWER) */
+/* ANSWER (ALICE ONLY VALID RESPONDER) */
 items.push({id:id++,text:"No, truth exists regardless",user:"alice",parent:3,side:"right",type:"answer"});
 
-/* FOLLOWUP PROCLAMATION */
-items.push({id:id++,text:"Then how do we verify claims?",user:"charlie",parent:3,side:"left",type:"question"});
+/* FOLLOWUP QUESTION */
+items.push({id:id++,text:"How is truth verified then?",user:"charlie",parent:3,side:"left",type:"question"});
 
 /* ANSWER */
-items.push({id:id++,text:"Through consistent observation",user:"bob",parent:5,side:"right",type:"answer"});
+items.push({id:id++,text:"Through stable external consistency",user:"bob",parent:5,side:"right",type:"answer"});
 
 renderUsers();
 render();

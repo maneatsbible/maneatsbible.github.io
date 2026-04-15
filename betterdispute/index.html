@@ -1,425 +1,272 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Better Dispute v65</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Better Dispute v1</title>
 
-<style>
-body{
-  margin:0;
-  font-family:system-ui;
-  background:#0f0f0f;
-  color:#eee;
-}
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f0f10;
+      color: #fff;
+    }
 
-header{
-  display:flex;
-  justify-content:space-between;
-  padding:10px;
-  border-bottom:1px solid #222;
-}
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 12px;
+    }
 
-#homeBtn{
-  background:#1c1c1c;
-  border:1px solid #333;
-  color:#aaa;
-  padding:6px 10px;
-  border-radius:8px;
-  cursor:pointer;
-}
+    .card {
+      background: #1a1a1c;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
 
-#title{font-weight:600}
+    .message {
+      font-size: 16px;
+      line-height: 1.4;
+    }
 
-#composerWrap{padding:10px}
+    .meta {
+      font-size: 12px;
+      opacity: 0.6;
+      margin-top: 6px;
+    }
 
-textarea{
-  width:100%;
-  font-size:16px;
-  background:#0b0b0b;
-  color:#eee;
-  border:1px solid #333;
-  padding:8px;
-  border-radius:6px;
-  box-sizing:border-box;
-}
+    .actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+    }
 
-.card{
-  background:#1a1a1a;
-  padding:10px;
-  margin-bottom:8px;
-  border-radius:8px;
-}
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      background: #2a2a2d;
+      color: #fff;
+      font-size: 14px;
+    }
 
-.disputeWrap{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin:10px;
-}
+    button.primary {
+      background: #3a6df0;
+    }
 
-.lane{
-  background:#141414;
-  padding:8px;
-  border-radius:8px;
-}
+    .chain {
+      margin-top: 12px;
+    }
 
-.reactionRow{margin-top:6px}
+    .turn {
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 10px;
+    }
 
-.reactionBtn{
-  background:#111;
-  border:1px solid #333;
-  color:#aaa;
-  padding:4px 6px;
-  border-radius:6px;
-  cursor:pointer;
-}
+    .question {
+      background: #2c2c2f;
+    }
 
-.activeAgree{color:#7CFF7C;border-color:#7CFF7C}
-.activeDisagree{color:#FF7C7C;border-color:#FF7C7C}
+    .answer {
+      background: #1f3a2c;
+    }
 
-#nav{padding:0 10px}
-#backBtn{
-  background:#1c1c1c;
-  border:1px solid #333;
-  color:#aaa;
-  padding:6px 10px;
-  border-radius:8px;
-  cursor:pointer;
-  margin-bottom:10px;
-}
+    .turn.you {
+      outline: 2px solid #3a6df0;
+    }
 
-#log{
-  border-top:1px solid #222;
-  padding:10px;
-  font-size:11px;
-  color:#7f7;
-  max-height:140px;
-  overflow:auto;
-}
+    .status {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-top: 6px;
+    }
 
-#modal{
-  display:none;
-  position:fixed;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-  width:280px;
-  background:#111;
-  border:1px solid #333;
-  border-radius:10px;
-  padding:10px;
-  z-index:10;
-}
-</style>
+    .inputBar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #0f0f10;
+      padding: 10px;
+      border-top: 1px solid #222;
+    }
+
+    .inputBar input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      font-size: 14px;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
 </head>
 
 <body>
 
-<header>
-  <button id="homeBtn" onclick="home()">⚖ home</button>
-  <div id="title">Better Dispute v65</div>
-</header>
+<div class="container">
 
-<div id="composerWrap">
-  <textarea id="composer" placeholder="Start a fire..."></textarea>
-  <button onclick="create()">Proclaim</button>
+  <!-- ROOT MESSAGE -->
+  <div class="card" id="rootCard">
+    <div class="message" id="rootText">
+      “This claim can be challenged.”
+    </div>
+
+    <div class="meta">
+      Posted by @alice
+    </div>
+
+    <div class="actions">
+      <button class="primary" onclick="startChallenge()">Challenge</button>
+      <button onclick="viewChains()">View Interrogations</button>
+    </div>
+  </div>
+
+  <!-- INTERROGATION LIST -->
+  <div id="chainList"></div>
+
+  <!-- ACTIVE CHAIN -->
+  <div id="chainView" class="hidden"></div>
+
 </div>
 
-<div id="nav"></div>
-<div id="view"></div>
-
-<div id="modal">
-  <textarea id="q" placeholder="Question"></textarea>
-  <textarea id="c" placeholder="Counter"></textarea>
-  <button onclick="submitDispute()">Submit</button>
+<!-- INPUT -->
+<div class="inputBar hidden" id="inputBar">
+  <input id="inputField" placeholder="" />
 </div>
-
-<div id="log"></div>
 
 <script>
+  // ---- MOCK USER ----
+  const currentUser = "bob";
 
-/* ---------------- STATE ---------------- */
+  // ---- STATE ----
+  let chains = [];
+  let activeChain = null;
 
-let id=0;
-let nodes=[];
-let stack=[];
-let logs=[];
+  // ---- START CHALLENGE ----
+  function startChallenge() {
+    const newChain = {
+      id: Date.now(),
+      root_id: 1,
+      user_a: "alice",
+      user_b: currentUser,
+      turns: [],
+      turn_state: "question", // first move = challenger asks
+      active_user: currentUser,
+      status: "active"
+    };
 
-let reactions={};
-let pendingDisagree=null;
+    chains.push(newChain);
+    openChain(newChain.id);
 
-/* ---------------- LOG ---------------- */
-
-function log(e,d){
-  logs.push({t:Date.now(),e,d});
-}
-
-/* ---------------- NAV ---------------- */
-
-function home(){
-  stack=[];
-  document.getElementById("composerWrap").style.display="block";
-  render();
-}
-
-function enter(i){
-  stack.push(i);
-  document.getElementById("composerWrap").style.display="none";
-  render();
-}
-
-function back(){
-  if(stack.length>1) stack.pop();
-  else {
-    stack=[];
-    document.getElementById("composerWrap").style.display="block";
+    setInput("Ask a precise question...");
   }
-  render();
-}
 
-/* ---------------- CREATE ---------------- */
+  // ---- VIEW CHAINS ----
+  function viewChains() {
+    const list = document.getElementById("chainList");
+    list.innerHTML = "";
 
-function create(){
-  const t=document.getElementById("composer").value.trim();
-  if(!t) return;
+    chains.forEach(c => {
+      const div = document.createElement("div");
+      div.className = "card";
+      div.innerHTML = `
+        Interrogation (${c.turns.length} turns)<br/>
+        <button onclick="openChain(${c.id})">Open</button>
+      `;
+      list.appendChild(div);
+    });
+  }
 
-  nodes.push({
-    id:id++,
-    rootId:id,
-    parentId:null,
-    type:"proclaim",
-    user:"alice",
-    text:t
+  // ---- OPEN CHAIN ----
+  function openChain(id) {
+    activeChain = chains.find(c => c.id === id);
+    renderChain();
+    document.getElementById("chainView").classList.remove("hidden");
+  }
+
+  // ---- RENDER CHAIN ----
+  function renderChain() {
+    const view = document.getElementById("chainView");
+
+    let html = `<div class="card"><strong>Interrogation</strong></div>`;
+
+    activeChain.turns.forEach(t => {
+      html += `
+        <div class="turn ${t.type} ${t.user === currentUser ? 'you' : ''}">
+          <div>${t.text}</div>
+          <div class="meta">@${t.user}</div>
+        </div>
+      `;
+    });
+
+    html += `<div class="status">`;
+
+    if (activeChain.active_user === currentUser) {
+      html += activeChain.turn_state === "question"
+        ? "Your turn to ask"
+        : "Your turn to answer";
+      showInput();
+    } else {
+      html += "Waiting on them";
+      hideInput();
+    }
+
+    html += `</div>`;
+
+    view.innerHTML = html;
+  }
+
+  // ---- INPUT ----
+  const input = document.getElementById("inputField");
+
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") submitTurn();
   });
 
-  document.getElementById("composer").value="";
-  render();
-}
-
-/* ---------------- REACTIONS (FIXED) ---------------- */
-
-function react(nodeId,type){
-
-  const node=nodes.find(n=>n.id===nodeId);
-  if(!node || node.user==="alice") return;
-
-  if(type==="agree"){
-    if(!reactions[nodeId]) reactions[nodeId]={};
-    reactions[nodeId]["bob"]="agree";
-    render();
-    return;
+  function setInput(placeholder) {
+    input.placeholder = placeholder;
+    showInput();
+    input.focus();
   }
 
-  if(type==="disagree"){
-    pendingDisagree=nodeId;
-    openModal();
-  }
-}
-
-/* commit only on submit */
-function commitDisagree(){
-  if(pendingDisagree!==null){
-    if(!reactions[pendingDisagree]) reactions[pendingDisagree]={};
-    reactions[pendingDisagree]["bob"]="disagree";
-    pendingDisagree=null;
-  }
-}
-
-/* ---------------- DISPUTE (RESTORED + FORK) ---------------- */
-
-function submitDispute(){
-
-  if(pendingDisagree!==null){
-    commitDisagree();
-    closeModal();
-    render();
-    return;
+  function showInput() {
+    document.getElementById("inputBar").classList.remove("hidden");
   }
 
-  const target=nodes[stack[stack.length-1]];
-  if(!target) return;
-
-  const forkId=id++;
-
-  nodes.push({
-    id:forkId,
-    rootId:forkId,
-    parentId:target.id,
-    type:"dispute_root",
-    user:target.user,
-    text:target.text
-  });
-
-  const q=document.getElementById("q").value.trim();
-  const c=document.getElementById("c").value.trim();
-
-  if(q){
-    nodes.push({
-      id:id++,
-      rootId:forkId,
-      parentId:forkId,
-      type:"question",
-      user:"bob",
-      text:q,
-      lane:"left"
-    });
+  function hideInput() {
+    document.getElementById("inputBar").classList.add("hidden");
   }
 
-  if(c){
-    nodes.push({
-      id:id++,
-      rootId:forkId,
-      parentId:forkId,
-      type:"proclaim",
-      user:"alice",
-      text:c,
-      lane:"right"
-    });
-  }
+  // ---- SUBMIT TURN ----
+  function submitTurn() {
+    if (!input.value.trim()) return;
 
-  closeModal();
-  render();
-}
+    const type = activeChain.turn_state;
 
-/* ---------------- MODAL ---------------- */
-
-function openModal(){
-  document.getElementById("modal").style.display="block";
-}
-
-function closeModal(){
-  document.getElementById("modal").style.display="none";
-  pendingDisagree=null;
-}
-
-/* ---------------- Q/A RULE ---------------- */
-
-function answer(qid){
-  const q=nodes.find(n=>n.id===qid);
-  if(!q) return;
-
-  if(q.answered) return;
-
-  const t=prompt("Answer:");
-  if(!t) return;
-
-  nodes.push({
-    id:id++,
-    rootId:q.rootId,
-    parentId:q.id,
-    type:"answer",
-    user:"alice",
-    text:t,
-    lane:"left"
-  });
-
-  q.answered=true;
-  render();
-}
-
-/* ---------------- LANES ---------------- */
-
-function lane(rootId,lane){
-  const out=[];
-  function walk(pid){
-    nodes.filter(n=>n.parentId===pid).forEach(n=>{
-      if(n.lane!==lane && n.lane) return;
-      out.push(n);
-      walk(n.id);
-    });
-  }
-  walk(rootId);
-  return out;
-}
-
-/* ---------------- RENDER ---------------- */
-
-function renderNode(n){
-
-  const r=reactions[n.id]?.["bob"];
-
-  return `
-    <div class="card" onclick="enter(${n.id})">
-
-      <div><b>${n.type}</b>: ${n.text}</div>
-
-      ${n.user!=="alice" ? `
-      <div class="reactionRow">
-        <button class="reactionBtn ${r==='agree'?'activeAgree':''}"
-          onclick="event.stopPropagation(); react(${n.id},'agree')">👍</button>
-
-        <button class="reactionBtn ${r==='disagree'?'activeDisagree':''}"
-          onclick="event.stopPropagation(); react(${n.id},'disagree')">👎</button>
-      </div>
-      ` : ""}
-
-    </div>
-  `;
-}
-
-function renderDispute(root){
-
-  const left=lane(root.rootId||root.id,"left");
-  const right=lane(root.rootId||root.id,"right");
-
-  return `
-    <div class="card"><b>${root.text}</b></div>
-    <div class="disputeWrap">
-      <div class="lane">${left.map(renderNode).join("")}</div>
-      <div class="lane">${right.map(renderNode).join("")}</div>
-    </div>
-  `;
-}
-
-/* ---------------- MAIN RENDER ---------------- */
-
-function render(){
-
-  const view=document.getElementById("view");
-  const nav=document.getElementById("nav");
-
-  view.innerHTML="";
-  nav.innerHTML="";
-
-  if(stack.length===0){
-
-    nodes.filter(n=>n.parentId===null).forEach(n=>{
-      view.innerHTML+=renderNode(n);
+    activeChain.turns.push({
+      type: type,
+      user: currentUser,
+      text: input.value.trim()
     });
 
-  } else {
+    // SWITCH TURN
+    activeChain.turn_state = type === "question" ? "answer" : "question";
+    activeChain.active_user =
+      activeChain.active_user === activeChain.user_a
+        ? activeChain.user_b
+        : activeChain.user_a;
 
-    const cur=nodes[stack[stack.length-1]];
-    nav.innerHTML=`<button id="backBtn" onclick="back()">⬅ back</button>`;
-    view.innerHTML=renderDispute(cur);
+    input.value = "";
 
+    renderChain();
   }
-
-  document.getElementById("log").innerHTML=
-    logs.slice(-100).map(l=>JSON.stringify(l)).join("<br>");
-}
-
-/* ---------------- TEST DATA ---------------- */
-
-nodes.push({
-  id:id++,
-  rootId:0,
-  parentId:null,
-  type:"proclaim",
-  user:"alice",
-  text:"Truth exists independent of consensus"
-});
-
-nodes.push({
-  id:id++,
-  rootId:0,
-  parentId:0,
-  type:"question",
-  user:"bob",
-  text:"Does truth require agreement?",
-  lane:"left"
-});
 
 </script>
 

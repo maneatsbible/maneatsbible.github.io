@@ -1,10 +1,31 @@
 # Better Dispute
 
-## A deterministic system for structured disagreement.
+## A system for structured disagreement that produces clarity, agreement, and resolution.
 
 Better Dispute models disagreement as an append-only graph of claims, challenges, and answers.
 
 All system state is derived deterministically from queryable records. No server-side state is required.
+
+---
+
+## Table of Contents
+
+> All entries below are clickable links to sections within this document.
+
+1. [Core Principles](#core-principles)  
+2. [Architecture](#architecture)  
+3. [Model](#model)  
+4. [Storage Model](#storage-model)  
+5. [Query Model](#query-model)  
+6. [Canonical Ordering](#canonical-ordering)  
+7. [State Reconstruction](#state-reconstruction)  
+8. [Active Challenge Rule](#active-challenge-rule)  
+9. [Turn Model](#turn-model)  
+10. [Validation Rules](#validation-rules)  
+11. [Rate Limiting Strategy](#rate-limiting-strategy)  
+12. [Failure Handling](#failure-handling)  
+13. [Known Constraints](#known-constraints)  
+14. [Future Improvements](#future-improvements)  
 
 ---
 
@@ -85,8 +106,8 @@ contentHash = SHA-256(
 
 #### Rule
 
-- Nodes with invalid hashes are ignored
-- Hash ensures integrity and tamper detection
+- Nodes with invalid hashes are ignored  
+- Hash ensures integrity and tamper detection  
 
 ---
 

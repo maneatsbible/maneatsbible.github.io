@@ -2,7 +2,7 @@
 
 ## A system for structured disagreement that produces clarity, agreement, and resolution.
 
-Better Dispute turns discussion into a constrained, auditable, turn-based event system where every claim, challenge, and answer is replayable from GitHub history.
+Better Dispute turns discussion into a constrained, auditable, turn-based event system where every claim, challenge, and answer is replayable from a persistent event stream.
 
 It replaces free-form argument with deterministic interaction graphs reconstructed entirely on the client.
 
@@ -10,32 +10,34 @@ It replaces free-form argument with deterministic interaction graphs reconstruct
 
 ## Table of Contents
 
-1. Core Principles  
-2. System Overview  
-3. Architecture  
-4. MVC Contract  
-5. Model  
-6. Event Model (GitHub)  
-7. Boot & Replay on Load  
-8. State Reconstruction  
-9. Core Rules  
-10. Challenge Targeting  
-11. Turn Model  
-12. Referenced Nodes  
-13. Resolution System  
-14. Crickets  
-15. Image Handling  
-16. Abuse & Malicious Events  
-17. Missing Data  
-18. Branching Model  
-19. UI/UX  
-20. Controller Interface  
-21. Reducer Specification  
-22. Failure Handling  
-23. Performance  
-24. SDLC  
-25. Versioning  
-26. Patch Notes  
+1. [Core Principles](#core-principles)  
+2. [System Overview](#system-overview)  
+3. [Architecture](#architecture)  
+4. [MVC Contract](#mvc-contract)  
+5. [Model](#model)  
+6. [Event Model](#event-model)  
+7. [Event Stream Storage](#event-stream-storage)  
+8. [Boot & Replay on Load](#boot--replay-on-load)  
+9. [State Reconstruction](#state-reconstruction)  
+10. [Core Rules](#core-rules)  
+11. [Challenge Targeting](#challenge-targeting)  
+12. [Turn Model](#turn-model)  
+13. [Referenced Nodes](#referenced-nodes)  
+14. [Resolution System](#resolution-system)  
+15. [Crickets](#crickets)  
+16. [Image Handling](#image-handling)  
+17. [Abuse & Malicious Events](#abuse--malicious-events)  
+18. [Missing Data](#missing-data)  
+19. [Branching Model](#branching-model)  
+20. [UI/UX](#uiux)  
+21. [Controller Interface](#controller-interface)  
+22. [Reducer Specification](#reducer-specification)  
+23. [Failure Handling](#failure-handling)  
+24. [Performance](#performance)  
+25. [GitHub Integration Specifications](#github-integration-specifications)  
+26. [SDLC](#sdlc)  
+27. [Versioning](#versioning)  
+28. [Patch Notes](#patch-notes)  
 
 ---
 
@@ -52,9 +54,9 @@ It replaces free-form argument with deterministic interaction graphs reconstruct
 
 ## System Overview
 
-Better Dispute is an event-sourced simulation.
+Better Dispute is an event-sourced simulation system.
 
-- GitHub Issues = immutable event log  
+- Event stream = immutable history  
 - Browser = deterministic simulation engine  
 - Controller state = fully client-side  
 
@@ -63,10 +65,10 @@ Better Dispute is an event-sourced simulation.
 ## Architecture
 
 - Frontend: Vanilla JavaScript  
-- Backend: GitHub Issues (append-only event stream)  
-- Auth: GitHub OAuth  
+- Backend: Append-only event stream storage layer  
+- Authentication: OAuth-based identity layer  
 - Pattern: Strict MVC  
-- No server-side state exists  
+- No server-side state is maintained  
 
 ---
 
@@ -138,22 +140,21 @@ Fields:
 
 ---
 
-## Event Model (GitHub)
+## Event Model
 
-Each Dispute = GitHub Issue  
-Comments = append-only event stream  
+Each dispute = one persistent event stream  
+Events are append-only and immutable  
 
 ### Constraints
 
 - No binary data in events  
 - Images must be external URLs only  
-- Events must remain compact (<65KB/comment)  
+- Events must remain compact  
 
 ---
 
 ### Event Encoding
 
-```json
 {
   "i": "eventId",
   "t": "TYPE",
@@ -162,7 +163,6 @@ Comments = append-only event stream
   "ts": 1712345678901,
   "p": {}
 }
-```
 
 ---
 
@@ -182,19 +182,44 @@ Comments = append-only event stream
 
 ---
 
+## Event Stream Storage
+
+The event stream is stored as an append-only log inside an external platform-backed issue thread.
+
+### Storage Mechanism
+
+- Each dispute maps to a single issue thread  
+- Each event is stored as a single comment  
+- Comments are append-only by design  
+
+### Retrieval
+
+On load:
+
+- All comments are fetched via API  
+- Parsed into event objects  
+- Sorted by sequence  
+- Replayed through reducer  
+
+### Constraints
+
+- Event order is authoritative via sequence number  
+- Storage is untrusted and validated client-side  
+- Invalid or malicious events are ignored during replay  
+
+---
+
 ## Boot & Replay on Load
 
-On startup:
-
-1. Fetch GitHub issue comments  
-2. Parse into events  
+1. Fetch event stream  
+2. Parse events  
 3. Sort by sequence  
-4. Replay deterministically through reducer  
+4. Replay through reducer  
 5. Drop invalid events  
 6. Hydrate controller state  
 
 Result:
-> Browser becomes a deterministic replay engine of GitHub history.
+> Deterministic reconstruction of full interaction state.
 
 ---
 
@@ -202,14 +227,14 @@ Result:
 
 - Pure reducer function  
 - Deterministic replay  
-- Sequence is authoritative  
+- Sequence-based ordering  
 
 ---
 
 ## Core Rules
 
 - No self-challenges  
-- One unresolved challenge at a time  
+- One unresolved challenge at a time per dispute  
 - All permissions scoped per dispute  
 
 ---
@@ -226,7 +251,7 @@ Only target may answer.
 
 ## Turn Model
 
-- Exactly one unresolved challenge exists globally per dispute  
+- Exactly one unresolved challenge exists per dispute  
 - Turn = target of unresolved challenge  
 
 Counter-challenge replaces current unresolved challenge.
@@ -256,33 +281,22 @@ currentTime - proposalTime >= duration
 
 ---
 
-## Image Handling (OPTION 1)
+## Image Handling
 
-Images are handled via GitHub Issue attachment flow.
+Images are handled via platform attachment flow.
 
 ### Upload Flow
 
-1. Client attaches image in issue comment creation request  
-2. GitHub uploads image to:
-   ```
-   https://user-images.githubusercontent.com/...
-   ```
-3. GitHub returns markdown with hosted URL  
-4. System extracts URL from response  
-5. Event stores ONLY the URL in `contentPic`  
+1. Image attached during comment creation  
+2. Platform uploads image to CDN  
+3. Platform returns hosted URL  
+4. Only URL is stored in event payload  
 
 ### Constraints
 
-- No raw image storage in events  
-- No base64 encoding  
-- No custom CDN required  
-- Images are treated as external immutable resources  
-
-### Properties
-
-- CDN-backed by GitHub  
-- Stable but not guaranteed permanent  
-- Fully decoupled from event replay logic  
+- No base64 storage  
+- No binary event data  
+- Images are external immutable resources  
 
 ---
 
@@ -293,7 +307,7 @@ Invalid events are ignored during replay:
 - invalid sequence  
 - unauthorized actor  
 - rule violations  
-- duplicate challenges  
+- duplicate actions  
 
 ---
 
@@ -306,7 +320,7 @@ Invalid events are ignored during replay:
 
 ## Branching Model
 
-All branches collapsed into summary cards  
+All branches are collapsed into summary cards  
 
 ---
 
@@ -331,17 +345,15 @@ All branches collapsed into summary cards
 
 ## Reducer Specification
 
-Pure state machine:
-
 state + event → next state  
 
-Invalid transitions are ignored.
+Invalid transitions ignored.
 
 ---
 
 ## Failure Handling
 
-- retry GitHub writes  
+- retry writes  
 - refetch on conflict  
 - full replay on recovery  
 
@@ -352,6 +364,48 @@ Invalid transitions are ignored.
 - lazy event loading  
 - incremental replay  
 - caching per dispute  
+
+---
+
+## GitHub Integration Specifications
+
+### OAuth
+
+- Authentication uses OAuth-based identity provider  
+- Client obtains access token via standard OAuth flow  
+- Token is stored only in memory (client-only controller constraint)  
+- Token is used to:
+  - identify Person identity (`githubId`)
+  - authorize event stream reads/writes  
+- No server-side token storage exists  
+- All requests are executed directly from browser to API  
+
+---
+
+### Append-only Event Storage
+
+- Each Dispute maps to a single issue thread  
+- Each event is appended as a new comment  
+- Comments are treated as immutable history  
+- Sequence number determines canonical ordering  
+- Client performs full validation during replay  
+
+Properties:
+- append-only  
+- tamper-tolerant (invalid events ignored)  
+- eventually consistent  
+- replayable to deterministic state  
+
+---
+
+### Image Hosting
+
+- Images are uploaded via platform comment attachment flow  
+- Platform returns hosted CDN URL (user-images domain)  
+- Only URL is persisted in event payload (`contentPic`)  
+- Images are not part of event state machine  
+- Image loss is treated as missing external resource  
+- No binary or base64 storage allowed anywhere in system  
 
 ---
 
@@ -369,11 +423,12 @@ vMAJOR.MINOR.PATCH
 
 ---
 
+## Patch Notes
+
+No releases have been made yet.
+
+---
+
 ## Release Notes
 
-No releases yet.
-
-### Patch Notes
-
-No patches yet.
-
+No releases have been made yet.

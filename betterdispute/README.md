@@ -409,26 +409,33 @@ Properties:
 
 ---
 
-## SDLC
+## Index.html Boot File
 
-Design → Implement → Test/Fix → Repeat → Deploy  
+The application is bootstrapped via a versioned HTML entrypoint.
 
-Patch → Test/Fix → Update README → Deploy  
+Each release exposes a versioned file:
 
----
+- `bd-v{version}.html`
 
-## Versioning
+### Boot Contract
 
-vMAJOR.MINOR.PATCH  
+- `index.html` always resolves latest versioned entrypoint  
+- Only one version is active at runtime  
+- Version file is treated as immutable snapshot of UI + controller wiring  
 
----
+### index.html
 
-## Patch Notes
-
-No releases have been made yet.
-
----
-
-## Release Notes
-
-No releases have been made yet.
+```html
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Better Dispute</title>
+  </head>
+  <body>
+    <script>
+      // Resolve latest versioned build
+      window.location.href = "./bd-v1.0.0.html";
+    </script>
+  </body>
+</html>

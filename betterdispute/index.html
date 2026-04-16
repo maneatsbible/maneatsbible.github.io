@@ -2,406 +2,382 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Better Dispute v1</title>
-
 <style>
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
     background: #111;
     color: #eee;
   }
 
-  .bar {
+  .titlebar {
     display: flex;
     align-items: center;
-    padding: 10px;
-    background: #1a1a1a;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: #1c1c1c;
     border-bottom: 1px solid #333;
+    font-weight: 600;
   }
 
-  .bar .title {
-    flex: 1;
-    text-align: center;
-    font-weight: bold;
-  }
-
-  .bar .right {
-    font-size: 14px;
-    opacity: 0.7;
-  }
-
-  .users {
+  .title-left {
     display: flex;
-    gap: 8px;
-    padding: 8px;
-    overflow-x: auto;
-    border-bottom: 1px solid #333;
+    align-items: center;
+    gap: 10px;
   }
 
-  .user {
-    padding: 6px 10px;
-    border-radius: 20px;
-    background: #333;
+  .home-btn {
     cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .user.active {
-    background: #4caf50;
-    color: #000;
+    font-size: 18px;
   }
 
   .container {
-    padding: 10px;
+    padding: 12px;
   }
 
   textarea {
     width: 100%;
-    min-height: 120px;
+    min-height: 100px;
     font-size: 16px;
     padding: 10px;
     border-radius: 8px;
     border: none;
-    background: #222;
-    color: #fff;
-    box-sizing: border-box;
+    outline: none;
+    margin-bottom: 10px;
   }
 
   button {
-    width: 100%;
-    padding: 12px;
-    margin-top: 8px;
+    padding: 10px 14px;
     font-size: 16px;
-    border: none;
     border-radius: 8px;
-    background: #4caf50;
-    color: black;
+    border: none;
+    background: #2e7dff;
+    color: white;
   }
 
   .post {
+    border: 1px solid #333;
+    border-radius: 10px;
     padding: 10px;
-    border-bottom: 1px solid #333;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+
+  .post.terminal {
+    opacity: 0.6;
   }
 
   .meta {
     font-size: 12px;
-    opacity: 0.6;
-  }
-
-  .clickable {
-    cursor: pointer;
-  }
-
-  .branch {
-    font-size: 12px;
     opacity: 0.7;
-    margin-top: 4px;
+    margin-bottom: 5px;
   }
 
-  .back {
+  .icon {
+    margin-right: 6px;
+  }
+
+  .breadcrumb {
+    font-size: 13px;
+    opacity: 0.8;
+    margin-bottom: 10px;
+  }
+
+  .userbar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .user {
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #333;
     cursor: pointer;
-    margin-right: 10px;
   }
 
-  .waiting {
-    text-align: center;
-    padding: 20px;
-    opacity: 0.6;
+  .user.active {
+    background: #2e7dff;
   }
+
+  .action {
+    margin-top: 10px;
+  }
+
 </style>
 </head>
 <body>
 
-<div class="bar">
-  <div class="back" onclick="goHome()">⚖️</div>
-  <div class="title">Better Dispute</div>
-  <div class="right">v1</div>
+<div class="titlebar">
+  <div class="title-left">
+    <div class="home-btn" onclick="goHome()">⚖️</div>
+    <div>Better Dispute</div>
+  </div>
+  <div>v1</div>
 </div>
 
-<div class="users" id="users"></div>
+<div class="container">
 
-<div id="app"></div>
+  <div class="userbar" id="userbar"></div>
+
+  <div id="view"></div>
+
+</div>
 
 <script>
-/* ================= MODEL ================= */
 
-let state = {
-  posts: [],
-  users: [
-    { id: 'u1', name: 'Alice' },
-    { id: 'u2', name: 'Bob' },
-    { id: 'u3', name: 'Charlie' }
-  ],
-  currentUser: 'u1',
-  view: 'home',
-  nav: [],
-};
+// ===== MODEL =====
 
-let idCounter = 1;
+let currentUser = "alice";
 
-function createPost(type, content, parentId = null) {
-  let rootId = parentId
-    ? state.posts.find(p => p.id === parentId).rootId
-    : idCounter;
+let users = ["alice", "bob", "carol"];
 
-  let post = {
-    id: idCounter++,
+let posts = {};
+let nextId = 1;
+
+// Post types: assertion, challenge, answer
+function createPost(type, content, parentId=null, extra={}) {
+  const id = nextId++;
+  posts[id] = {
+    id,
     type,
     content,
     parentId,
-    rootId,
-    author: state.currentUser,
-    challengedBy: null
+    author: currentUser,
+    children: [],
+    ...extra
   };
-
-  state.posts.push(post);
-  return post;
+  if (parentId) posts[parentId].children.push(id);
+  return id;
 }
 
-/* ================= CONTROLLER ================= */
+// ===== SEED DATA =====
 
-function getUser(id) {
-  return state.users.find(u => u.id === id);
-}
+const a1 = createPost("assertion", "Truth is absolute.");
+const c1 = createPost("challenge", "Is truth independent of perception?", a1, {target: "alice"});
+const ans1 = createPost("answer", "Yes", c1, {target: "bob", yes: true});
 
-function getChildren(id) {
-  return state.posts.filter(p => p.parentId === id);
-}
+currentUser = "bob";
+const a2 = createPost("assertion", "Morality is subjective.");
+
+currentUser = "carol";
+const c2 = createPost("challenge", "Is morality ever universal?", a2, {target: "bob"});
+
+currentUser = "alice";
+
+// ===== STATE =====
+
+let viewStack = []; // drill navigation
+
+// ===== CONTROLLER =====
 
 function canChallenge(post) {
-  return post.author !== state.currentUser && !post.challengedBy;
+  if (post.author === currentUser) return false;
+
+  const active = getActiveDispute(post.id);
+  if (active && active.turn !== currentUser) return false;
+
+  return true;
 }
 
-function getChain(startId) {
-  let chain = [];
-  let current = state.posts.find(p => p.id === startId);
+function canAnswer(post) {
+  return post.type === "challenge" && post.target === currentUser;
+}
 
-  while (current) {
-    chain.push(current);
-    let next = getChildren(current.id).find(p => p.type !== 'assertion');
-    current = next || null;
+function getActiveDispute(postId) {
+  const post = posts[postId];
+  if (!post) return null;
+
+  const last = post.children.map(id => posts[id]).slice(-1)[0];
+
+  if (!last) return {turn: post.target};
+
+  if (last.type === "answer") {
+    return {turn: post.author};
   }
 
-  return chain;
+  return null;
 }
 
-function getOpponent(userId, chain) {
-  let users = [...new Set(chain.map(p => p.author))];
-  return users.find(u => u !== userId);
-}
-
-function getTurn(chain) {
-  let last = chain[chain.length - 1];
-  return getOpponent(last.author, chain);
-}
-
-/* ================= ACTIONS ================= */
-
-function postAssertion(text) {
-  createPost('assertion', text);
-  render();
-}
-
-function postChallenge(parentId, text) {
-  let p = createPost('challenge', text, parentId);
-  let parent = state.posts.find(x => x.id === parentId);
-  parent.challengedBy = p.id;
-
-  state.nav.push(p.id);
-  state.view = 'dispute';
-  render();
-}
-
-function postAnswer(parentId, text) {
-  let p = createPost('answer', text, parentId);
-  state.nav.push(p.id);
-  render();
-}
-
-function openPost(id) {
-  state.nav.push(id);
-  state.view = 'dispute';
-  render();
-}
-
-function goBack() {
-  state.nav.pop();
-  if (state.nav.length === 0) state.view = 'home';
-  render();
-}
-
-function goHome() {
-  state.nav = [];
-  state.view = 'home';
-  render();
-}
-
-function switchUser(id) {
-  state.currentUser = id;
-  render();
-}
-
-/* ================= VIEW ================= */
-
-function renderUsers() {
-  let el = document.getElementById('users');
-  el.innerHTML = state.users.map(u => `
-    <div class="user ${u.id === state.currentUser ? 'active' : ''}"
-         onclick="switchUser('${u.id}')">
-      ${u.name}
-    </div>
-  `).join('');
-}
-
-function renderHome() {
-  let app = document.getElementById('app');
-
-  let assertions = state.posts.filter(p => p.type === 'assertion');
-
-  app.innerHTML = `
-    <div class="container">
-      <textarea id="compose" placeholder="Start a fire..."></textarea>
-      <button onclick="submitAssertion()">Post Assertion</button>
-    </div>
-
-    ${assertions.map(a => {
-      let challenges = getChildren(a.id).filter(p => p.type === 'challenge').length;
-
-      return `
-        <div class="post clickable" onclick="openPost(${a.id})">
-          <div>${a.content}</div>
-          <div class="meta">${getUser(a.author).name}</div>
-          <div class="branch">${challenges} disputes</div>
-        </div>
-      `;
-    }).join('')}
-  `;
-}
-
-function renderDispute() {
-  let app = document.getElementById('app');
-  let currentId = state.nav[state.nav.length - 1];
-  let root = state.posts.find(p => p.id === currentId);
-
-  if (root.type === 'assertion') {
-    let children = getChildren(root.id).filter(p => p.type === 'challenge');
-
-    app.innerHTML = `
-      <div class="container">
-        <div class="post"><b>Assertion:</b> ${root.content}</div>
-
-        ${children.map(c => `
-          <div class="post clickable" onclick="openPost(${c.id})">
-            <div>${c.content}</div>
-            <div class="meta">${getUser(c.author).name}</div>
-          </div>
-        `).join('')}
-
-        ${canChallenge(root) ? `
-          <textarea id="input" placeholder="Challenge this..."></textarea>
-          <button onclick="submitChallenge(${root.id})">Challenge</button>
-        ` : ''}
-      </div>
-    `;
-    return;
-  }
-
-  let chain = getChain(root.id);
-
-  let turn = getTurn(chain);
-
-  app.innerHTML = `
-    <div class="container">
-      <div class="back" onclick="goBack()">← Back</div>
-
-      ${chain.map(p => `
-        <div class="post">
-          <div><b>${getUser(p.author).name} (${p.type})</b></div>
-          <div>${p.content}</div>
-        </div>
-      `).join('')}
-
-      ${renderAction(chain, turn)}
-    </div>
-  `;
-}
-
-function renderAction(chain, turn) {
-  let last = chain[chain.length - 1];
-
-  if (turn !== state.currentUser) {
-    return `<div class="waiting">Waiting for ${getUser(turn).name}...</div>`;
-  }
-
-  if (last.type === 'challenge') {
-    return `
-      <textarea id="input" placeholder="Your answer..."></textarea>
-      <button onclick="submitAnswer(${last.id})">Answer</button>
-    `;
-  }
-
-  if (last.type === 'answer') {
-    return `
-      <textarea id="input" placeholder="Challenge this..."></textarea>
-      <button onclick="submitChallenge(${last.id})">Challenge</button>
-    `;
-  }
-}
+// ===== VIEW =====
 
 function render() {
   renderUsers();
 
-  if (state.view === 'home') {
+  if (viewStack.length === 0) {
     renderHome();
   } else {
-    renderDispute();
+    renderDispute(viewStack[viewStack.length - 1]);
   }
 }
 
-/* ================= UI HANDLERS ================= */
+function renderUsers() {
+  const el = document.getElementById("userbar");
+  el.innerHTML = "";
+
+  users.forEach(u => {
+    const d = document.createElement("div");
+    d.className = "user" + (u === currentUser ? " active" : "");
+    d.innerText = u;
+    d.onclick = () => {
+      currentUser = u;
+      render();
+    };
+    el.appendChild(d);
+  });
+}
+
+function renderHome() {
+  const el = document.getElementById("view");
+
+  el.innerHTML = `
+    <textarea id="assertionInput" placeholder="Start a fire..."></textarea>
+    <button onclick="submitAssertion()">Post</button>
+    <hr/>
+  `;
+
+  Object.values(posts)
+    .filter(p => p.type === "assertion")
+    .forEach(p => el.appendChild(renderSummary(p)));
+}
+
+function renderSummary(post) {
+  const div = document.createElement("div");
+
+  const hasChildren = post.children.length > 0;
+
+  div.className = "post" + (hasChildren ? "" : " terminal");
+
+  div.innerHTML = `
+    <div class="meta">${post.author}</div>
+    <div><span class="icon">${icon(post.type)}</span>${post.content}</div>
+  `;
+
+  if (hasChildren) {
+    div.onclick = () => {
+      viewStack.push(post.id);
+      render();
+    };
+  }
+
+  return div;
+}
+
+function renderDispute(rootId) {
+  const el = document.getElementById("view");
+
+  const lineage = [];
+  let cur = rootId;
+  while (cur) {
+    lineage.unshift(posts[cur]);
+    cur = posts[cur].parentId;
+  }
+
+  el.innerHTML = `
+    <div class="breadcrumb">${lineage.map(p => icon(p.type)).join(" → ")}</div>
+    <button onclick="goBack()">Back</button>
+    <hr/>
+  `;
+
+  lineage.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "post";
+    div.innerHTML = `
+      <div class="meta">${p.author}</div>
+      <div><span class="icon">${icon(p.type)}</span>${p.content}</div>
+    `;
+    el.appendChild(div);
+  });
+
+  const current = posts[rootId];
+
+  // actions
+  if (canAnswer(current)) {
+    const a = document.createElement("div");
+    a.className = "action";
+    a.innerHTML = `
+      <button onclick="submitAnswer(true)">Yes</button>
+      <button onclick="submitAnswer(false)">No</button>
+      <textarea id="answerText" placeholder="Optional explanation..."></textarea>
+    `;
+    el.appendChild(a);
+  }
+
+  if (canChallenge(current)) {
+    const a = document.createElement("div");
+    a.className = "action";
+    a.innerHTML = `
+      <textarea id="challengeInput" placeholder="Ask a yes/no question..."></textarea>
+      <button onclick="submitChallenge()">Challenge</button>
+    `;
+    el.appendChild(a);
+  }
+
+  // children summaries
+  current.children.forEach(id => {
+    el.appendChild(renderSummary(posts[id]));
+  });
+}
+
+// ===== ACTIONS =====
 
 function submitAssertion() {
-  let val = document.getElementById('compose').value.trim();
-  if (!val) return;
-  postAssertion(val);
+  const text = document.getElementById("assertionInput").value.trim();
+  if (!text) return;
+
+  createPost("assertion", text);
+  render();
 }
 
-function submitChallenge(id) {
-  let val = document.getElementById('input').value.trim();
-  if (!val) return;
-  postChallenge(id, val);
+function submitChallenge() {
+  const text = document.getElementById("challengeInput").value.trim();
+  if (!text) return;
+
+  const parentId = viewStack[viewStack.length - 1];
+
+  createPost("challenge", text, parentId, {
+    target: posts[parentId].author
+  });
+
+  render();
 }
 
-function submitAnswer(id) {
-  let val = document.getElementById('input').value.trim();
-  if (!val) return;
-  postAnswer(id, val);
+function submitAnswer(yes) {
+  const text = document.getElementById("answerText").value.trim();
+  const parentId = viewStack[viewStack.length - 1];
+
+  createPost("answer", text || (yes ? "Yes" : "No"), parentId, {
+    target: posts[parentId].author,
+    yes
+  });
+
+  render();
 }
 
-/* ================= TEST DATA ================= */
-
-function seed() {
-  let a = createPost('assertion', "AI is deception");
-  state.currentUser = 'u2';
-  let c1 = createPost('challenge', "Prove it", a.id);
-  a.challengedBy = c1.id;
-
-  state.currentUser = 'u1';
-  let ans = createPost('answer', "It misleads people", c1.id);
-
-  state.currentUser = 'u2';
-  createPost('challenge', "How exactly?", ans.id);
-
-  state.currentUser = 'u3';
-  createPost('challenge', "Define deception", a.id);
-
-  state.currentUser = 'u1';
+function goHome() {
+  viewStack = [];
+  render();
 }
 
-seed();
+function goBack() {
+  viewStack.pop();
+  render();
+}
+
+// ===== UTILS =====
+
+function icon(type) {
+  if (type === "assertion") return "!";
+  if (type === "challenge") return "?";
+  if (type === "answer") return "✓";
+}
+
+// ===== INIT =====
+
 render();
+
 </script>
 
 </body>

@@ -1,30 +1,40 @@
 # Better Dispute
 
+## A system for structured disagreement that produces clarity, agreement, and resolution.
+
+Better Dispute turns discussion into a constrained, auditable, turn-based system where every claim, challenge, and answer is traceable, replayable, and enforceable.
+
+It replaces free-form argument with structured interaction graphs that can be reconstructed from an immutable event log.
+
+---
+
 ## Table of Contents
 
 1. [Core Principles](#core-principles)  
-2. [Architecture](#architecture)  
-3. [MVC Contract](#mvc-contract)  
-4. [Model](#model)  
-5. [Event Model (GitHub)](#event-model-github)  
-6. [State Reconstruction](#state-reconstruction)  
-7. [Core Rules](#core-rules)  
-8. [Challenge Targeting](#challenge-targeting)  
-9. [Turn Model](#turn-model)  
-10. [Referenced Nodes](#referenced-nodes)  
-11. [Resolution System](#resolution-system)  
-12. [Crickets](#crickets)  
-13. [Abuse & Malicious Events](#abuse--malicious-events)  
-14. [Missing Data](#missing-data)  
-15. [Branching Model](#branching-model)  
-16. [UI/UX](#uiux)  
-17. [Controller Interface](#controller-interface)  
-18. [Reducer Specification](#reducer-specification)  
-19. [Failure Handling](#failure-handling)  
-20. [Performance](#performance)  
-21. [SDLC](#sdlc)  
-22. [Versioning](#versioning)  
-23. [Patch Notes](#patch-notes)  
+2. [System Overview](#system-overview)  
+3. [Architecture](#architecture)  
+4. [MVC Contract](#mvc-contract)  
+5. [Model](#model)  
+6. [Event Model (GitHub)](#event-model-github)  
+7. [Boot & Replay on Load](#boot--replay-on-load)  
+8. [State Reconstruction](#state-reconstruction)  
+9. [Core Rules](#core-rules)  
+10. [Challenge Targeting](#challenge-targeting)  
+11. [Turn Model](#turn-model)  
+12. [Referenced Nodes](#referenced-nodes)  
+13. [Resolution System](#resolution-system)  
+14. [Crickets](#crickets)  
+15. [Abuse & Malicious Events](#abuse--malicious-events)  
+16. [Missing Data](#missing-data)  
+17. [Branching Model](#branching-model)  
+18. [UI/UX](#uiux)  
+19. [Controller Interface](#controller-interface)  
+20. [Reducer Specification](#reducer-specification)  
+21. [Failure Handling](#failure-handling)  
+22. [Performance](#performance)  
+23. [SDLC](#sdlc)  
+24. [Versioning](#versioning)  
+25. [Patch Notes](#patch-notes)  
 
 ---
 
@@ -39,13 +49,26 @@
 
 ---
 
+## System Overview
+
+Better Dispute models disagreement as a deterministic event graph.
+
+Every interaction:
+- is immutable
+- is replayable
+- is derived from GitHub issue events
+
+The system behaves like a local simulation engine with GitHub acting as the persistence layer.
+
+---
+
 ## Architecture
 
 - Frontend: Vanilla JavaScript  
-- Backend: GitHub  
-  - Auth: GitHub OAuth  
-  - Data: GitHub Issues (append-only event log)  
+- Backend: GitHub Issues (append-only event log)  
+- Auth: GitHub OAuth  
 - Pattern: Strict MVC  
+- Controller state: **fully client-side (no server-side state)**  
 
 ---
 
@@ -53,22 +76,26 @@
 
 ### Controller (Authoritative Layer)
 
+- Runs entirely in the browser  
+- Reconstructs all state from GitHub events  
+- Enforces rules locally before write  
+- Validates transitions during replay  
+
 Responsibilities:
 
 - Enforce all rules  
 - Determine permissions  
 - Compute derived state  
-- Reconstruct full state deterministically  
-- Reject invalid actions pre-write  
-- Ignore invalid actions during reconstruction  
+- Replay full history deterministically  
+- Reject invalid actions before commit  
 
 ---
 
 ### View (Dumb Renderer)
 
 - Reads controller state only  
-- Never determines permissions  
-- Reflects controller output exactly  
+- Never computes rules  
+- Fully reactive to controller output  
 
 ---
 
@@ -78,262 +105,154 @@ Responsibilities:
 
 - 11-character base62 strings  
 - Globally unique  
-- Client-generated with retry  
+- Client-generated  
 
 ---
 
 ### Person
 
-- `id`  
-- `@name`  
-- `githubId`  
+- id  
+- @name  
+- githubId  
 
 ---
 
 ### Post
 
 Types:
+- Assertion (!)
+- Challenge (?)
+- Answer (✓)
 
-- Assertion `!`  
-- Challenge `?`  
-- Answer `✓`  
-
-Structure:
-
-- `id`  
-- `type`  
-- `authorId`  
-- `parentId`  
-- `disputeId`  
-- `contentText`  
-- `contentPic` (optional URL)  
-- `createdAt`  
-
-Rules:
-
-- Root must be Assertion  
-- Root Assertion: text OR pic  
-- Other posts: text + optional pic  
+Fields:
+- id  
+- type  
+- authorId  
+- parentId  
+- disputeId  
+- contentText  
+- contentPic (external URL only)  
+- createdAt  
 
 ---
 
 ### Dispute
 
-- `id`  
-- `rootAssertionId`  
-- `participants[]`  
-- `status`: active | resolved | abandoned  
-- `sequence`  
-- `createdAt`  
+- id  
+- rootAssertionId  
+- participants[]  
+- status  
+- sequence  
+- createdAt  
 
 ---
 
 ## Event Model (GitHub)
 
-Each Dispute = one Issue  
-Comments = append-only events  
+Each Dispute = one GitHub Issue  
+Comments = append-only event stream  
 
-### Limits
+### Storage Constraints
 
-- Comment size limit enforced (~65KB)  
-- Payloads must be compact  
-- Pics must be external URLs  
+- No binary data stored in GitHub comments  
+- Images must be external URLs only  
+- Events must remain compact (<65KB comment limit)  
 
 ---
 
-### Encoding Format (Compact JSON)
-
-All events use compact keys to minimize payload size.
-
-#### Base Structure
+### Event Encoding
 
 ```json
 {
-  "i": "evtId",
-  "t": "type",
+  "i": "eventId",
+  "t": "TYPE",
   "a": "actorId",
   "s": 12,
   "ts": 1712345678901,
-  "p": { }
+  "p": {}
 }
 ```
-
-Fields:
-
-- `i` → event id  
-- `t` → type  
-- `a` → actor id  
-- `s` → sequence  
-- `ts` → timestamp (ms)  
-- `p` → payload  
 
 ---
 
-### Event Types (Codes)
+### Event Types
 
-- `PC` → POST_CREATED  
-- `CC` → CHALLENGE_CREATED  
-- `AS` → ANSWER_SUBMITTED  
-- `RO` → RESOLUTION_OFFERED  
-- `RA` → RESOLUTION_ACCEPTED  
-- `CP` → CRICKETS_PROPOSED  
-- `CA` → CRICKETS_AGREED  
-- `CT` → CRICKETS_TRIGGERED  
-- `CD` → CRICKETS_DISPUTED  
-- `MU` → PARTICIPANT_MUTED  
-- `BL` → PARTICIPANT_BLOCKED  
+- PC → POST_CREATED  
+- CC → CHALLENGE_CREATED  
+- AS → ANSWER_SUBMITTED  
+- RO → RESOLUTION_OFFERED  
+- RA → RESOLUTION_ACCEPTED  
+- CP → CRICKETS_PROPOSED  
+- CA → CRICKETS_AGREED  
+- CT → CRICKETS_TRIGGERED  
+- CD → CRICKETS_DISPUTED  
+- MU → MUTED  
+- BL → BLOCKED  
 
 ---
 
-### Payload Schemas
+## Boot & Replay on Load
 
-#### POST_CREATED (`PC`)
+On application startup:
 
-```json
-{
-  "pi": "postId",
-  "pt": "A|C|N",
-  "pa": "parentId|null",
-  "tx": "text",
-  "pc": "picUrl|null"
-}
-```
+### Step 1 — Fetch
+- Load GitHub Issue for current dispute
+- Retrieve all comments (events)
 
-#### CHALLENGE_CREATED (`CC`)
+### Step 2 — Normalize
+- Parse each comment into event objects
+- Validate schema
 
-```json
-{
-  "pi": "postId",
-  "ci": "challengeId",
-  "tp": "targetPersonId",
-  "ct": "I|O"
-}
-```
+### Step 3 — Sort
+- Sort by sequence `s` ascending
 
-#### ANSWER_SUBMITTED (`AS`)
+### Step 4 — Reduce
+- Run deterministic reducer:
+  - state0 → event1 → state1 → event2 → state2 …
 
-```json
-{
-  "ci": "challengeId",
-  "ai": "answerId",
-  "yn": true,
-  "tx": "optional text"
-}
-```
+### Step 5 — Validate
+- Drop invalid events during replay
+- Log inconsistencies (dev mode)
 
-#### COUNTER-CHALLENGE (embedded in AS)
+### Step 6 — Hydrate Controller
+- Final state becomes active runtime state
 
-```json
-{
-  "cc": {
-    "ci": "challengeId",
-    "tp": "targetPersonId",
-    "ct": "I|O",
-    "tx": "text"
-  }
-}
-```
-
-#### RESOLUTION_OFFERED (`RO`)
-
-```json
-{
-  "pi": "postId"
-}
-```
-
-#### RESOLUTION_ACCEPTED (`RA`)
-
-```json
-{
-  "pi": "postId"
-}
-```
-
-#### CRICKETS_PROPOSED (`CP`)
-
-```json
-{
-  "ci": "challengeId",
-  "d": 60000
-}
-```
-
-#### CRICKETS_AGREED (`CA`)
-
-```json
-{
-  "ci": "challengeId"
-}
-```
+Result:
+> The browser becomes a deterministic simulation of GitHub history.
 
 ---
 
 ## State Reconstruction
 
-### Ordering
-
-- Strictly by sequence  
-
----
-
-### Reducer
-
-- Pure  
-- Deterministic  
-- Validates transitions  
-- Ignores invalid events  
-
----
-
-### Idempotency
-
-- Unique event IDs  
-- Duplicate-safe  
-
----
-
-### Concurrency
-
-- Client submits with expectedSequence  
-- First valid write wins  
-- Others refetch and retry  
+- Pure function reducer  
+- Deterministic replay  
+- Sequence is authoritative ordering  
 
 ---
 
 ## Core Rules
 
-- A Person cannot challenge their own Post  
-- A Person may challenge a Post once per Dispute  
-- All permissions scoped to Dispute  
-- Posts globally addressable  
+- No self-challenges  
+- One unresolved challenge at a time  
+- All permissions scoped to dispute  
 
 ---
 
 ## Challenge Targeting
 
-Every Challenge MUST include:
+Each challenge includes:
+- targetPersonId  
 
-- targetPersonId
-
-Rules:
-
-- Target must be author of challenged Post  
-- Only target may answer  
+Only target may answer.
 
 ---
 
 ## Turn Model
 
-- Only one unresolved Challenge may exist  
+- Only one unresolved challenge exists  
+- Turn = target of unresolved challenge  
 
-Turn:
-
-- Target of unresolved Challenge  
-
-After answer:
-
-- Optional counter-challenge becomes next unresolved Challenge  
+Counter-challenge replaces unresolved challenge.
 
 ---
 
@@ -341,274 +260,91 @@ After answer:
 
 - External posts may be referenced  
 - Visually distinct  
-- Read-only projection  
-
-Rules:
-
-- Can be challenged locally  
-- Do not affect original context  
+- Do not mutate original context  
 
 ---
 
 ## Resolution System
 
-### Offers
-
-- Assertions proposed within Dispute  
-- Must be accepted  
-
----
-
-### Agreement
-
-- Occurs when participants accept same Assertion  
+- Offers are assertions  
+- Must be mutually accepted  
 
 ---
 
 ## Crickets
 
-Derived:
-
-currentTime - proposalTime >= duration
-
-Requires agreement  
+Derived from timestamps  
+No stored timers  
 
 ---
 
 ## Abuse & Malicious Events
 
-Reducer rejects:
+Invalid events are ignored during replay:
 
-- Invalid sequence  
-- Unauthorized actor  
-- Turn violations  
-- Duplicate challenges  
-
-Invalid events are ignored  
+- invalid sequence  
+- unauthorized actor  
+- rule violations  
 
 ---
 
 ## Missing Data
 
-- Missing nodes rendered as placeholders  
-- No deletion  
+Missing nodes render as placeholders  
+No deletion supported  
 
 ---
 
 ## Branching Model
 
-- All branches collapsed into summary cards  
+All branches are collapsed into summary cards  
 
 ---
 
 ## UI/UX
 
-### Home View
-
-- Composer: "Start a fire... 🔥"  
-- Feed sorted:
-  1. Your turn  
-  2. Activity  
-  3. Recency  
-
----
-
-### Dispute View
-
-- Parent chain  
-- Duel projection  
-- Nested summary cards  
-
----
-
-### Layout
-
-- Single lane  
-- Two lane after counter  
-
----
-
-### Post UI
-
-- Icons: ! ? ✓  
-- Copy link  
-- Depth stacking  
-
----
-
-### Interaction
-
-- Challenge primary  
-- Answer Yes/No + optional  
-
----
-
-### Terminal Nodes
-
-- Not clickable  
-- Fully challengeable  
-
----
-
-### Notifications
-
-- Challenged  
-- Answer challenged  
-
----
-
-### Test Mode
-
-- Multiple Persons  
-- Switchable sessions  
+- Dark theme  
+- Minimal interaction surface  
+- Emphasis on actionable state  
 
 ---
 
 ## Controller Interface
 
-### Identity
+Controller runs entirely in browser:
 
 - getCurrentPerson()  
-- switchPerson(personId)  
-
----
-
-### Queries
-
+- switchPerson()  
 - getHomeFeed()  
-- getDispute(disputeId)  
-- getPost(postId)  
-- getLineage(postId)  
-- getAvailableActions(personId, context)  
-
----
-
-### Permissions
-
-- canChallenge(personId, postId)  
-- canAnswer(personId, challengeId)  
-- canCounterChallenge(personId, answerId)  
-- canAgree(personId, assertionId)  
-- canOfferResolution(personId, disputeId)  
-- canAcceptResolution(personId, offerId)  
-- canProposeCrickets(personId, challengeId)  
-- canRespondCrickets(personId, proposalId)  
-
----
-
-### Actions
-
-- createAssertion(input)  
-- createChallenge(input)  
-- submitAnswer(input)  
-- submitCounterChallenge(input)  
-- agreeAssertion(input)  
-- offerResolution(input)  
-- acceptResolution(input)  
-- proposeCrickets(input)  
-- respondCrickets(input)  
-- triggerCrickets(input)  
-- muteParticipant(input)  
-- blockParticipant(input)  
+- getDispute()  
+- getPost()  
+- getAvailableActions()  
 
 ---
 
 ## Reducer Specification
 
-### State Shape
+Pure deterministic state machine:
 
-state = {
-  posts: Map,
-  challenges: Map,
-  answers: Map,
-  participants: Set,
-  unresolvedChallengeId: null
-}
+state + event → next state  
 
----
-
-### POST_CREATED (PC)
-
-- Add post  
-- Add participant  
-
----
-
-### CHALLENGE_CREATED (CC)
-
-Valid if:
-
-- No unresolved challenge  
-
-Effects:
-
-- Create challenge  
-- Set unresolved  
-
----
-
-### ANSWER_SUBMITTED (AS)
-
-Valid if:
-
-- Actor is target  
-
-Effects:
-
-- Add answer  
-- Clear unresolved  
-
----
-
-### COUNTER-CHALLENGE
-
-- Same as CC  
-
----
-
-### RESOLUTION_OFFERED (RO)
-
-- Store offer  
-
----
-
-### RESOLUTION_ACCEPTED (RA)
-
-- Mark agreement  
-
----
-
-### CRICKETS_PROPOSED (CP)
-
-- Store  
-
----
-
-### CRICKETS_AGREED (CA)
-
-- Enable derived check  
-
----
-
-### INVALID EVENTS
-
-Ignored  
+All invalid transitions ignored.
 
 ---
 
 ## Failure Handling
 
-- Retry  
-- Refetch  
-- Re-render  
+- retry GitHub writes  
+- refetch on conflict  
+- full replay after recovery  
 
 ---
 
 ## Performance
 
-- Lazy loading  
-- Incremental reconstruction  
-- Caching  
+- lazy event loading  
+- incremental replay  
+- caching per dispute  
 
 ---
 

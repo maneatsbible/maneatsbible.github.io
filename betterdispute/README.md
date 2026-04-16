@@ -102,7 +102,6 @@ Runs entirely in browser:
 
 - UUIDv7  
 - Globally unique  
-- Time-ordered  
 
 ---
 
@@ -153,16 +152,20 @@ Fields:
 
 ### Content Hash
 
-```
 contentHash = SHA-256(
-  type +
-  authorId +
-  disputeId +
-  parentId +
-  contentText +
-  createdAt
+  canonicalJson(
+    id,
+    type,
+    authorId,
+    disputeId,
+    parentId,
+    targetPersonId,
+    contentText,
+    contentPic,
+    status,
+    createdAt
+  )
 )
-```
 
 ---
 
@@ -189,11 +192,9 @@ Queries are:
 
 ## Canonical Ordering
 
-```
 ORDER BY:
-  createdAt ASC,
+  githubIssueNumber ASC,
   id ASC
-```
 
 ---
 
@@ -244,11 +245,7 @@ Nodes may reference external nodes without mutation.
 
 ## Crickets
 
-Derived from timestamps:
-
-```
 currentTime - createdAt >= duration
-```
 
 ---
 
@@ -262,7 +259,7 @@ currentTime - createdAt >= duration
 
 ## Abuse & Malicious Data
 
-Invalid nodes ignored:
+Invalid nodes are surfaced but marked invalid:
 
 - schema violations  
 - hash mismatch  
@@ -279,9 +276,9 @@ Invalid nodes ignored:
 
 ## Branching Model
 
-- Tree via parentId  
-- Multiple branches allowed  
-- UI collapses non-relevant branches  
+- Single canonical path enforced via parentId  
+- Only nodes on the canonical path participate in state derivation  
+- Non-canonical branches may exist but are ignored by the controller  
 
 ---
 
@@ -340,6 +337,7 @@ Invalid nodes ignored:
 
 - Issues used as node store  
 - Labels + body for indexing  
+- GitHub issue number used as canonical clock  
 
 ---
 

@@ -132,7 +132,7 @@ Fields (stored in issue body or metadata):
 - parentId  
 - targetPersonId (challenge only)  
 - contentText  
-- contentPic (GitHub attachment URL)  
+- contentPic (GitHub CDN URL)  
 - contentHash  
 - createdAt  
 - status  
@@ -261,26 +261,33 @@ currentTime - createdAt >= duration
 
 ## Image Handling
 
-Images are handled via GitHub issue attachments.
+Images are handled transparently by the client using GitHub’s upload infrastructure.
 
-### Upload Flow
+### User Experience
 
-1. User attaches image during issue creation  
-2. GitHub uploads image to its CDN  
-3. Markdown in issue body references the attachment  
-4. Extracted CDN URL is stored as `contentPic`  
+- User selects or pastes an image  
+- No manual upload steps are exposed  
+- Image appears as part of the node content  
+
+### Internal Upload Flow
+
+1. Client uploads image to GitHub upload endpoint  
+2. GitHub returns a CDN URL (`user-images.githubusercontent.com/...`)  
+3. Client embeds the URL into issue body markdown  
+4. Issue is created with embedded image  
+5. URL is extracted and stored as `contentPic`  
 
 ### Properties
 
-- Images are immutable after upload  
-- URLs are stable and platform-hosted  
-- No external image dependencies  
+- Fully abstracted from end user  
+- Images are immutable and CDN-hosted  
+- No external dependencies  
 
 ### Constraints
 
+- Two-step client process (upload → create issue)  
 - Subject to GitHub file size limits  
-- No binary data stored outside platform  
-- Duplicate uploads are not deduplicated  
+- Possible orphaned uploads on failure (non-critical)  
 
 ---
 
@@ -384,9 +391,10 @@ Rules:
 
 ### Image Hosting
 
-- Images stored as GitHub issue attachments  
-- CDN URLs persisted as `contentPic`  
-- No external hosting required  
+- Images uploaded via GitHub upload endpoint  
+- CDN URLs embedded in issue body  
+- Stored as `contentPic`  
+- Fully abstracted from user  
 
 ---
 

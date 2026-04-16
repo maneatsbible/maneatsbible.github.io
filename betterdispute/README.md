@@ -37,7 +37,7 @@ It replaces free-form argument with deterministic interaction graphs reconstruct
 25. [GitHub Integration Specifications](#github-integration-specifications)  
 26. [SDLC](#sdlc)  
 27. [Versioning](#versioning)  
-28. [Patch Notes](#patch-notes)  
+28. [Release & Patch Notes](#release--patch-notes)  
 
 ---
 
@@ -420,6 +420,14 @@ Patch → Test/Fix → Update README → Deploy
 - Each deployment must produce a versioned `bd-vX.Y.Z.html`
 - `index.html` must always point to latest versioned file  
 
+### Notes Requirement
+
+- Every release and patch must include:
+  - summary of changes  
+  - version number  
+  - timestamp  
+  - GPT model used to generate the changes  
+
 ---
 
 ## Versioning
@@ -428,12 +436,6 @@ vMAJOR.MINOR.PATCH
 
 ---
 
-## Patch Notes
+## Release & Patch Notes
 
-No releases have been made yet.
-
----
-
-## Release Notes
-
-No releases have been made yet.
+No releases or patches have been made yet.

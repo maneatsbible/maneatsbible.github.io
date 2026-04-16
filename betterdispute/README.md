@@ -10,6 +10,8 @@ It replaces free-form argument with deterministic interaction graphs reconstruct
 
 ## Table of Contents
 
+> All entries are clickable links to sections below.
+
 1. [Core Principles](#core-principles)  
 2. [System Overview](#system-overview)  
 3. [Architecture](#architecture)  
@@ -99,6 +101,7 @@ Runs entirely in browser:
 
 - 11-character base62  
 - Client-generated  
+- Must be globally unique  
 
 ---
 
@@ -107,6 +110,7 @@ Runs entirely in browser:
 - id  
 - @name  
 - githubId  
+- publicKey  
 
 ---
 
@@ -125,6 +129,7 @@ Fields:
 - disputeId  
 - contentText  
 - contentPic (external URL only)  
+- contentHash  
 - createdAt  
 
 ---
@@ -135,7 +140,6 @@ Fields:
 - rootAssertionId  
 - participants[]  
 - status  
-- sequence  
 - createdAt  
 
 ---
@@ -144,6 +148,8 @@ Fields:
 
 Each dispute = one persistent event stream  
 Events are append-only and immutable  
+
+---
 
 ### Constraints
 
@@ -155,14 +161,28 @@ Events are append-only and immutable
 
 ### Event Encoding
 
+```json
 {
   "i": "eventId",
+  "v": 1,
   "t": "TYPE",
   "a": "actorId",
-  "s": 12,
+  "prev": "previousEventId",
   "ts": 1712345678901,
+  "sig": "signature",
   "p": {}
 }
+```
+
+---
+
+### Event Guarantees
+
+- `prev` forms a hash-linked chain of events  
+- Only events with valid signatures are accepted  
+- Event order is derived from chain linkage, not sequence numbers  
+- Duplicate events (same `i`) are ignored  
+- Events must be idempotent  
 
 ---
 
@@ -173,6 +193,7 @@ Events are append-only and immutable
 - AS → ANSWER_SUBMITTED  
 - RO → RESOLUTION_OFFERED  
 - RA → RESOLUTION_ACCEPTED  
+- RF → RESOLUTION_FINALIZED  
 - CP → CRICKETS_PROPOSED  
 - CA → CRICKETS_AGREED  
 - CT → CRICKETS_TRIGGERED  
@@ -198,12 +219,12 @@ On load:
 
 - All comments are fetched via API  
 - Parsed into event objects  
-- Sorted by sequence  
+- Reconstructed into a valid event chain  
+- Longest valid chain is selected  
 - Replayed through reducer  
 
 ### Constraints
 
-- Event order is authoritative via sequence number  
 - Storage is untrusted and validated client-side  
 - Invalid or malicious events are ignored during replay  
 
@@ -213,10 +234,12 @@ On load:
 
 1. Fetch event stream  
 2. Parse events  
-3. Sort by sequence  
-4. Replay through reducer  
-5. Drop invalid events  
-6. Hydrate controller state  
+3. Verify signatures  
+4. Build valid event chains  
+5. Select longest valid chain  
+6. Replay through reducer  
+7. Drop invalid events  
+8. Hydrate controller state  
 
 Result:
 > Deterministic reconstruction of full interaction state.
@@ -226,8 +249,8 @@ Result:
 ## State Reconstruction
 
 - Pure reducer function  
-- Deterministic replay  
-- Sequence-based ordering  
+- Deterministic replay based on chain order  
+- Only valid events are applied  
 
 ---
 
@@ -254,6 +277,11 @@ Only target may answer.
 - Exactly one unresolved challenge exists per dispute  
 - Turn = target of unresolved challenge  
 
+### Concurrency Rule
+
+- First valid challenge in replay order is accepted  
+- Subsequent concurrent challenges are rejected  
+
 Counter-challenge replaces current unresolved challenge.
 
 ---
@@ -270,6 +298,8 @@ Counter-challenge replaces current unresolved challenge.
 
 - Offers are assertions  
 - Must be mutually accepted  
+- Finalized via `RF` event  
+- No further events allowed after finalization  
 
 ---
 
@@ -277,7 +307,12 @@ Counter-challenge replaces current unresolved challenge.
 
 Derived, not stored:
 
-currentTime - proposalTime >= duration  
+Uses:
+- latest event timestamp instead of wall clock  
+
+```
+latestEventTime - proposalTime >= duration
+```
 
 ---
 
@@ -304,10 +339,18 @@ Images are handled via platform attachment flow.
 
 Invalid events are ignored during replay:
 
-- invalid sequence  
+- invalid signature  
+- broken chain linkage  
 - unauthorized actor  
 - rule violations  
-- duplicate actions  
+- duplicate eventId  
+
+### Rate Heuristics
+
+Clients may ignore:
+
+- excessive rapid events from same actor  
+- high volumes of invalid events  
 
 ---
 
@@ -320,7 +363,9 @@ Invalid events are ignored during replay:
 
 ## Branching Model
 
-All branches are collapsed into summary cards  
+- Multiple chains may exist  
+- Only the longest valid chain is canonical  
+- Non-canonical branches are ignored  
 
 ---
 
@@ -345,15 +390,29 @@ All branches are collapsed into summary cards
 
 ## Reducer Specification
 
-state + event → next state  
+```
+state + event → next state
+```
 
-Invalid transitions ignored.
+### Validation Layers
+
+1. Schema validation  
+2. Signature validation  
+3. Authorization validation  
+4. State transition validation  
+
+Rules:
+
+- Reducer must be pure  
+- Deterministic across clients  
+- Only prior accepted events influence validation  
+- Invalid transitions are ignored  
 
 ---
 
 ## Failure Handling
 
-- retry writes  
+- retry writes with same eventId (idempotent)  
 - refetch on conflict  
 - full replay on recovery  
 
@@ -377,8 +436,6 @@ Invalid transitions ignored.
 - Token is used to:
   - identify Person identity (`githubId`)
   - authorize event stream reads/writes  
-- No server-side token storage exists  
-- All requests are executed directly from browser to API  
 
 ---
 
@@ -387,12 +444,12 @@ Invalid transitions ignored.
 - Each Dispute maps to a single issue thread  
 - Each event is appended as a new comment  
 - Comments are treated as immutable history  
-- Sequence number determines canonical ordering  
+- Clients reconstruct canonical chain via `prev` linkage  
 - Client performs full validation during replay  
 
 Properties:
 - append-only  
-- tamper-tolerant (invalid events ignored)  
+- tamper-evident (via signatures + chain)  
 - eventually consistent  
 - replayable to deterministic state  
 
@@ -401,11 +458,9 @@ Properties:
 ### Image Hosting
 
 - Images are uploaded via platform comment attachment flow  
-- Platform returns hosted CDN URL (user-images domain)  
+- Platform returns hosted CDN URL  
 - Only URL is persisted in event payload (`contentPic`)  
-- Images are not part of event state machine  
 - Image loss is treated as missing external resource  
-- No binary or base64 storage allowed anywhere in system  
 
 ---
 
@@ -438,4 +493,5 @@ vMAJOR.MINOR.PATCH
 
 ## Release & Patch Notes
 
-No releases or patches have been made yet.
+> These notes track differences between deployed releases.  
+> No deployments have been made yet.

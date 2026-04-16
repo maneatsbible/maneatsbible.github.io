@@ -1,190 +1,115 @@
 # Better Dispute
 
-## A system for structured disagreement that produces clarity, agreement, and resolution.
+## A deterministic system for structured disagreement.
 
-Better Dispute turns discussion into a constrained, auditable, graph-based system where every claim, challenge, and answer is stored as an independent, queryable node.
+Better Dispute models disagreement as an append-only graph of claims, challenges, and answers.
 
-It replaces replay-based simulation with deterministic state derived from structured queries.
-
----
-
-## Table of Contents
-
-> All entries are clickable links to sections below.
-
-1. [Core Principles](#core-principles)  
-2. [System Overview](#system-overview)  
-3. [Architecture](#architecture)  
-4. [MVC Contract](#mvc-contract)  
-5. [Model](#model)  
-6. [Storage Model](#storage-model)  
-7. [Query Model](#query-model)  
-8. [State Reconstruction](#state-reconstruction)  
-9. [Core Rules](#core-rules)  
-10. [Challenge Targeting](#challenge-targeting)  
-11. [Turn Model](#turn-model)  
-12. [Referenced Nodes](#referenced-nodes)  
-13. [Resolution System](#resolution-system)  
-14. [Crickets](#crickets)  
-15. [Image Handling](#image-handling)  
-16. [Abuse & Malicious Data](#abuse--malicious-data)  
-17. [Missing Data](#missing-data)  
-18. [Branching Model](#branching-model)  
-19. [UI/UX](#uiux)  
-20. [Controller Interface](#controller-interface)  
-21. [Validation Rules](#validation-rules)  
-22. [Failure Handling](#failure-handling)  
-23. [Performance](#performance)  
-24. [GitHub Integration Specifications](#github-integration-specifications)  
-25. [SDLC](#sdlc)  
-26. [Versioning](#versioning)  
-27. [Release & Patch Notes](#release--patch-notes)  
+All system state is derived deterministically from queryable records. No server-side state is required.
 
 ---
 
 ## Core Principles
 
-- Dialogue is structured through challenges and answers  
-- The system enforces clarity, accountability, and progression  
-- Outcomes prioritize:
-  - Understanding  
-  - Agreement  
-  - Conflict resolution  
-
----
-
-## System Overview
-
-Better Dispute is a query-driven state system.
-
-- Each node = independent record  
-- GitHub = distributed document store  
-- Browser = deterministic query engine  
-- State = derived from queries, not replay  
+- Structured dialogue through explicit challenge/answer relationships  
+- Deterministic state derived from queries  
+- Append-only, auditable data model  
+- Client-side validation and reconstruction  
 
 ---
 
 ## Architecture
 
-- Frontend: Vanilla JavaScript  
-- Backend: GitHub Issues + Search API  
-- Authentication: OAuth-based identity layer  
-- Pattern: Strict MVC  
-- No server-side state is maintained  
-
----
-
-## MVC Contract
-
-### Controller (Authoritative Layer)
-
-Runs entirely in browser:
-
-- Enforces all rules  
-- Executes queries  
-- Computes derived state  
-- Rejects invalid actions before write  
-
----
-
-### View (Dumb Renderer)
-
-- Reads controller state only  
-- No business logic  
-- Pure rendering layer  
+- Frontend: Browser (Vanilla JS)
+- Backend: GitHub Issues (storage layer only)
+- Auth: GitHub OAuth
+- Pattern: Strict MVC
+- No server-side state
 
 ---
 
 ## Model
 
-### ID Format
+### ID
 
-- 11-character base62  
-- Client-generated  
-- Must be globally unique  
+All entities use **UUIDv7**:
 
----
-
-### Person
-
-- id  
-- @name  
-- githubId  
+- globally unique  
+- time-ordered  
+- lexicographically sortable  
 
 ---
 
-### Node (Issue)
+### Node
 
 Each node is stored as a GitHub Issue.
 
-Types:
-- Assertion (!)
-- Challenge (?)
-- Answer (✓)
-- Resolution  
+#### Types
 
-Fields (stored in issue body or metadata):
-
-- id  
-- type  
-- authorId  
-- disputeId  
-- parentId  
-- targetPersonId (challenge only)  
-- contentText  
-- contentPic (GitHub CDN URL)  
-- contentHash  
-- createdAt  
-- status  
+- Assertion
+- Challenge
+- Answer
+- Resolution
 
 ---
 
-### Dispute
+### Node Fields
 
-- id  
-- rootNodeId  
-- participants[]  
-- status  
-- activeChallengeId  
-- createdAt  
+- id (UUIDv7)
+- type
+- authorId
+- disputeId
+- parentId
+- targetPersonId (challenge only)
+- contentText
+- contentPic
+- contentHash
+- createdAt
+- status
+
+---
+
+### Content Hash
+
+Each node includes a deterministic hash:
+
+```
+contentHash = SHA-256(
+  type +
+  authorId +
+  disputeId +
+  parentId +
+  contentText +
+  createdAt
+)
+```
+
+#### Rule
+
+- Nodes with invalid hashes are ignored
+- Hash ensures integrity and tamper detection
 
 ---
 
 ## Storage Model
 
-- Each node = one GitHub Issue  
+- Each node = GitHub Issue  
 - Relationships defined via:
-  - `disputeId`
-  - `parentId`  
-- Metadata stored in:
-  - issue body (JSON block)
-  - labels (type, status)  
+  - disputeId
+  - parentId  
 
 Properties:
 
-- append-only (no edits assumed)  
-- tamper-tolerant via validation  
+- append-only  
 - eventually consistent  
+- tamper-tolerant via validation  
 
 ---
 
 ## Query Model
 
-State is derived using GitHub search/filter APIs.
+State is derived via GitHub Search API.
 
-Examples:
-
-- All nodes in dispute:
-  - `disputeId = X`
-
-- Active challenge:
-  - `type = challenge`
-  - `status = open`
-
-- Answers to challenge:
-  - `parentId = challengeId`
-
-Queries are:
+All queries must be:
 
 - deterministic  
 - idempotent  
@@ -192,225 +117,99 @@ Queries are:
 
 ---
 
-## State Reconstruction
+## Canonical Ordering
 
-No replay required.
+All node sets MUST be sorted before selection:
+
+```
+ORDER BY:
+  createdAt ASC,
+  id ASC
+```
+
+This ensures deterministic behavior across clients.
+
+---
+
+## State Reconstruction
 
 State is computed as:
 
-- Fetch relevant nodes  
-- Filter valid nodes  
-- Apply deterministic selection rules  
+1. Fetch relevant nodes  
+2. Validate schema + hash  
+3. Sort canonically  
+4. Apply selection rules  
+
+No replay is required.
 
 ---
 
-## Core Rules
+## Active Challenge Rule
 
-- No self-challenges  
-- One unresolved challenge per dispute  
-- All permissions scoped per dispute  
+At most one challenge is considered active.
 
----
+### Selection
 
-## Challenge Targeting
+```
+activeChallenge =
+  openChallenges
+    .sorted(createdAt ASC, id ASC)
+    .first()
+```
 
-Each challenge includes:
-
-- targetPersonId  
-
-Only target may answer.
+All other open challenges are ignored.
 
 ---
 
 ## Turn Model
 
-- Turn is derived from active challenge  
-- `activeChallengeId` stored on dispute  
-
-### Rule
-
-- Only one challenge may have `status = open`  
-- Creating a new challenge closes previous one  
-
----
-
-## Referenced Nodes
-
-- Nodes may reference external nodes  
-- References do not mutate original  
-
----
-
-## Resolution System
-
-- Resolution is a node  
-- Must be accepted by both parties  
-- Dispute marked `resolved`  
-
----
-
-## Crickets
-
-Derived from timestamps:
-
-```
-currentTime - createdAt >= duration
-```
-
----
-
-## Image Handling
-
-Images are handled transparently by the client using GitHub’s upload infrastructure.
-
-### User Experience
-
-- User selects or pastes an image  
-- No manual upload steps are exposed  
-- Image appears as part of the node content  
-
-### Internal Upload Flow
-
-1. Client uploads image to GitHub upload endpoint  
-2. GitHub returns a CDN URL (`user-images.githubusercontent.com/...`)  
-3. Client embeds the URL into issue body markdown  
-4. Issue is created with embedded image  
-5. URL is extracted and stored as `contentPic`  
-
-### Properties
-
-- Fully abstracted from end user  
-- Images are immutable and CDN-hosted  
-- No external dependencies  
-
-### Constraints
-
-- Two-step client process (upload → create issue)  
-- Subject to GitHub file size limits  
-- Possible orphaned uploads on failure (non-critical)  
-
----
-
-## Abuse & Malicious Data
-
-Invalid nodes ignored:
-
-- schema violations  
-- unauthorized actor  
-- rule violations  
-
-### Rate Heuristics
-
-Clients may ignore:
-
-- excessive node creation  
-- spam patterns  
-
----
-
-## Missing Data
-
-- Missing nodes render as placeholders  
-- No deletion supported  
-
----
-
-## Branching Model
-
-- Tree structure via `parentId`  
-- Multiple branches allowed  
-- UI collapses non-relevant branches  
-
----
-
-## UI/UX
-
-- Dark theme  
-- Minimal interaction model  
-- Emphasis on actionable state  
-
----
-
-## Controller Interface
-
-- getCurrentPerson()  
-- switchPerson()  
-- getDispute()  
-- getNode()  
-- getAvailableActions()  
+- Turn is derived from activeChallenge  
+- Only targetPersonId may answer  
 
 ---
 
 ## Validation Rules
 
-- Schema validation  
-- Authorization validation  
-- State rule validation  
+Nodes are ignored if:
 
-Rules:
+- schema invalid  
+- hash invalid  
+- violates system rules  
 
-- Deterministic  
-- Query-based  
-- Independent of fetch order  
+Validation is deterministic and client-side.
+
+---
+
+## Rate Limiting Strategy
+
+Due to GitHub Search API constraints:
+
+- No real-time polling  
+- Queries must be debounced (≥2s)  
+- Aggressive caching per dispute  
+- Manual refresh preferred over live sync  
 
 ---
 
 ## Failure Handling
 
-- retry writes  
-- refetch queries  
-- tolerate partial data  
+- Retry writes  
+- Refetch on failure  
+- Tolerate partial data  
 
 ---
 
-## Performance
+## Known Constraints
 
-- query-based loading  
-- partial fetches  
-- caching per dispute  
-
----
-
-## GitHub Integration Specifications
-
-### OAuth
-
-- OAuth-based identity  
-- Token stored in memory  
-- Used for read/write operations  
+- GitHub Search API rate limits  
+- Eventual consistency of search index  
+- No hard prevention of malicious writes  
+- Client-side validation is authoritative  
 
 ---
 
-### Storage
+## Future Improvements
 
-- Each node = GitHub Issue  
-- Queries via Search API  
-- Labels + body used for indexing  
-
----
-
-### Image Hosting
-
-- Images uploaded via GitHub upload endpoint  
-- CDN URLs embedded in issue body  
-- Stored as `contentPic`  
-- Fully abstracted from user  
-
----
-
-## SDLC
-
-Design → Implement → Test/Fix → Repeat → Deploy  
-
----
-
-## Versioning
-
-vMAJOR.MINOR.PATCH  
-
----
-
-## Release & Patch Notes
-
-> These notes track differences between deployed releases.  
-> No deployments have been made yet.
+- Signed nodes (public/private key verification)  
+- Indexed query layer (optional backend)  
+- Improved moderation controls  

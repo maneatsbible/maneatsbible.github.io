@@ -2,376 +2,463 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Better Dispute v3</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Better Dispute v3o</title>
 <style>
-:root {
-  --bg: #0f1115;
-  --card: #1a1d24;
-  --muted: #888;
-  --text: #eaeaea;
-  --accent: #4da3ff;
-  --warn: #ffcc00;
-  --ok: #4caf50;
-  --danger: #ff5252;
+:root{
+  --bg:#0b0c10;
+  --panel:#12141a;
+  --panel2:#171a22;
+  --text:#e6e6e6;
+  --muted:#8b8f98;
+  --accent:#7c5cff;
+  --good:#2ee59d;
+  --warn:#ffcc00;
+  --bad:#ff4d4d;
+  --border:#232634;
 }
 
-body {
-  margin: 0;
-  font-family: system-ui;
-  background: var(--bg);
-  color: var(--text);
+*{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto}
+body{margin:0;background:var(--bg);color:var(--text);}
+
+header{
+  position:sticky;top:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px;
+  background:rgba(10,11,15,.9);
+  backdrop-filter: blur(10px);
+  border-bottom:1px solid var(--border);
+  z-index:10;
+}
+.header-left{display:flex;gap:10px;align-items:center;}
+.iconbtn{background:none;border:none;color:var(--text);font-size:18px;}
+.title{font-weight:600}
+.version{color:var(--muted);font-size:12px}
+
+#userBar{
+  display:flex;gap:8px;align-items:center;
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+}
+.userpill{
+  padding:6px 10px;border-radius:999px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  cursor:pointer;font-size:12px;
+}
+.userpill.active{background:var(--accent);color:white}
+
+#homeInput{
+  padding:14px;
+}
+textarea{
+  width:100%;
+  min-height:70px;
+  resize:none;
+  padding:12px;
+  border-radius:12px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  color:var(--text);
+  outline:none;
+  font-size:15px;
 }
 
-header {
-  display: flex;
-  justify-content: space-between;
-  padding: 12px;
-  background: #000;
-  border-bottom: 1px solid #222;
+.btn{
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:var(--panel);
+  color:var(--text);
+  cursor:pointer;
+}
+.btn.primary{background:var(--accent);border:none;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+#feed{padding:10px 10px 120px;}
+
+.card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:12px;
+  margin-bottom:10px;
+  position:relative;
 }
 
-.container {
-  padding: 12px;
+.stack{
+  margin-left:10px;
+  border-left:1px dashed #2b2f3c;
+  padding-left:10px;
 }
 
-.card {
-  background: var(--card);
-  padding: 12px;
-  border-radius: 10px;
-  margin-bottom: 10px;
+.meta{font-size:11px;color:var(--muted);margin-bottom:6px}
+.badge{
+  font-size:11px;
+  padding:2px 6px;
+  border-radius:999px;
+  background:var(--panel2);
+  border:1px solid var(--border);
+  margin-left:6px;
+}
+.badge.turn{color:var(--warn)}
+.badge.your{color:var(--good)}
+
+.icon{
+  font-weight:700;margin-right:6px;
+}
+.assertion .icon{color:#fff}
+.challenge .icon{color:var(--warn)}
+.answer .icon{color:var(--good)}
+
+.clickable{cursor:pointer}
+.terminal::after{
+  content:"";
+  position:absolute;right:10px;top:10px;
+  width:10px;height:10px;border-radius:50%;
+  background:var(--muted);
+  opacity:.4;
 }
 
-button {
-  background: none;
-  border: 1px solid #333;
-  color: var(--text);
-  padding: 8px 10px;
-  border-radius: 8px;
-  margin-top: 6px;
+.highlight{
+  outline:1px solid var(--accent);
 }
 
-button:disabled {
-  opacity: 0.3;
+/* DISPUTE VIEW */
+#disputeView{display:none;padding-bottom:120px}
+
+.threadTop{
+  padding:10px 14px;
+  color:var(--muted);
+  font-size:12px;
 }
 
-textarea {
-  width: 100%;
-  background: #000;
-  color: var(--text);
-  border: 1px solid #333;
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 16px;
+.arrowline{
+  display:flex;align-items:center;gap:6px;
+  flex-wrap:wrap;
 }
 
-.badge {
-  background: var(--warn);
-  color: #000;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 12px;
-  margin-left: 6px;
+/* COMPOSER */
+#composer{
+  position:fixed;left:0;right:0;bottom:-400px;
+  background:var(--panel);
+  border-top:1px solid var(--border);
+  padding:10px;
+  transition:bottom .25s ease;
+  z-index:20;
 }
+#composer.open{bottom:0}
+.composerRow{display:flex;gap:8px;margin-top:8px}
+.smallhint{font-size:12px;color:var(--muted)}
 
-.highlight {
-  border: 1px solid var(--accent);
-}
-
-.terminal {
-  opacity: 0.5;
-}
-
-.row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.icon {
-  margin-right: 6px;
-}
-
-.topline {
-  font-size: 12px;
-  color: var(--muted);
-}
+/* TOPBAR ICONS */
+.topbarIcon{font-size:18px;margin-right:6px}
 </style>
 </head>
-
 <body>
 
 <header>
-  <div>⚖️ Better Dispute</div>
-  <div>v3</div>
+  <div class="header-left">
+    <button class="iconbtn" onclick="App.goHome()">🏠</button>
+    <div class="title">Better Dispute</div>
+  </div>
+  <div class="version">v3o</div>
 </header>
 
-<div class="container">
+<div id="userBar"></div>
 
-<!-- USER SWITCH -->
-<div class="card">
-  <div>Current User:</div>
-  <div id="users"></div>
-</div>
-
-<!-- HOME -->
 <div id="homeView">
-
-  <div class="card">
-    <textarea id="assertionInput" placeholder="Start a fire..."></textarea>
-    <button onclick="Controller.createAssertion()">Post Assertion</button>
+  <div id="homeInput">
+    <textarea id="assertInput" placeholder="Start a fire..."></textarea>
+    <div style="margin-top:8px;display:flex;justify-content:flex-end">
+      <button class="btn primary" onclick="App.createAssertion()">Post</button>
+    </div>
   </div>
 
   <div id="feed"></div>
 </div>
 
-<!-- DISPUTE -->
-<div id="disputeView" style="display:none;">
-  <button onclick="Controller.back()">⬅ Back</button>
-  <div id="lineage"></div>
-  <div id="thread"></div>
+<div id="disputeView">
+  <div class="threadTop" id="threadTop"></div>
+  <div id="disputeFeed"></div>
 </div>
 
+<div id="composer">
+  <div class="smallhint" id="composerHint"></div>
+  <textarea id="composerInput"></textarea>
+  <div class="composerRow">
+    <button class="btn" onclick="App.closeComposer()">Cancel</button>
+    <button class="btn primary" id="composerSubmit" onclick="App.submitComposer()">Submit</button>
+  </div>
 </div>
 
 <script>
-/* ===================== MODEL ===================== */
+/* =========================
+   MODEL
+========================= */
 
 const Model = {
-  users: ["Alice", "Bob", "Charlie"],
-  currentUser: "Alice",
-  posts: [],
-  disputes: [],
-
-  createPost(type, content, parentId = null, meta = {}) {
-    const post = {
-      id: Math.random().toString(36).substr(2, 9),
-      type,
-      content,
-      user: this.currentUser,
-      parentId,
-      meta,
-      created: Date.now()
-    };
-    this.posts.push(post);
-    return post;
-  },
-
-  getChildren(parentId) {
-    return this.posts.filter(p => p.parentId === parentId);
-  },
-
-  getPost(id) {
-    return this.posts.find(p => p.id === id);
-  }
+  users:[
+    {id:"u1",name:"Alice"},
+    {id:"u2",name:"Bob"},
+    {id:"u3",name:"Cara"}
+  ],
+  currentUser:"u1",
+  posts:[],
+  disputes:{}, // key: pairId -> {turnIndex, resolved, history}
+  id:1
 };
 
-/* ===================== CONTROLLER ===================== */
+function uid(){return "p"+(Model.id++)}
+
+function pairId(a,b){
+  return [a,b].sort().join("_");
+}
+
+/* =========================
+   CONTROLLER
+========================= */
 
 const Controller = {
-  stack: [],
 
-  createAssertion() {
-    const val = document.getElementById("assertionInput").value.trim();
-    if (!val) return;
-    Model.createPost("assertion", val);
-    document.getElementById("assertionInput").value = "";
-    View.renderHome();
-  },
-
-  challenge(postId) {
-    if (!this.canChallenge(postId)) return;
-
-    const content = prompt("Enter challenge (Y/N question):");
-    if (!content) return;
-
-    const challenge = Model.createPost("challenge", content, postId);
-
-    // create dispute
-    Model.disputes.push({
-      id: challenge.id,
-      postId: challenge.id,
-      users: [Model.currentUser, Model.getPost(postId).user],
-      turn: Model.getPost(postId).user,
-      active: true
+  createAssertion(text){
+    Model.posts.push({
+      id:uid(),
+      type:"assertion",
+      user:Model.currentUser,
+      text,
+      children:[]
     });
-
-    View.renderHome();
+    App.renderHome();
   },
 
-  answer(postId, yesNo) {
-    if (!this.canAnswer(postId)) return;
+  startDispute(postId){
+    const post = Model.posts.find(p=>p.id===postId);
+    const otherUser = "u2"; // simplified starter opponent
+    const pid = pairId(post.user, otherUser);
 
-    const text = prompt("Optional explanation:");
-    Model.createPost("answer", text || yesNo, postId, { yn: yesNo });
-
-    this.advanceTurn(postId);
-
-    View.renderDispute(this.currentDisputeId());
-  },
-
-  canChallenge(postId) {
-    const post = Model.getPost(postId);
-    if (!post) return false;
-    if (post.user === Model.currentUser) return false;
-
-    const existing = Model.getChildren(postId).find(p => p.type === "challenge");
-    return !existing;
-  },
-
-  canAnswer(postId) {
-    const post = Model.getPost(postId);
-    if (!post || post.type !== "challenge") return false;
-
-    const dispute = Model.disputes.find(d => d.postId === postId);
-    if (!dispute) return false;
-
-    if (dispute.turn !== Model.currentUser) return false;
-
-    const existing = Model.getChildren(postId).find(p => p.type === "answer" && p.user === Model.currentUser);
-    return !existing;
-  },
-
-  advanceTurn(postId) {
-    const dispute = Model.disputes.find(d => d.postId === postId);
-    dispute.turn = dispute.users.find(u => u !== Model.currentUser);
-  },
-
-  openDispute(postId) {
-    this.stack.push(postId);
-    View.renderDispute(postId);
-  },
-
-  back() {
-    this.stack.pop();
-    if (this.stack.length === 0) {
-      View.renderHome();
-    } else {
-      View.renderDispute(this.stack[this.stack.length - 1]);
+    if(!Model.disputes[pid]){
+      Model.disputes[pid]={
+        participants:[post.user, otherUser],
+        turnIndex:0,
+        root:postId,
+        nodes:[]
+      };
     }
+
+    App.openDispute(pid);
   },
 
-  currentDisputeId() {
-    return this.stack[this.stack.length - 1];
+  canAct(dispute){
+    return dispute.participants[dispute.turnIndex] === Model.currentUser;
+  },
+
+  nextTurn(dispute){
+    dispute.turnIndex = (dispute.turnIndex+1)%2;
+  },
+
+  addNode(dispute, node){
+    dispute.nodes.push(node);
   }
 };
 
-/* ===================== VIEW ===================== */
+/* =========================
+   VIEW / APP
+========================= */
 
-const View = {
-  renderUsers() {
-    const el = document.getElementById("users");
-    el.innerHTML = "";
-    Model.users.forEach(u => {
-      const btn = document.createElement("button");
-      btn.innerText = u;
-      if (u === Model.currentUser) btn.style.borderColor = "var(--accent)";
-      btn.onclick = () => {
-        Model.currentUser = u;
-        this.renderHome();
-      };
-      el.appendChild(btn);
-    });
-  },
+const App = {
 
-  renderHome() {
-    document.getElementById("homeView").style.display = "block";
-    document.getElementById("disputeView").style.display = "none";
+  mode:"home",
+  activeDispute:null,
+  composerCtx:null,
 
+  init(){
     this.renderUsers();
-
-    const feed = document.getElementById("feed");
-    feed.innerHTML = "";
-
-    Model.posts
-      .filter(p => p.type === "assertion")
-      .forEach(p => {
-        const div = document.createElement("div");
-        div.className = "card";
-
-        const hasDispute = Model.disputes.find(d => d.postId === p.id);
-        const yourTurn = hasDispute && hasDispute.turn === Model.currentUser;
-
-        div.innerHTML = `
-          <div><span class="icon">!</span>${p.content}
-            ${yourTurn ? '<span class="badge">Your turn</span>' : ''}
-          </div>
-          <button onclick="Controller.openDispute('${p.id}')">
-            ${hasDispute ? "Open" : "View"}
-          </button>
-        `;
-
-        if (!hasDispute) div.classList.add("terminal");
-
-        feed.appendChild(div);
-      });
+    this.renderHome();
   },
 
-  renderDispute(postId) {
-    document.getElementById("homeView").style.display = "none";
-    document.getElementById("disputeView").style.display = "block";
+  renderUsers(){
+    const bar = document.getElementById("userBar");
+    bar.innerHTML = Model.users.map(u=>`
+      <div class="userpill ${Model.currentUser===u.id?'active':''}"
+           onclick="App.switchUser('${u.id}')">
+        ${u.name}
+      </div>
+    `).join("");
+  },
 
-    const lineage = document.getElementById("lineage");
-    lineage.innerHTML = "";
+  switchUser(id){
+    Model.currentUser=id;
+    this.renderUsers();
+    this.renderHome();
+    if(this.activeDispute) this.openDispute(this.activeDispute);
+  },
 
-    let current = Model.getPost(postId);
-    const chain = [];
+  goHome(){
+    this.mode="home";
+    this.activeDispute=null;
+    document.getElementById("homeView").style.display="block";
+    document.getElementById("disputeView").style.display="none";
+  },
 
-    while (current) {
-      chain.unshift(current);
-      current = Model.getPost(current.parentId);
-    }
+  renderHome(){
+    const feed = document.getElementById("feed");
 
-    lineage.innerHTML = chain.map(p => {
-      const icon = p.type === "assertion" ? "!" : p.type === "challenge" ? "?" : "✓";
-      return `<span>${icon} ${p.content}</span>`;
-    }).join(" → ");
+    feed.innerHTML = Model.posts.map(p=>{
+      const yourTurn = this.isYourTurnOnPost(p);
 
-    const thread = document.getElementById("thread");
-    thread.innerHTML = "";
-
-    const children = Model.getChildren(postId);
-
-    children.forEach(p => {
-      const div = document.createElement("div");
-      div.className = "card";
-
-      const canChallenge = Controller.canChallenge(p.id);
-      const canAnswer = Controller.canAnswer(p.id);
-
-      div.innerHTML = `
-        <div class="topline">${p.user}</div>
-        <div>
-          <span class="icon">${p.type === "challenge" ? "?" : "✓"}</span>
-          ${p.content}
-        </div>
-
-        <div class="row">
-          <button ${canChallenge ? "" : "disabled"} onclick="Controller.challenge('${p.id}')">Challenge</button>
-          <button ${canAnswer ? "" : "disabled"} onclick="Controller.answer('${p.id}','Yes')">Yes</button>
-          <button ${canAnswer ? "" : "disabled"} onclick="Controller.answer('${p.id}','No')">No</button>
+      return `
+        <div class="card assertion clickable ${yourTurn?'highlight':''} ${p.children.length===0?'terminal':''}"
+             onclick="App.expandPost('${p.id}')">
+          <div class="meta">
+            ${this.userName(p.user)}
+            ${yourTurn?'<span class="badge your">Your turn</span>':''}
+          </div>
+          <div><span class="icon">!</span>${p.text}</div>
+          <div style="margin-top:6px">
+            <button class="btn" onclick="event.stopPropagation();App.startDispute('${p.id}')"
+            ${p.user===Model.currentUser?'disabled':''}>
+              Challenge
+            </button>
+          </div>
         </div>
       `;
+    }).join("");
+  },
 
-      if (canChallenge || canAnswer) {
-        div.classList.add("highlight");
-      }
+  expandPost(id){
+    // simple drill-in placeholder (could become recursive view)
+    this.startDispute(id);
+  },
 
-      thread.appendChild(div);
-    });
+  isYourTurnOnPost(p){
+    return p.user !== Model.currentUser;
+  },
+
+  userName(id){
+    return Model.users.find(u=>u.id===id)?.name || "Unknown";
+  },
+
+  createAssertion(){
+    const text = document.getElementById("assertInput").value.trim();
+    if(!text) return;
+    Controller.createAssertion(text);
+    document.getElementById("assertInput").value="";
+  },
+
+  openDispute(pid){
+    this.mode="dispute";
+    this.activeDispute=pid;
+
+    document.getElementById("homeView").style.display="none";
+    document.getElementById("disputeView").style.display="block";
+
+    this.renderDispute();
+  },
+
+  renderDispute(){
+    const d = Model.disputes[this.activeDispute];
+    const feed = document.getElementById("disputeFeed");
+    const top = document.getElementById("threadTop");
+
+    const root = Model.posts.find(p=>p.id===d.root);
+
+    top.innerHTML = this.renderThreadRoot(root);
+
+    const canAct = Controller.canAct(d);
+
+    feed.innerHTML = d.nodes.map(n=>`
+      <div class="card ${n.type}">
+        <div class="meta">
+          ${this.userName(n.user)}
+          ${canAct && n.user!==Model.currentUser ? '<span class="badge turn">Your turn</span>':''}
+        </div>
+        <div>
+          <span class="icon">${n.type==="challenge"?"?":"✓"}</span>
+          ${n.text}
+        </div>
+        ${n.type==="challenge" ? `
+          <div style="margin-top:6px">
+            <button class="btn" onclick="App.openAnswer('${n.id}','yes')">Yes</button>
+            <button class="btn" onclick="App.openAnswer('${n.id}','no')">No</button>
+          </div>`:""}
+      </div>
+    `).join("");
+
+    if(canAct){
+      this.showComposer({mode:"challenge"});
+    }
+  },
+
+  renderThreadRoot(root){
+    return `
+      <div class="arrowline">
+        <span class="icon">!</span>${root.text}
+        ${" → "}
+        <span class="badge">Dispute</span>
+      </div>
+    `;
+  },
+
+  startDispute(postId){
+    Controller.startDispute(postId);
+  },
+
+  openComposer(ctx){
+    this.composerCtx=ctx;
+    document.getElementById("composer").classList.add("open");
+    document.getElementById("composerInput").value="";
+    document.getElementById("composerHint").innerText =
+      ctx.mode==="challenge"
+        ? "Ask a Yes/No challenge"
+        : "Respond (Yes/No + optional explanation)";
+  },
+
+  closeComposer(){
+    document.getElementById("composer").classList.remove("open");
+  },
+
+  showComposer(ctx){
+    this.openComposer(ctx);
+  },
+
+  submitComposer(){
+    const d = Model.disputes[this.activeDispute];
+    const text = document.getElementById("composerInput").value.trim();
+
+    if(!Controller.canAct(d)) return;
+
+    const node = {
+      id:uid(),
+      type:this.composerCtx.mode,
+      user:Model.currentUser,
+      text
+    };
+
+    Controller.addNode(d,node);
+    Controller.nextTurn(d);
+
+    this.closeComposer();
+    this.renderDispute();
+  },
+
+  openAnswer(challengeId, value){
+    const d = Model.disputes[this.activeDispute];
+
+    const node = {
+      id:uid(),
+      type:"answer",
+      user:Model.currentUser,
+      text:value.toUpperCase() + (document.getElementById("composerInput")?.value || "")
+    };
+
+    Controller.addNode(d,node);
+    Controller.nextTurn(d);
+    this.renderDispute();
   }
 };
 
-/* ===================== INIT ===================== */
-
-// seed data
-Model.createPost("assertion", "God exists.");
-Model.createPost("assertion", "AI is spiritually dangerous.");
-
-View.renderHome();
-
+App.init();
 </script>
-
 </body>
 </html>

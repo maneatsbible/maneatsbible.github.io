@@ -2,9 +2,9 @@
 
 ## A system for structured disagreement that produces clarity, agreement, and resolution.
 
-Better Dispute turns discussion into a constrained, auditable, turn-based event system where every claim, challenge, and answer is replayable from a persistent event stream.
+Better Dispute turns discussion into a constrained, auditable, graph-based system where every claim, challenge, and answer is stored as an independent, queryable node.
 
-It replaces free-form argument with deterministic interaction graphs reconstructed entirely on the client.
+It replaces replay-based simulation with deterministic state derived from structured queries.
 
 ---
 
@@ -17,29 +17,28 @@ It replaces free-form argument with deterministic interaction graphs reconstruct
 3. [Architecture](#architecture)  
 4. [MVC Contract](#mvc-contract)  
 5. [Model](#model)  
-6. [Event Model](#event-model)  
-7. [Event Stream Storage](#event-stream-storage)  
-8. [Boot & Replay on Load](#boot--replay-on-load)  
-9. [State Reconstruction](#state-reconstruction)  
-10. [Core Rules](#core-rules)  
-11. [Challenge Targeting](#challenge-targeting)  
-12. [Turn Model](#turn-model)  
-13. [Referenced Nodes](#referenced-nodes)  
-14. [Resolution System](#resolution-system)  
-15. [Crickets](#crickets)  
-16. [Image Handling](#image-handling)  
-17. [Abuse & Malicious Events](#abuse--malicious-events)  
-18. [Missing Data](#missing-data)  
-19. [Branching Model](#branching-model)  
-20. [UI/UX](#uiux)  
-21. [Controller Interface](#controller-interface)  
-22. [Reducer Specification](#reducer-specification)  
-23. [Failure Handling](#failure-handling)  
-24. [Performance](#performance)  
-25. [GitHub Integration Specifications](#github-integration-specifications)  
-26. [SDLC](#sdlc)  
-27. [Versioning](#versioning)  
-28. [Release & Patch Notes](#release--patch-notes)  
+6. [Storage Model](#storage-model)  
+7. [Query Model](#query-model)  
+8. [State Reconstruction](#state-reconstruction)  
+9. [Core Rules](#core-rules)  
+10. [Challenge Targeting](#challenge-targeting)  
+11. [Turn Model](#turn-model)  
+12. [Referenced Nodes](#referenced-nodes)  
+13. [Resolution System](#resolution-system)  
+14. [Crickets](#crickets)  
+15. [Image Handling](#image-handling)  
+16. [Abuse & Malicious Data](#abuse--malicious-data)  
+17. [Missing Data](#missing-data)  
+18. [Branching Model](#branching-model)  
+19. [UI/UX](#uiux)  
+20. [Controller Interface](#controller-interface)  
+21. [Validation Rules](#validation-rules)  
+22. [Failure Handling](#failure-handling)  
+23. [Performance](#performance)  
+24. [GitHub Integration Specifications](#github-integration-specifications)  
+25. [SDLC](#sdlc)  
+26. [Versioning](#versioning)  
+27. [Release & Patch Notes](#release--patch-notes)  
 
 ---
 
@@ -56,18 +55,19 @@ It replaces free-form argument with deterministic interaction graphs reconstruct
 
 ## System Overview
 
-Better Dispute is an event-sourced simulation system.
+Better Dispute is a query-driven state system.
 
-- Event stream = immutable history  
-- Browser = deterministic simulation engine  
-- Controller state = fully client-side  
+- Each node = independent record  
+- GitHub = distributed document store  
+- Browser = deterministic query engine  
+- State = derived from queries, not replay  
 
 ---
 
 ## Architecture
 
 - Frontend: Vanilla JavaScript  
-- Backend: Append-only event stream storage layer  
+- Backend: GitHub Issues + Search API  
 - Authentication: OAuth-based identity layer  
 - Pattern: Strict MVC  
 - No server-side state is maintained  
@@ -81,8 +81,8 @@ Better Dispute is an event-sourced simulation system.
 Runs entirely in browser:
 
 - Enforces all rules  
-- Reconstructs state via replay  
-- Computes permissions  
+- Executes queries  
+- Computes derived state  
 - Rejects invalid actions before write  
 
 ---
@@ -110,26 +110,31 @@ Runs entirely in browser:
 - id  
 - @name  
 - githubId  
-- publicKey  
 
 ---
 
-### Post
+### Node (Issue)
+
+Each node is stored as a GitHub Issue.
 
 Types:
 - Assertion (!)
 - Challenge (?)
 - Answer (✓)
+- Resolution  
 
-Fields:
+Fields (stored in issue body or metadata):
+
 - id  
 - type  
 - authorId  
-- parentId  
 - disputeId  
+- parentId  
+- targetPersonId (challenge only)  
 - contentText  
-- contentPic (external URL only)  
+- contentPic  
 - contentHash  
+- status  
 - createdAt  
 
 ---
@@ -137,127 +142,72 @@ Fields:
 ### Dispute
 
 - id  
-- rootAssertionId  
+- rootNodeId  
 - participants[]  
 - status  
+- activeChallengeId  
 - createdAt  
 
 ---
 
-## Event Model
+## Storage Model
 
-Each dispute = one persistent event stream  
-Events are append-only and immutable  
+- Each node = one GitHub Issue  
+- Relationships defined via:
+  - `disputeId`
+  - `parentId`  
+- Metadata stored in:
+  - issue body (JSON block)
+  - labels (type, status)  
 
----
+Properties:
 
-### Constraints
-
-- No binary data in events  
-- Images must be external URLs only  
-- Events must remain compact  
-
----
-
-### Event Encoding
-
-```json
-{
-  "i": "eventId",
-  "v": 1,
-  "t": "TYPE",
-  "a": "actorId",
-  "prev": "previousEventId",
-  "ts": 1712345678901,
-  "sig": "signature",
-  "p": {}
-}
-```
+- append-only (no edits assumed)  
+- tamper-tolerant via validation  
+- eventually consistent  
 
 ---
 
-### Event Guarantees
+## Query Model
 
-- `prev` forms a hash-linked chain of events  
-- Only events with valid signatures are accepted  
-- Event order is derived from chain linkage, not sequence numbers  
-- Duplicate events (same `i`) are ignored  
-- Events must be idempotent  
+State is derived using GitHub search/filter APIs.
 
----
+Examples:
 
-### Event Types
+- All nodes in dispute:
+  - `disputeId = X`
 
-- PC → POST_CREATED  
-- CC → CHALLENGE_CREATED  
-- AS → ANSWER_SUBMITTED  
-- RO → RESOLUTION_OFFERED  
-- RA → RESOLUTION_ACCEPTED  
-- RF → RESOLUTION_FINALIZED  
-- CP → CRICKETS_PROPOSED  
-- CA → CRICKETS_AGREED  
-- CT → CRICKETS_TRIGGERED  
-- CD → CRICKETS_DISPUTED  
-- MU → MUTED  
-- BL → BLOCKED  
+- Active challenge:
+  - `type = challenge`
+  - `status = open`
 
----
+- Answers to challenge:
+  - `parentId = challengeId`
 
-## Event Stream Storage
+Queries are:
 
-The event stream is stored as an append-only log inside an external platform-backed issue thread.
-
-### Storage Mechanism
-
-- Each dispute maps to a single issue thread  
-- Each event is stored as a single comment  
-- Comments are append-only by design  
-
-### Retrieval
-
-On load:
-
-- All comments are fetched via API  
-- Parsed into event objects  
-- Reconstructed into a valid event chain  
-- Longest valid chain is selected  
-- Replayed through reducer  
-
-### Constraints
-
-- Storage is untrusted and validated client-side  
-- Invalid or malicious events are ignored during replay  
-
----
-
-## Boot & Replay on Load
-
-1. Fetch event stream  
-2. Parse events  
-3. Verify signatures  
-4. Build valid event chains  
-5. Select longest valid chain  
-6. Replay through reducer  
-7. Drop invalid events  
-8. Hydrate controller state  
-
-Result:
-> Deterministic reconstruction of full interaction state.
+- deterministic  
+- idempotent  
+- order-independent  
 
 ---
 
 ## State Reconstruction
 
-- Pure reducer function  
-- Deterministic replay based on chain order  
-- Only valid events are applied  
+No replay required.
+
+State is computed as:
+
+- Fetch relevant nodes  
+- Filter valid nodes  
+- Apply deterministic selection rules  
 
 ---
 
 ## Core Rules
 
 - No self-challenges  
-- One unresolved challenge at a time per dispute  
+- One unresolved challenge per dispute  
 - All permissions scoped per dispute  
 
 ---
@@ -274,83 +224,62 @@ Only target may answer.
 
 ## Turn Model
 
-- Exactly one unresolved challenge exists per dispute  
-- Turn = target of unresolved challenge  
+- Turn is derived from active challenge  
+- `activeChallengeId` stored on dispute  
 
-### Concurrency Rule
+### Rule
 
-- First valid challenge in replay order is accepted  
-- Subsequent concurrent challenges are rejected  
-
-Counter-challenge replaces current unresolved challenge.
+- Only one challenge may have `status = open`  
+- Creating a new challenge closes previous one  
 
 ---
 
 ## Referenced Nodes
 
-- External posts may be referenced  
-- Visually distinct  
-- Do not mutate original context  
+- Nodes may reference external nodes  
+- References do not mutate original  
 
 ---
 
 ## Resolution System
 
-- Offers are assertions  
-- Must be mutually accepted  
-- Finalized via `RF` event  
-- No further events allowed after finalization  
+- Resolution is a node  
+- Must be accepted by both parties  
+- Dispute marked `resolved`  
 
 ---
 
 ## Crickets
 
-Derived, not stored:
-
-Uses:
-- latest event timestamp instead of wall clock  
+Derived from timestamps:
 
 ```
-latestEventTime - proposalTime >= duration
+currentTime - createdAt >= duration
 ```
 
 ---
 
 ## Image Handling
 
-Images are handled via platform attachment flow.
-
-### Upload Flow
-
-1. Image attached during comment creation  
-2. Platform uploads image to CDN  
-3. Platform returns hosted URL  
-4. Only URL is stored in event payload  
-
-### Constraints
-
-- No base64 storage  
-- No binary event data  
-- Images are external immutable resources  
+- Images stored via GitHub CDN  
+- Only URLs persisted  
 
 ---
 
-## Abuse & Malicious Events
+## Abuse & Malicious Data
 
-Invalid events are ignored during replay:
+Invalid nodes ignored:
 
-- invalid signature  
-- broken chain linkage  
+- schema violations  
 - unauthorized actor  
 - rule violations  
-- duplicate eventId  
 
 ### Rate Heuristics
 
 Clients may ignore:
 
-- excessive rapid events from same actor  
-- high volumes of invalid events  
+- excessive node creation  
+- spam patterns  
 
 ---
 
@@ -363,9 +292,9 @@ Clients may ignore:
 
 ## Branching Model
 
-- Multiple chains may exist  
-- Only the longest valid chain is canonical  
-- Non-canonical branches are ignored  
+- Tree structure via `parentId`  
+- Multiple branches allowed  
+- UI collapses non-relevant branches  
 
 ---
 
@@ -381,47 +310,38 @@ Clients may ignore:
 
 - getCurrentPerson()  
 - switchPerson()  
-- getHomeFeed()  
 - getDispute()  
-- getPost()  
+- getNode()  
 - getAvailableActions()  
 
 ---
 
-## Reducer Specification
+## Validation Rules
 
-```
-state + event → next state
-```
-
-### Validation Layers
-
-1. Schema validation  
-2. Signature validation  
-3. Authorization validation  
-4. State transition validation  
+- Schema validation  
+- Authorization validation  
+- State rule validation  
 
 Rules:
 
-- Reducer must be pure  
-- Deterministic across clients  
-- Only prior accepted events influence validation  
-- Invalid transitions are ignored  
+- Deterministic  
+- Query-based  
+- Independent of fetch order  
 
 ---
 
 ## Failure Handling
 
-- retry writes with same eventId (idempotent)  
-- refetch on conflict  
-- full replay on recovery  
+- retry writes  
+- refetch queries  
+- tolerate partial data  
 
 ---
 
 ## Performance
 
-- lazy event loading  
-- incremental replay  
+- query-based loading  
+- partial fetches  
 - caching per dispute  
 
 ---
@@ -430,58 +350,30 @@ Rules:
 
 ### OAuth
 
-- Authentication uses OAuth-based identity provider  
-- Client obtains access token via standard OAuth flow  
-- Token is stored only in memory (client-only controller constraint)  
-- Token is used to:
-  - identify Person identity (`githubId`)
-  - authorize event stream reads/writes  
+- OAuth-based identity  
+- Token stored in memory  
+- Used for read/write operations  
 
 ---
 
-### Append-only Event Storage
+### Storage
 
-- Each Dispute maps to a single issue thread  
-- Each event is appended as a new comment  
-- Comments are treated as immutable history  
-- Clients reconstruct canonical chain via `prev` linkage  
-- Client performs full validation during replay  
-
-Properties:
-- append-only  
-- tamper-evident (via signatures + chain)  
-- eventually consistent  
-- replayable to deterministic state  
+- Each node = GitHub Issue  
+- Queries via Search API  
+- Labels + body used for indexing  
 
 ---
 
 ### Image Hosting
 
-- Images are uploaded via platform comment attachment flow  
-- Platform returns hosted CDN URL  
-- Only URL is persisted in event payload (`contentPic`)  
-- Image loss is treated as missing external resource  
+- GitHub CDN URLs only  
+- No binary storage  
 
 ---
 
 ## SDLC
 
 Design → Implement → Test/Fix → Repeat → Deploy  
-
-Patch → Test/Fix → Update README → Deploy  
-
-### Deployment Constraint
-
-- Each deployment must produce a versioned `bd-vX.Y.Z.html`
-- `index.html` must always point to latest versioned file  
-
-### Notes Requirement
-
-- Every release and patch must include:
-  - summary of changes  
-  - version number  
-  - timestamp  
-  - GPT model used to generate the changes  
 
 ---
 

@@ -2,463 +2,318 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Better Dispute v3o</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Better Dispute v4o</title>
+
 <style>
 :root{
   --bg:#0b0c10;
-  --panel:#12141a;
-  --panel2:#171a22;
+  --card:#151821;
+  --border:#232634;
   --text:#e6e6e6;
   --muted:#8b8f98;
   --accent:#7c5cff;
-  --good:#2ee59d;
-  --warn:#ffcc00;
-  --bad:#ff4d4d;
-  --border:#232634;
+  --yes:#2ee59d;
+  --no:#ff4d4d;
 }
 
-*{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto}
-body{margin:0;background:var(--bg);color:var(--text);}
-
+body{margin:0;background:var(--bg);color:var(--text);font-family:sans-serif}
 header{
-  position:sticky;top:0;
-  display:flex;align-items:center;justify-content:space-between;
-  padding:12px 14px;
-  background:rgba(10,11,15,.9);
-  backdrop-filter: blur(10px);
-  border-bottom:1px solid var(--border);
-  z-index:10;
+  display:flex;justify-content:space-between;
+  padding:12px;border-bottom:1px solid var(--border)
 }
-.header-left{display:flex;gap:10px;align-items:center;}
-.iconbtn{background:none;border:none;color:var(--text);font-size:18px;}
-.title{font-weight:600}
-.version{color:var(--muted);font-size:12px}
+.btn{padding:8px 10px;border-radius:10px;background:var(--card);border:1px solid var(--border);color:var(--text)}
+.btn.primary{background:var(--accent);border:none}
+.btn:disabled{opacity:.4}
 
-#userBar{
-  display:flex;gap:8px;align-items:center;
-  padding:10px 14px;
-  border-bottom:1px solid var(--border);
-}
-.userpill{
-  padding:6px 10px;border-radius:999px;
-  background:var(--panel);
-  border:1px solid var(--border);
-  cursor:pointer;font-size:12px;
-}
-.userpill.active{background:var(--accent);color:white}
-
-#homeInput{
-  padding:14px;
-}
 textarea{
-  width:100%;
-  min-height:70px;
-  resize:none;
-  padding:12px;
-  border-radius:12px;
-  background:var(--panel);
-  border:1px solid var(--border);
-  color:var(--text);
-  outline:none;
-  font-size:15px;
+  width:100%;background:var(--card);border:1px solid var(--border);
+  border-radius:10px;color:var(--text);padding:10px;
 }
-
-.btn{
-  padding:10px 12px;
-  border-radius:10px;
-  border:1px solid var(--border);
-  background:var(--panel);
-  color:var(--text);
-  cursor:pointer;
-}
-.btn.primary{background:var(--accent);border:none;}
-.btn:disabled{opacity:.4;cursor:not-allowed;}
-
-#feed{padding:10px 10px 120px;}
 
 .card{
-  background:var(--panel);
+  background:var(--card);
   border:1px solid var(--border);
-  border-radius:14px;
-  padding:12px;
-  margin-bottom:10px;
-  position:relative;
+  border-radius:12px;
+  padding:10px;margin:8px;
 }
+.stack{margin-left:12px;border-left:1px dashed #333;padding-left:8px}
+.meta{font-size:11px;color:var(--muted)}
+.highlight{outline:1px solid var(--accent)}
+.badge{font-size:10px;margin-left:6px}
+.your{color:var(--yes)}
 
-.stack{
-  margin-left:10px;
-  border-left:1px dashed #2b2f3c;
-  padding-left:10px;
-}
-
-.meta{font-size:11px;color:var(--muted);margin-bottom:6px}
-.badge{
-  font-size:11px;
-  padding:2px 6px;
-  border-radius:999px;
-  background:var(--panel2);
-  border:1px solid var(--border);
-  margin-left:6px;
-}
-.badge.turn{color:var(--warn)}
-.badge.your{color:var(--good)}
-
-.icon{
-  font-weight:700;margin-right:6px;
-}
-.assertion .icon{color:#fff}
-.challenge .icon{color:var(--warn)}
-.answer .icon{color:var(--good)}
-
-.clickable{cursor:pointer}
-.terminal::after{
-  content:"";
-  position:absolute;right:10px;top:10px;
-  width:10px;height:10px;border-radius:50%;
-  background:var(--muted);
-  opacity:.4;
-}
-
-.highlight{
-  outline:1px solid var(--accent);
-}
-
-/* DISPUTE VIEW */
-#disputeView{display:none;padding-bottom:120px}
-
-.threadTop{
-  padding:10px 14px;
-  color:var(--muted);
-  font-size:12px;
-}
-
-.arrowline{
-  display:flex;align-items:center;gap:6px;
-  flex-wrap:wrap;
-}
-
-/* COMPOSER */
 #composer{
-  position:fixed;left:0;right:0;bottom:-400px;
-  background:var(--panel);
-  border-top:1px solid var(--border);
-  padding:10px;
-  transition:bottom .25s ease;
-  z-index:20;
+ position:fixed;bottom:-300px;left:0;right:0;
+ background:var(--card);padding:10px;
+ border-top:1px solid var(--border);
+ transition:.2s;
 }
 #composer.open{bottom:0}
-.composerRow{display:flex;gap:8px;margin-top:8px}
-.smallhint{font-size:12px;color:var(--muted)}
-
-/* TOPBAR ICONS */
-.topbarIcon{font-size:18px;margin-right:6px}
 </style>
 </head>
+
 <body>
 
 <header>
-  <div class="header-left">
-    <button class="iconbtn" onclick="App.goHome()">🏠</button>
-    <div class="title">Better Dispute</div>
-  </div>
-  <div class="version">v3o</div>
+<div>
+<button onclick="App.home()">🏠</button>
+Better Dispute
+</div>
+<div>v4o</div>
 </header>
 
-<div id="userBar"></div>
+<div id="users"></div>
 
-<div id="homeView">
-  <div id="homeInput">
-    <textarea id="assertInput" placeholder="Start a fire..."></textarea>
-    <div style="margin-top:8px;display:flex;justify-content:flex-end">
-      <button class="btn primary" onclick="App.createAssertion()">Post</button>
-    </div>
-  </div>
-
-  <div id="feed"></div>
+<div id="home">
+<div style="padding:10px">
+<textarea id="newAssertion" placeholder="Start a fire..."></textarea>
+<button class="btn primary" onclick="App.createAssertion()">Post</button>
+</div>
+<div id="feed"></div>
 </div>
 
-<div id="disputeView">
-  <div class="threadTop" id="threadTop"></div>
-  <div id="disputeFeed"></div>
+<div id="dispute" style="display:none">
+<div id="lineage" style="padding:10px;color:var(--muted)"></div>
+<div id="thread"></div>
 </div>
 
 <div id="composer">
-  <div class="smallhint" id="composerHint"></div>
-  <textarea id="composerInput"></textarea>
-  <div class="composerRow">
-    <button class="btn" onclick="App.closeComposer()">Cancel</button>
-    <button class="btn primary" id="composerSubmit" onclick="App.submitComposer()">Submit</button>
-  </div>
+<div id="hint"></div>
+<textarea id="input"></textarea>
+<button onclick="App.submit()">Submit</button>
+<button onclick="App.close()">Cancel</button>
 </div>
 
 <script>
-/* =========================
-   MODEL
-========================= */
-
-const Model = {
-  users:[
-    {id:"u1",name:"Alice"},
-    {id:"u2",name:"Bob"},
-    {id:"u3",name:"Cara"}
-  ],
-  currentUser:"u1",
-  posts:[],
-  disputes:{}, // key: pairId -> {turnIndex, resolved, history}
-  id:1
+const Model={
+ users:[
+  {id:'u1',name:'Alice'},
+  {id:'u2',name:'Bob'},
+  {id:'u3',name:'Cara'}
+ ],
+ current:'u1',
+ posts:{},
+ rootIds:[],
+ disputes:{}, // disputeId -> {users,turn,resolved}
 };
 
-function uid(){return "p"+(Model.id++)}
+let id=1;
+const nid=()=> 'n'+(id++);
 
-function pairId(a,b){
-  return [a,b].sort().join("_");
-}
+const Controller={
 
-/* =========================
-   CONTROLLER
-========================= */
+ createAssertion(text){
+  const idd=nid();
+  Model.posts[idd]={
+    id:idd,type:'assertion',user:Model.current,text,
+    parent:null,children:[]
+  };
+  Model.rootIds.push(idd);
+ },
 
-const Controller = {
+ createChallenge(parentId,text){
+  const p=Model.posts[parentId];
+  if(p.user===Model.current) return;
 
-  createAssertion(text){
-    Model.posts.push({
-      id:uid(),
-      type:"assertion",
-      user:Model.currentUser,
-      text,
-      children:[]
-    });
-    App.renderHome();
-  },
+  const d=this.getOrCreateDispute(parentId);
 
-  startDispute(postId){
-    const post = Model.posts.find(p=>p.id===postId);
-    const otherUser = "u2"; // simplified starter opponent
-    const pid = pairId(post.user, otherUser);
+  if(!this.canAct(d)) return;
 
-    if(!Model.disputes[pid]){
-      Model.disputes[pid]={
-        participants:[post.user, otherUser],
-        turnIndex:0,
-        root:postId,
-        nodes:[]
-      };
-    }
+  const idd=nid();
+  Model.posts[idd]={
+    id:idd,type:'challenge',user:Model.current,text,
+    parent:parentId,children:[]
+  };
 
-    App.openDispute(pid);
-  },
+  p.children.push(idd);
+  d.turn=this.next(d);
+ },
 
-  canAct(dispute){
-    return dispute.participants[dispute.turnIndex] === Model.currentUser;
-  },
+ createAnswer(parentId,yn,text){
+  const p=Model.posts[parentId];
+  const d=this.getDispute(parentId);
 
-  nextTurn(dispute){
-    dispute.turnIndex = (dispute.turnIndex+1)%2;
-  },
+  if(!this.canAct(d)) return;
 
-  addNode(dispute, node){
-    dispute.nodes.push(node);
+  // enforce one answer per user
+  if(p.children.some(c=>Model.posts[c].user===Model.current)) return;
+
+  const idd=nid();
+  Model.posts[idd]={
+    id:idd,type:'answer',
+    user:Model.current,
+    text:yn+(text?' '+text:''),
+    parent:parentId,children:[]
+  };
+
+  p.children.push(idd);
+  d.turn=this.next(d);
+ },
+
+ getDispute(postId){
+  const key=this.rootOf(postId);
+  return Model.disputes[key];
+ },
+
+ getOrCreateDispute(postId){
+  const root=this.rootOf(postId);
+  if(!Model.disputes[root]){
+    const p=Model.posts[root];
+    const opponent=Model.users.find(u=>u.id!==p.user).id;
+    Model.disputes[root]={
+      users:[p.user,opponent],
+      turn:p.user,
+      resolved:false
+    };
   }
+  return Model.disputes[root];
+ },
+
+ rootOf(id){
+  let cur=Model.posts[id];
+  while(cur.parent) cur=Model.posts[cur.parent];
+  return cur.id;
+ },
+
+ canAct(d){
+  return d.turn===Model.current;
+ },
+
+ next(d){
+  return d.users.find(u=>u!==d.turn);
+ }
 };
 
-/* =========================
-   VIEW / APP
-========================= */
+const App={
 
-const App = {
+ view:'home',
+ currentNode:null,
+ ctx:null,
 
-  mode:"home",
-  activeDispute:null,
-  composerCtx:null,
+ init(){
+  this.renderUsers();
+  this.renderHome();
+ },
 
-  init(){
-    this.renderUsers();
-    this.renderHome();
-  },
+ renderUsers(){
+  document.getElementById('users').innerHTML=
+  Model.users.map(u=>`
+    <button onclick="App.switch('${u.id}')"
+    class="btn">${u.name}${Model.current===u.id?' *':''}</button>
+  `).join('');
+ },
 
-  renderUsers(){
-    const bar = document.getElementById("userBar");
-    bar.innerHTML = Model.users.map(u=>`
-      <div class="userpill ${Model.currentUser===u.id?'active':''}"
-           onclick="App.switchUser('${u.id}')">
-        ${u.name}
-      </div>
-    `).join("");
-  },
+ switch(id){
+  Model.current=id;
+  this.renderUsers();
+  this.refresh();
+ },
 
-  switchUser(id){
-    Model.currentUser=id;
-    this.renderUsers();
-    this.renderHome();
-    if(this.activeDispute) this.openDispute(this.activeDispute);
-  },
+ home(){
+  this.view='home';
+  document.getElementById('home').style.display='block';
+  document.getElementById('dispute').style.display='none';
+ },
 
-  goHome(){
-    this.mode="home";
-    this.activeDispute=null;
-    document.getElementById("homeView").style.display="block";
-    document.getElementById("disputeView").style.display="none";
-  },
+ open(id){
+  this.view='dispute';
+  this.currentNode=id;
+  document.getElementById('home').style.display='none';
+  document.getElementById('dispute').style.display='block';
+  this.renderThread();
+ },
 
-  renderHome(){
-    const feed = document.getElementById("feed");
+ createAssertion(){
+  const t=document.getElementById('newAssertion').value.trim();
+  if(!t) return;
+  Controller.createAssertion(t);
+  document.getElementById('newAssertion').value='';
+  this.renderHome();
+ },
 
-    feed.innerHTML = Model.posts.map(p=>{
-      const yourTurn = this.isYourTurnOnPost(p);
+ renderHome(){
+  const feed=document.getElementById('feed');
+  feed.innerHTML=Model.rootIds.map(id=>this.card(id,true)).join('');
+ },
 
-      return `
-        <div class="card assertion clickable ${yourTurn?'highlight':''} ${p.children.length===0?'terminal':''}"
-             onclick="App.expandPost('${p.id}')">
-          <div class="meta">
-            ${this.userName(p.user)}
-            ${yourTurn?'<span class="badge your">Your turn</span>':''}
-          </div>
-          <div><span class="icon">!</span>${p.text}</div>
-          <div style="margin-top:6px">
-            <button class="btn" onclick="event.stopPropagation();App.startDispute('${p.id}')"
-            ${p.user===Model.currentUser?'disabled':''}>
-              Challenge
-            </button>
-          </div>
-        </div>
-      `;
-    }).join("");
-  },
+ renderThread(){
+  const root=Controller.rootOf(this.currentNode);
+  document.getElementById('lineage').innerText=root;
+  document.getElementById('thread').innerHTML=this.branch(root);
+ },
 
-  expandPost(id){
-    // simple drill-in placeholder (could become recursive view)
-    this.startDispute(id);
-  },
+ branch(id){
+  const p=Model.posts[id];
+  const d=Controller.getOrCreateDispute(id);
 
-  isYourTurnOnPost(p){
-    return p.user !== Model.currentUser;
-  },
+  const canAct=Controller.canAct(d);
 
-  userName(id){
-    return Model.users.find(u=>u.id===id)?.name || "Unknown";
-  },
-
-  createAssertion(){
-    const text = document.getElementById("assertInput").value.trim();
-    if(!text) return;
-    Controller.createAssertion(text);
-    document.getElementById("assertInput").value="";
-  },
-
-  openDispute(pid){
-    this.mode="dispute";
-    this.activeDispute=pid;
-
-    document.getElementById("homeView").style.display="none";
-    document.getElementById("disputeView").style.display="block";
-
-    this.renderDispute();
-  },
-
-  renderDispute(){
-    const d = Model.disputes[this.activeDispute];
-    const feed = document.getElementById("disputeFeed");
-    const top = document.getElementById("threadTop");
-
-    const root = Model.posts.find(p=>p.id===d.root);
-
-    top.innerHTML = this.renderThreadRoot(root);
-
-    const canAct = Controller.canAct(d);
-
-    feed.innerHTML = d.nodes.map(n=>`
-      <div class="card ${n.type}">
-        <div class="meta">
-          ${this.userName(n.user)}
-          ${canAct && n.user!==Model.currentUser ? '<span class="badge turn">Your turn</span>':''}
-        </div>
-        <div>
-          <span class="icon">${n.type==="challenge"?"?":"✓"}</span>
-          ${n.text}
-        </div>
-        ${n.type==="challenge" ? `
-          <div style="margin-top:6px">
-            <button class="btn" onclick="App.openAnswer('${n.id}','yes')">Yes</button>
-            <button class="btn" onclick="App.openAnswer('${n.id}','no')">No</button>
-          </div>`:""}
-      </div>
-    `).join("");
-
-    if(canAct){
-      this.showComposer({mode:"challenge"});
-    }
-  },
-
-  renderThreadRoot(root){
-    return `
-      <div class="arrowline">
-        <span class="icon">!</span>${root.text}
-        ${" → "}
-        <span class="badge">Dispute</span>
-      </div>
+  let actions='';
+  if(p.user!==Model.current && canAct){
+    actions+=`<button onclick="App.challenge('${id}')">?</button>`;
+  }
+  if(p.type==='challenge' && canAct){
+    actions+=`
+      <button onclick="App.answer('${id}','Yes')">Yes</button>
+      <button onclick="App.answer('${id}','No')">No</button>
     `;
-  },
-
-  startDispute(postId){
-    Controller.startDispute(postId);
-  },
-
-  openComposer(ctx){
-    this.composerCtx=ctx;
-    document.getElementById("composer").classList.add("open");
-    document.getElementById("composerInput").value="";
-    document.getElementById("composerHint").innerText =
-      ctx.mode==="challenge"
-        ? "Ask a Yes/No challenge"
-        : "Respond (Yes/No + optional explanation)";
-  },
-
-  closeComposer(){
-    document.getElementById("composer").classList.remove("open");
-  },
-
-  showComposer(ctx){
-    this.openComposer(ctx);
-  },
-
-  submitComposer(){
-    const d = Model.disputes[this.activeDispute];
-    const text = document.getElementById("composerInput").value.trim();
-
-    if(!Controller.canAct(d)) return;
-
-    const node = {
-      id:uid(),
-      type:this.composerCtx.mode,
-      user:Model.currentUser,
-      text
-    };
-
-    Controller.addNode(d,node);
-    Controller.nextTurn(d);
-
-    this.closeComposer();
-    this.renderDispute();
-  },
-
-  openAnswer(challengeId, value){
-    const d = Model.disputes[this.activeDispute];
-
-    const node = {
-      id:uid(),
-      type:"answer",
-      user:Model.currentUser,
-      text:value.toUpperCase() + (document.getElementById("composerInput")?.value || "")
-    };
-
-    Controller.addNode(d,node);
-    Controller.nextTurn(d);
-    this.renderDispute();
   }
+
+  return `
+  <div class="card ${canAct?'highlight':''}">
+    <div class="meta">${p.user}
+    ${canAct?'<span class="badge your">Your turn</span>':''}
+    </div>
+    <div>${p.type==='assertion'?'!':p.type==='challenge'?'?':'✓'} ${p.text}</div>
+    ${actions}
+    <div class="stack">
+      ${p.children.map(c=>this.branch(c)).join('')}
+    </div>
+  </div>
+  `;
+ },
+
+ challenge(id){
+  this.ctx={type:'challenge',parent:id};
+  this.openComposer("Ask Yes/No");
+ },
+
+ answer(id,yn){
+  this.ctx={type:'answer',parent:id,yn};
+  this.openComposer("Optional explanation");
+ },
+
+ openComposer(h){
+  document.getElementById('hint').innerText=h;
+  document.getElementById('composer').classList.add('open');
+ },
+
+ close(){
+  document.getElementById('composer').classList.remove('open');
+ },
+
+ submit(){
+  const t=document.getElementById('input').value;
+
+  if(this.ctx.type==='challenge'){
+    Controller.createChallenge(this.ctx.parent,t);
+  } else {
+    Controller.createAnswer(this.ctx.parent,this.ctx.yn,t);
+  }
+
+  this.close();
+  this.renderThread();
+ },
+
+ refresh(){
+  if(this.view==='home') this.renderHome();
+  else this.renderThread();
+ }
 };
 
 App.init();
 </script>
+
 </body>
 </html>

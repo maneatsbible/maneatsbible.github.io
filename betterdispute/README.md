@@ -2,39 +2,40 @@
 
 ## A system for structured disagreement that produces clarity, agreement, and resolution.
 
-Better Dispute turns discussion into a constrained, auditable, turn-based system where every claim, challenge, and answer is traceable, replayable, and enforceable.
+Better Dispute turns discussion into a constrained, auditable, turn-based event system where every claim, challenge, and answer is replayable from GitHub history.
 
-It replaces free-form argument with structured interaction graphs that can be reconstructed from an immutable event log.
+It replaces free-form argument with deterministic interaction graphs reconstructed entirely on the client.
 
 ---
 
 ## Table of Contents
 
-1. [Core Principles](#core-principles)  
-2. [System Overview](#system-overview)  
-3. [Architecture](#architecture)  
-4. [MVC Contract](#mvc-contract)  
-5. [Model](#model)  
-6. [Event Model (GitHub)](#event-model-github)  
-7. [Boot & Replay on Load](#boot--replay-on-load)  
-8. [State Reconstruction](#state-reconstruction)  
-9. [Core Rules](#core-rules)  
-10. [Challenge Targeting](#challenge-targeting)  
-11. [Turn Model](#turn-model)  
-12. [Referenced Nodes](#referenced-nodes)  
-13. [Resolution System](#resolution-system)  
-14. [Crickets](#crickets)  
-15. [Abuse & Malicious Events](#abuse--malicious-events)  
-16. [Missing Data](#missing-data)  
-17. [Branching Model](#branching-model)  
-18. [UI/UX](#uiux)  
-19. [Controller Interface](#controller-interface)  
-20. [Reducer Specification](#reducer-specification)  
-21. [Failure Handling](#failure-handling)  
-22. [Performance](#performance)  
-23. [SDLC](#sdlc)  
-24. [Versioning](#versioning)  
-25. [Patch Notes](#patch-notes)  
+1. Core Principles  
+2. System Overview  
+3. Architecture  
+4. MVC Contract  
+5. Model  
+6. Event Model (GitHub)  
+7. Boot & Replay on Load  
+8. State Reconstruction  
+9. Core Rules  
+10. Challenge Targeting  
+11. Turn Model  
+12. Referenced Nodes  
+13. Resolution System  
+14. Crickets  
+15. Image Handling  
+16. Abuse & Malicious Events  
+17. Missing Data  
+18. Branching Model  
+19. UI/UX  
+20. Controller Interface  
+21. Reducer Specification  
+22. Failure Handling  
+23. Performance  
+24. SDLC  
+25. Versioning  
+26. Patch Notes  
 
 ---
 
@@ -51,24 +52,21 @@ It replaces free-form argument with structured interaction graphs that can be re
 
 ## System Overview
 
-Better Dispute models disagreement as a deterministic event graph.
+Better Dispute is an event-sourced simulation.
 
-Every interaction:
-- is immutable
-- is replayable
-- is derived from GitHub issue events
-
-The system behaves like a local simulation engine with GitHub acting as the persistence layer.
+- GitHub Issues = immutable event log  
+- Browser = deterministic simulation engine  
+- Controller state = fully client-side  
 
 ---
 
 ## Architecture
 
 - Frontend: Vanilla JavaScript  
-- Backend: GitHub Issues (append-only event log)  
+- Backend: GitHub Issues (append-only event stream)  
 - Auth: GitHub OAuth  
 - Pattern: Strict MVC  
-- Controller state: **fully client-side (no server-side state)**  
+- No server-side state exists  
 
 ---
 
@@ -76,26 +74,20 @@ The system behaves like a local simulation engine with GitHub acting as the pers
 
 ### Controller (Authoritative Layer)
 
-- Runs entirely in the browser  
-- Reconstructs all state from GitHub events  
-- Enforces rules locally before write  
-- Validates transitions during replay  
+Runs entirely in browser:
 
-Responsibilities:
-
-- Enforce all rules  
-- Determine permissions  
-- Compute derived state  
-- Replay full history deterministically  
-- Reject invalid actions before commit  
+- Enforces all rules  
+- Reconstructs state via replay  
+- Computes permissions  
+- Rejects invalid actions before write  
 
 ---
 
 ### View (Dumb Renderer)
 
 - Reads controller state only  
-- Never computes rules  
-- Fully reactive to controller output  
+- No business logic  
+- Pure rendering layer  
 
 ---
 
@@ -103,8 +95,7 @@ Responsibilities:
 
 ### ID Format
 
-- 11-character base62 strings  
-- Globally unique  
+- 11-character base62  
 - Client-generated  
 
 ---
@@ -149,14 +140,14 @@ Fields:
 
 ## Event Model (GitHub)
 
-Each Dispute = one GitHub Issue  
+Each Dispute = GitHub Issue  
 Comments = append-only event stream  
 
-### Storage Constraints
+### Constraints
 
-- No binary data stored in GitHub comments  
+- No binary data in events  
 - Images must be external URLs only  
-- Events must remain compact (<65KB comment limit)  
+- Events must remain compact (<65KB/comment)  
 
 ---
 
@@ -193,40 +184,25 @@ Comments = append-only event stream
 
 ## Boot & Replay on Load
 
-On application startup:
+On startup:
 
-### Step 1 — Fetch
-- Load GitHub Issue for current dispute
-- Retrieve all comments (events)
-
-### Step 2 — Normalize
-- Parse each comment into event objects
-- Validate schema
-
-### Step 3 — Sort
-- Sort by sequence `s` ascending
-
-### Step 4 — Reduce
-- Run deterministic reducer:
-  - state0 → event1 → state1 → event2 → state2 …
-
-### Step 5 — Validate
-- Drop invalid events during replay
-- Log inconsistencies (dev mode)
-
-### Step 6 — Hydrate Controller
-- Final state becomes active runtime state
+1. Fetch GitHub issue comments  
+2. Parse into events  
+3. Sort by sequence  
+4. Replay deterministically through reducer  
+5. Drop invalid events  
+6. Hydrate controller state  
 
 Result:
-> The browser becomes a deterministic simulation of GitHub history.
+> Browser becomes a deterministic replay engine of GitHub history.
 
 ---
 
 ## State Reconstruction
 
-- Pure function reducer  
+- Pure reducer function  
 - Deterministic replay  
-- Sequence is authoritative ordering  
+- Sequence is authoritative  
 
 ---
 
@@ -234,13 +210,14 @@ Result:
 
 - No self-challenges  
 - One unresolved challenge at a time  
-- All permissions scoped to dispute  
+- All permissions scoped per dispute  
 
 ---
 
 ## Challenge Targeting
 
 Each challenge includes:
+
 - targetPersonId  
 
 Only target may answer.
@@ -249,10 +226,10 @@ Only target may answer.
 
 ## Turn Model
 
-- Only one unresolved challenge exists  
+- Exactly one unresolved challenge exists globally per dispute  
 - Turn = target of unresolved challenge  
 
-Counter-challenge replaces unresolved challenge.
+Counter-challenge replaces current unresolved challenge.
 
 ---
 
@@ -273,8 +250,39 @@ Counter-challenge replaces unresolved challenge.
 
 ## Crickets
 
-Derived from timestamps  
-No stored timers  
+Derived, not stored:
+
+currentTime - proposalTime >= duration  
+
+---
+
+## Image Handling (OPTION 1)
+
+Images are handled via GitHub Issue attachment flow.
+
+### Upload Flow
+
+1. Client attaches image in issue comment creation request  
+2. GitHub uploads image to:
+   ```
+   https://user-images.githubusercontent.com/...
+   ```
+3. GitHub returns markdown with hosted URL  
+4. System extracts URL from response  
+5. Event stores ONLY the URL in `contentPic`  
+
+### Constraints
+
+- No raw image storage in events  
+- No base64 encoding  
+- No custom CDN required  
+- Images are treated as external immutable resources  
+
+### Properties
+
+- CDN-backed by GitHub  
+- Stable but not guaranteed permanent  
+- Fully decoupled from event replay logic  
 
 ---
 
@@ -285,33 +293,32 @@ Invalid events are ignored during replay:
 - invalid sequence  
 - unauthorized actor  
 - rule violations  
+- duplicate challenges  
 
 ---
 
 ## Missing Data
 
-Missing nodes render as placeholders  
-No deletion supported  
+- Missing nodes render as placeholders  
+- No deletion supported  
 
 ---
 
 ## Branching Model
 
-All branches are collapsed into summary cards  
+All branches collapsed into summary cards  
 
 ---
 
 ## UI/UX
 
 - Dark theme  
-- Minimal interaction surface  
+- Minimal interaction model  
 - Emphasis on actionable state  
 
 ---
 
 ## Controller Interface
-
-Controller runs entirely in browser:
 
 - getCurrentPerson()  
 - switchPerson()  
@@ -324,11 +331,11 @@ Controller runs entirely in browser:
 
 ## Reducer Specification
 
-Pure deterministic state machine:
+Pure state machine:
 
 state + event → next state  
 
-All invalid transitions ignored.
+Invalid transitions are ignored.
 
 ---
 
@@ -336,7 +343,7 @@ All invalid transitions ignored.
 
 - retry GitHub writes  
 - refetch on conflict  
-- full replay after recovery  
+- full replay on recovery  
 
 ---
 
@@ -362,6 +369,11 @@ vMAJOR.MINOR.PATCH
 
 ---
 
-## Patch Notes
+## Release Notes
 
-(To be appended)
+No releases yet.
+
+### Patch Notes
+
+No patches yet.
+

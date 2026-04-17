@@ -9,293 +9,316 @@
     margin: 0;
     font-family: system-ui;
     background: #0f0f14;
-    color: #fff;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 
   header {
-    padding: 10px;
-    text-align: center;
-    font-weight: bold;
-    background: #1b1b24;
+    padding: 12px;
+    width: 100%;
+    background: #181824;
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
   }
 
-  #studio {
+  #loops {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 12px;
-    padding: 10px;
-  }
-
-  .loop {
-    position: relative;
-    width: 140px;
-    height: 140px;
-    border-radius: 50%;
-    background: #181822;
-    border: 2px solid #333;
+    gap: 16px;
+    padding: 12px;
   }
 
   canvas {
-    width: 100%;
-    height: 100%;
+    touch-action: none;
   }
 
   .controls {
-    position: absolute;
-    bottom: -40px;
+    position: fixed;
+    bottom: 0;
     width: 100%;
-    text-align: center;
-  }
-
-  button {
-    background: #2c2c3a;
-    color: white;
-    border: none;
-    padding: 6px 8px;
-    margin: 2px;
-    border-radius: 6px;
-  }
-
-  #network {
-    padding: 10px;
-    font-size: 12px;
-    background: #111;
-  }
-
-  #actions {
+    background: #181824;
     display: flex;
     justify-content: space-around;
     padding: 10px;
   }
+
+  button {
+    background: #2a2a40;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .status {
+    font-size: 12px;
+    opacity: 0.7;
+  }
 </style>
 </head>
-
 <body>
 
-<header>Loopify</header>
+<header>
+  <div>Loopify</div>
+  <div id="session"></div>
+</header>
 
-<div id="actions">
-  <button onclick="startMic()">🎤 Record</button>
-  <button onclick="addSynth()">🎹 Synth Loop</button>
+<div id="loops"></div>
+
+<div class="controls">
+  <button id="record">🎤 Record</button>
+  <button id="beat">🥁 Beat</button>
+  <button id="copy">🔗 Share</button>
 </div>
 
-<div id="studio"></div>
-
-<div id="network">
-  <b>Network:</b>
-  <div id="log"></div>
-</div>
+<div class="status" id="status"></div>
 
 <script>
-// ---------------- AUDIO ENGINE ----------------
-
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-let globalStart = audioCtx.currentTime;
-let loopLength = 2; // seconds
+let loops = [];
+let peers = [];
+let dataChannels = [];
+
+const tempo = 100;
+const loopBeats = 4;
+const secondsPerBeat = 60 / tempo;
+const loopDuration = loopBeats * secondsPerBeat;
+
+const startTime = audioCtx.currentTime + 1;
 
 function nowLoopTime() {
-  let t = audioCtx.currentTime - globalStart;
-  return t % loopLength;
+  return (audioCtx.currentTime - startTime) % loopDuration;
 }
 
-// ---------------- LOOP CLASS ----------------
+// ---- P2P LAYER (WebRTC minimal mesh) ----
+const urlParams = new URLSearchParams(location.search);
+let sessionId = urlParams.get("session") || Math.random().toString(36).slice(2);
 
-class Loop {
-  constructor(buffer) {
-    this.buffer = buffer;
-    this.speed = 1;
-    this.muted = false;
-    this.id = Math.random().toString(36).slice(2);
+document.getElementById("session").innerText = sessionId;
 
-    this.canvas = document.createElement("canvas");
-    this.ctx = this.canvas.getContext("2d");
+function copySession() {
+  const url = location.origin + location.pathname + "?session=" + sessionId;
+  navigator.clipboard.writeText(url);
+}
 
-    this.el = document.createElement("div");
-    this.el.className = "loop";
-    this.el.appendChild(this.canvas);
+document.getElementById("copy").onclick = copySession;
 
-    this.controls = document.createElement("div");
-    this.controls.className = "controls";
-    this.controls.innerHTML = `
-      <button onclick="loops['${this.id}'].toggleMute()">M</button>
-      <button onclick="loops['${this.id}'].double()">2x</button>
-      <button onclick="loops['${this.id}'].half()">½</button>
-    `;
-    this.el.appendChild(this.controls);
+// signaling via BroadcastChannel (same browser / tab demo)
+const signaling = new BroadcastChannel("loopify-" + sessionId);
 
-    document.getElementById("studio").appendChild(this.el);
+signaling.onmessage = async (e) => {
+  const msg = e.data;
 
-    this.draw();
-    this.schedule();
+  if (msg.type === "offer") {
+    const pc = createPeer();
+    await pc.setRemoteDescription(msg.offer);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    signaling.postMessage({ type: "answer", answer });
   }
 
-  schedule() {
-    if (this.source) this.source.stop();
-
-    this.source = audioCtx.createBufferSource();
-    this.source.buffer = this.buffer;
-    this.source.loop = true;
-    this.source.playbackRate.value = this.speed;
-
-    this.gain = audioCtx.createGain();
-    this.source.connect(this.gain).connect(audioCtx.destination);
-
-    this.gain.gain.value = this.muted ? 0 : 1;
-
-    this.source.start();
+  if (msg.type === "answer") {
+    peers[0]?.setRemoteDescription(msg.answer);
   }
 
-  toggleMute() {
-    this.muted = !this.muted;
-    this.gain.gain.value = this.muted ? 0 : 1;
+  if (msg.type === "candidate") {
+    peers[0]?.addIceCandidate(msg.candidate);
   }
+};
 
-  double() {
-    this.speed *= 2;
-    this.schedule();
-  }
+function createPeer() {
+  const pc = new RTCPeerConnection();
 
-  half() {
-    this.speed *= 0.5;
-    this.schedule();
-  }
+  const dc = pc.createDataChannel("loops");
+  setupDataChannel(dc);
 
-  draw() {
-    const ctx = this.ctx;
-    const w = this.canvas.width = this.canvas.clientWidth;
-    const h = this.canvas.height = this.canvas.clientHeight;
+  pc.ondatachannel = (e) => setupDataChannel(e.channel);
 
-    ctx.clearRect(0,0,w,h);
-
-    // waveform ring
-    const data = this.buffer.getChannelData(0);
-    const step = Math.floor(data.length / 100);
-
-    ctx.strokeStyle = "#4af";
-    ctx.beginPath();
-
-    for (let i = 0; i < 100; i++) {
-      let v = data[i * step];
-      let angle = (i / 100) * Math.PI * 2;
-      let r = (w/2) * (0.7 + v * 0.2);
-
-      let x = w/2 + Math.cos(angle) * r;
-      let y = h/2 + Math.sin(angle) * r;
-
-      if (i === 0) ctx.moveTo(x,y);
-      else ctx.lineTo(x,y);
+  pc.onicecandidate = (e) => {
+    if (e.candidate) {
+      signaling.postMessage({ type: "candidate", candidate: e.candidate });
     }
-
-    ctx.closePath();
-    ctx.stroke();
-
-    // playhead
-    let t = nowLoopTime() / loopLength;
-    let angle = t * Math.PI * 2;
-
-    ctx.strokeStyle = "#fff";
-    ctx.beginPath();
-    ctx.moveTo(w/2, h/2);
-    ctx.lineTo(
-      w/2 + Math.cos(angle) * w/2,
-      h/2 + Math.sin(angle) * h/2
-    );
-    ctx.stroke();
-
-    requestAnimationFrame(() => this.draw());
-  }
-}
-
-const loops = {};
-
-// ---------------- MIC RECORDING ----------------
-
-async function startMic() {
-  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-  const recorder = new MediaRecorder(stream);
-  let chunks = [];
-
-  recorder.ondataavailable = e => chunks.push(e.data);
-
-  recorder.onstop = async () => {
-    const blob = new Blob(chunks);
-    const arrayBuffer = await blob.arrayBuffer();
-    const buffer = await audioCtx.decodeAudioData(arrayBuffer);
-
-    let loop = new Loop(buffer);
-    loops[loop.id] = loop;
-
-    broadcastLoop(buffer);
   };
 
-  recorder.start();
-  setTimeout(()=>recorder.stop(), loopLength * 1000);
+  peers.push(pc);
+  return pc;
 }
 
-// ---------------- SYNTH ----------------
+function setupDataChannel(dc) {
+  dataChannels.push(dc);
 
-function addSynth() {
-  const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * loopLength, audioCtx.sampleRate);
-  const data = buffer.getChannelData(0);
-
-  for (let i = 0; i < data.length; i++) {
-    let t = i / audioCtx.sampleRate;
-    let beat = Math.floor(t * 4);
-
-    if (beat % 2 === 0) {
-      data[i] = Math.sin(t * 440 * Math.PI * 2) * 0.3;
+  dc.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === "loop") {
+      receiveLoop(msg);
     }
-  }
+  };
+}
 
-  let loop = new Loop(buffer);
-  loops[loop.id] = loop;
+// init connection if first
+async function initConnection() {
+  const pc = createPeer();
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
 
+  signaling.postMessage({ type: "offer", offer });
+}
+initConnection();
+
+// ---- LOOP SYSTEM ----
+function createLoop(buffer) {
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  source.loop = true;
+  source.playbackRate.value = 1;
+
+  const gain = audioCtx.createGain();
+  source.connect(gain).connect(audioCtx.destination);
+
+  source.start(startTime);
+
+  const loop = {
+    buffer,
+    source,
+    gain,
+    muted: false,
+    speed: 1
+  };
+
+  loops.push(loop);
+  drawLoop(loop);
   broadcastLoop(buffer);
 }
 
-// ---------------- P2P LAYER ----------------
+function broadcastLoop(buffer) {
+  const channelData = buffer.getChannelData(0);
+  const arr = Array.from(channelData);
 
-// NOTE: Simplified signaling via broadcast channel (same tab origin)
-// Replace with WebSocket signaling server for real-world use
+  const msg = JSON.stringify({
+    type: "loop",
+    data: arr
+  });
 
-const channel = new BroadcastChannel("loopify");
+  dataChannels.forEach(dc => dc.send(msg));
+}
 
-channel.onmessage = async (msg) => {
-  log("Received loop from peer");
+function receiveLoop(msg) {
+  const arr = new Float32Array(msg.data);
+  const buffer = audioCtx.createBuffer(1, arr.length, audioCtx.sampleRate);
+  buffer.copyToChannel(arr, 0);
 
-  const arrayBuffer = msg.data;
-  const buffer = await audioCtx.decodeAudioData(arrayBuffer);
+  createLoop(buffer);
+}
 
-  let loop = new Loop(buffer);
-  loops[loop.id] = loop;
+// ---- RECORD MIC ----
+document.getElementById("record").onclick = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const recorder = audioCtx.createMediaStreamSource(stream);
+
+  const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * loopDuration, audioCtx.sampleRate);
+  let offset = 0;
+
+  const processor = audioCtx.createScriptProcessor(1024, 1, 1);
+  recorder.connect(processor);
+  processor.connect(audioCtx.destination);
+
+  processor.onaudioprocess = (e) => {
+    const input = e.inputBuffer.getChannelData(0);
+    buffer.getChannelData(0).set(input, offset);
+    offset += input.length;
+
+    if (offset >= buffer.length) {
+      processor.disconnect();
+      createLoop(buffer);
+    }
+  };
 };
 
-function broadcastLoop(buffer) {
-  buffer.copyFromChannel(buffer.getChannelData(0), 0);
+// ---- SIMPLE BEAT ----
+document.getElementById("beat").onclick = () => {
+  const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * loopDuration, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
 
-  audioCtx.decodeAudioData(
-    buffer.getChannelData(0).buffer.slice(0),
-    (decoded) => {}
-  );
+  for (let i = 0; i < data.length; i++) {
+    const t = i / audioCtx.sampleRate;
+    const beat = Math.floor(t / secondsPerBeat);
 
-  channel.postMessage(buffer.getChannelData(0).buffer);
-  log("Sent loop to peers");
+    if (beat % 4 === 0) {
+      data[i] = Math.sin(2 * Math.PI * 100 * t) * Math.exp(-t * 10);
+    }
+  }
+
+  createLoop(buffer);
+};
+
+// ---- UI RENDER ----
+function drawLoop(loop) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 140;
+  canvas.height = 140;
+  document.getElementById("loops").appendChild(canvas);
+
+  const ctx = canvas.getContext("2d");
+
+  function draw() {
+    ctx.clearRect(0, 0, 140, 140);
+
+    const data = loop.buffer.getChannelData(0);
+
+    ctx.beginPath();
+    for (let i = 0; i < data.length; i += 200) {
+      const angle = (i / data.length) * Math.PI * 2;
+      const r = 50 + data[i] * 20;
+      const x = 70 + Math.cos(angle) * r;
+      const y = 70 + Math.sin(angle) * r;
+
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = "#6cf";
+    ctx.stroke();
+
+    // playhead
+    const t = nowLoopTime() / loopDuration;
+    const angle = t * Math.PI * 2;
+
+    ctx.beginPath();
+    ctx.moveTo(70, 70);
+    ctx.lineTo(
+      70 + Math.cos(angle) * 60,
+      70 + Math.sin(angle) * 60
+    );
+    ctx.strokeStyle = "#fff";
+    ctx.stroke();
+
+    requestAnimationFrame(draw);
+  }
+
+  draw();
+
+  canvas.onclick = () => {
+    loop.muted = !loop.muted;
+    loop.gain.gain.value = loop.muted ? 0 : 1;
+  };
+
+  canvas.oncontextmenu = (e) => {
+    e.preventDefault();
+    loop.speed = loop.speed === 1 ? 2 : loop.speed === 2 ? 0.5 : 1;
+    loop.source.playbackRate.value = loop.speed;
+  };
 }
 
-// ---------------- NETWORK UI ----------------
+// ---- STATUS ----
+setInterval(() => {
+  document.getElementById("status").innerText =
+    `Loops: ${loops.length} | Peers: ${dataChannels.length} | Sync: ${nowLoopTime().toFixed(2)}`;
+}, 500);
 
-function log(msg) {
-  const el = document.getElementById("log");
-  const div = document.createElement("div");
-  div.textContent = msg;
-  el.prepend(div);
-}
-
-// ---------------- START ----------------
-
-log("Loopify ready");
 </script>
-
 </body>
 </html>

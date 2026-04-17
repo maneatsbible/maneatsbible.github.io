@@ -1,323 +1,322 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Loopify v2</title>
+<meta charset="UTF-8" />
+<title>Loopify v4</title>
 <style>
-body {
-  margin:0;
-  font-family: system-ui;
-  background:#0b0f14;
-  color:white;
-  display:flex;
-  flex-direction:column;
-  height:100vh;
-}
-
-header {
-  padding:10px;
-  display:flex;
-  justify-content:space-between;
-  background:#111;
-}
-
-button {
-  padding:8px 12px;
-  border:none;
-  border-radius:6px;
-  background:#1e88e5;
-  color:white;
-}
-
-#grid {
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:8px;
-  padding:10px;
-}
-
-.clip {
-  height:70px;
-  background:#222;
-  border-radius:10px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-
-.clip.active { background:#00c853; }
-.clip.muted { opacity:0.3; }
-
-canvas {
-  flex:1;
-  background:#05070a;
-}
+  body {
+    font-family: system-ui;
+    background: #0f0f14;
+    color: #eee;
+    margin: 0;
+    padding: 0;
+  }
+  header {
+    padding: 10px;
+    background: #181820;
+    display: flex;
+    gap: 10px;
+  }
+  button {
+    background: #2a2a40;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 8px;
+    padding: 10px;
+  }
+  .loop {
+    background: #222;
+    padding: 10px;
+    text-align: center;
+    border-radius: 6px;
+  }
+  .active { background: #4caf50; }
+  #debug {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #111;
+    padding: 10px;
+    font-size: 12px;
+  }
 </style>
 </head>
 <body>
 
 <header>
   <button id="start">Start Audio</button>
-  <div>BPM <input id="bpm" type="number" value="100" style="width:60px"></div>
-  <button id="record">Record</button>
-  <button id="ai">AI Beat</button>
+  <button id="record">Record Loop</button>
+  <button id="synth">Add Synth Loop</button>
 </header>
 
-<canvas id="viz"></canvas>
 <div id="grid"></div>
 
+<div id="debug"></div>
+
 <script>
-// ============================
-// STATE
-// ============================
+/* ================================
+   GLOBAL CONFIG
+================================ */
+const cycleDuration = 2.0 // seconds
+let epoch = 0
 
-const state = {
-  bpm: 100,
-  beatsPerBar: 4,
-  bars: 2,
-  loops: [],
-  audioCtx: null,
-  master: null,
-  mediaStream: null,
-  epoch: performance.now(),
-  offset: 0
-};
+/* ================================
+   AUDIO ENGINE
+================================ */
+class LoopScheduler {
+  constructor(ctx) {
+    this.ctx = ctx
+    this.sources = new Map()
+  }
 
-function cycleDuration() {
-  return (60 / state.bpm) * state.beatsPerBar * state.bars;
+  schedule(loop, startTime, offset = 0) {
+    const src = this.ctx.createBufferSource()
+    src.buffer = loop.buffer
+    src.loop = true
+
+    src.connect(loop.gainNode)
+    loop.gainNode.connect(this.ctx.destination)
+
+    src.start(startTime, offset)
+    this.sources.set(loop.id, src)
+  }
+
+  stop(loopId) {
+    const src = this.sources.get(loopId)
+    if (src) src.stop()
+  }
+}
+
+/* ================================
+   LOOP MODEL
+================================ */
+class Loop {
+  constructor(buffer) {
+    this.id = crypto.randomUUID()
+    this.buffer = buffer
+    this.gainNode = audioCtx.createGain()
+    this.gainNode.gain.value = 1
+  }
+}
+
+/* ================================
+   LOOPSET
+================================ */
+class LoopSet {
+  constructor(name) {
+    this.id = crypto.randomUUID()
+    this.name = name
+    this.loops = []
+    this.active = true
+  }
+}
+
+/* ================================
+   STATE
+================================ */
+let audioCtx
+let scheduler
+let loops = []
+let loopSets = []
+let currentSet = null
+
+/* ================================
+   TIMING
+================================ */
+function now() {
+  return audioCtx.currentTime
+}
+
+function nextCycleBoundary() {
+  const t = now()
+  const cycles = Math.ceil((t - epoch) / cycleDuration)
+  return epoch + cycles * cycleDuration
 }
 
 function phase() {
-  const now = performance.now();
-  const t = (now + state.offset - state.epoch) / 1000;
-  return (t % cycleDuration()) / cycleDuration();
+  return ((now() - epoch) % cycleDuration) / cycleDuration
 }
 
-// ============================
-// AUDIO ENGINE
-// ============================
+/* ================================
+   RECORDING ENGINE
+================================ */
+let mediaStream
+let recorder
+let chunks = []
 
-function initAudio() {
-  state.audioCtx = new AudioContext();
-  state.master = state.audioCtx.createGain();
-  state.master.connect(state.audioCtx.destination);
+async function initMic() {
+  mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
 }
-
-function playLoop(loop) {
-  const src = state.audioCtx.createBufferSource();
-  src.buffer = loop.buffer;
-  src.loop = true;
-
-  const gain = state.audioCtx.createGain();
-  gain.gain.value = loop.muted ? 0 : loop.gain;
-
-  src.connect(gain).connect(state.master);
-
-  const startTime = state.audioCtx.currentTime + 0.1;
-  src.start(startTime);
-
-  loop.node = { src, gain };
-}
-
-// ============================
-// RECORDING
-// ============================
 
 async function recordLoop() {
-  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-  const rec = new MediaRecorder(stream);
-  let chunks = [];
+  const start = nextCycleBoundary()
+  const end = start + cycleDuration
 
-  rec.ondataavailable = e => chunks.push(e.data);
+  chunks = []
+  recorder = new MediaRecorder(mediaStream)
 
-  rec.start();
+  recorder.ondataavailable = e => chunks.push(e.data)
 
-  setTimeout(() => rec.stop(), cycleDuration()*1000);
+  recorder.start()
 
-  rec.onstop = async () => {
-    const blob = new Blob(chunks);
-    const array = await blob.arrayBuffer();
-    const buffer = await state.audioCtx.decodeAudioData(array);
+  setTimeout(() => recorder.stop(), (end - now()) * 1000)
 
-    const loop = {
-      id: crypto.randomUUID(),
-      buffer,
-      gain:1,
-      muted:false
-    };
+  recorder.onstop = async () => {
+    const blob = new Blob(chunks)
+    const array = await blob.arrayBuffer()
+    const buffer = await audioCtx.decodeAudioData(array)
 
-    state.loops.push(loop);
-    playLoop(loop);
-    renderGrid();
-    save();
-  };
+    const loop = new Loop(buffer)
+    loops.push(loop)
+
+    scheduler.schedule(loop, nextCycleBoundary())
+    render()
+    saveLoop(buffer)
+  }
 }
 
-// ============================
-// AI GENERATOR (demo)
-// ============================
+/* ================================
+   SYNTH ENGINE
+================================ */
+function createSynthLoop() {
+  const length = audioCtx.sampleRate * cycleDuration
+  const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate)
+  const data = buffer.getChannelData(0)
 
-function generateBeat() {
-  const ctx = state.audioCtx;
-  const buffer = ctx.createBuffer(1, ctx.sampleRate * cycleDuration(), ctx.sampleRate);
-  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) {
+    data[i] = Math.sin(i * 0.01) * 0.3
+  }
 
-  for (let i=0;i<data.length;i++) {
-    if (i % (ctx.sampleRate/2) < 200) {
-      data[i] = Math.random()*0.5;
+  const loop = new Loop(buffer)
+  loops.push(loop)
+  scheduler.schedule(loop, nextCycleBoundary())
+  render()
+}
+
+/* ================================
+   DRUM MACHINE (simple)
+================================ */
+function createKickLoop() {
+  const length = audioCtx.sampleRate * cycleDuration
+  const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate)
+  const data = buffer.getChannelData(0)
+
+  for (let i = 0; i < length; i++) {
+    if (i % (audioCtx.sampleRate / 2) < 2000) {
+      data[i] = Math.exp(-i * 0.0005) * Math.sin(i * 0.2)
     }
   }
 
-  const loop = {
+  const loop = new Loop(buffer)
+  loops.push(loop)
+  scheduler.schedule(loop, nextCycleBoundary())
+  render()
+}
+
+/* ================================
+   INDEXED DB
+================================ */
+let db
+
+function initDB() {
+  const req = indexedDB.open("loopify", 1)
+
+  req.onupgradeneeded = e => {
+    db = e.target.result
+    db.createObjectStore("loops", { keyPath: "id" })
+  }
+
+  req.onsuccess = e => {
+    db = e.target.result
+    loadLoops()
+  }
+}
+
+function saveLoop(buffer) {
+  const tx = db.transaction("loops", "readwrite")
+  const store = tx.objectStore("loops")
+
+  store.put({
     id: crypto.randomUUID(),
-    buffer,
-    gain:1,
-    muted:false
-  };
-
-  state.loops.push(loop);
-  playLoop(loop);
-  renderGrid();
+    data: buffer.getChannelData(0)
+  })
 }
 
-// ============================
-// UI GRID
-// ============================
+function loadLoops() {
+  const tx = db.transaction("loops", "readonly")
+  const store = tx.objectStore("loops")
 
-function renderGrid() {
-  const grid = document.getElementById("grid");
-  grid.innerHTML = "";
+  store.getAll().onsuccess = async e => {
+    for (let item of e.target.result) {
+      const buf = audioCtx.createBuffer(1, item.data.length, audioCtx.sampleRate)
+      buf.copyToChannel(item.data, 0)
 
-  state.loops.forEach(loop => {
-    const div = document.createElement("div");
-    div.className = "clip active";
-
-    if (loop.muted) div.classList.add("muted");
-
-    div.innerText = "Loop";
-
-    div.onclick = () => {
-      loop.muted = !loop.muted;
-      loop.node.gain.gain.value = loop.muted ? 0 : loop.gain;
-      renderGrid();
-    };
-
-    grid.appendChild(div);
-  });
-}
-
-// ============================
-// VISUALIZATION
-// ============================
-
-const canvas = document.getElementById("viz");
-const ctx = canvas.getContext("2d");
-
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight * 0.5;
-}
-window.onresize = resize;
-resize();
-
-function draw() {
-  requestAnimationFrame(draw);
-
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  const cx = canvas.width/2;
-  const cy = canvas.height/2;
-
-  const p = phase();
-
-  state.loops.forEach((loop,i) => {
-    const radius = 50 + i*30;
-
-    ctx.beginPath();
-    ctx.arc(cx,cy,radius,0,Math.PI*2);
-    ctx.strokeStyle = loop.muted ? "#555" : "#0f0";
-    ctx.stroke();
-
-    // playhead
-    const angle = p * Math.PI*2;
-
-    ctx.beginPath();
-    ctx.arc(cx + Math.cos(angle)*radius,
-            cy + Math.sin(angle)*radius,
-            5,0,Math.PI*2);
-    ctx.fillStyle="#fff";
-    ctx.fill();
-  });
-}
-draw();
-
-// ============================
-// PERSISTENCE
-// ============================
-
-function save() {
-  const data = state.loops.map(l => ({
-    gain:l.gain,
-    muted:l.muted,
-    buffer: Array.from(l.buffer.getChannelData(0))
-  }));
-  localStorage.setItem("loops", JSON.stringify(data));
-}
-
-async function load() {
-  const data = JSON.parse(localStorage.getItem("loops") || "[]");
-  for (let d of data) {
-    const buffer = state.audioCtx.createBuffer(1, d.buffer.length, state.audioCtx.sampleRate);
-    buffer.copyToChannel(new Float32Array(d.buffer),0);
-
-    const loop = { ...d, buffer };
-    state.loops.push(loop);
-    playLoop(loop);
+      const loop = new Loop(buf)
+      loops.push(loop)
+      scheduler.schedule(loop, nextCycleBoundary())
+    }
+    render()
   }
-  renderGrid();
 }
 
-// ============================
-// EVENTS
-// ============================
+/* ================================
+   UI
+================================ */
+function render() {
+  const grid = document.getElementById("grid")
+  grid.innerHTML = ""
 
+  loops.forEach(loop => {
+    const el = document.createElement("div")
+    el.className = "loop active"
+    el.innerText = loop.id.slice(0, 4)
+
+    el.onclick = () => {
+      loop.gainNode.gain.value =
+        loop.gainNode.gain.value ? 0 : 1
+      el.classList.toggle("active")
+    }
+
+    grid.appendChild(el)
+  })
+}
+
+/* ================================
+   DEBUG PANEL
+================================ */
+function updateDebug() {
+  const dbg = document.getElementById("debug")
+  dbg.innerHTML = `
+    phase: ${phase().toFixed(3)} |
+    loops: ${loops.length} |
+    time: ${now().toFixed(2)}
+  `
+  requestAnimationFrame(updateDebug)
+}
+
+/* ================================
+   INIT
+================================ */
 document.getElementById("start").onclick = async () => {
-  initAudio();
-  await load();
-};
+  audioCtx = new AudioContext()
+  scheduler = new LoopScheduler(audioCtx)
+  epoch = audioCtx.currentTime
 
-document.getElementById("record").onclick = () => {
-  recordLoop();
-};
+  await initMic()
+  initDB()
 
-document.getElementById("ai").onclick = () => {
-  generateBeat();
-};
-
-document.getElementById("bpm").onchange = e => {
-  state.bpm = Number(e.target.value);
-};
-
-// ============================
-// P2P (SCAFFOLD)
-// ============================
-
-class P2P {
-  constructor() {
-    this.peers = [];
-  }
-
-  send(msg) {
-    console.log("send", msg);
-  }
-
-  receive(msg) {
-    console.log("recv", msg);
-  }
+  updateDebug()
 }
 
-state.p2p = new P2P();
+document.getElementById("record").onclick = recordLoop
+document.getElementById("synth").onclick = createSynthLoop
 
 </script>
 </body>

@@ -300,6 +300,7 @@ Bottom: Loop inspector
 - Waveform rings  
 - Radius = loop length  
 - Color = peer  
+- Arranged in grid or lanes
 
 Playhead:
 

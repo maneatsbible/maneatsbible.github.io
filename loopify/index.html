@@ -1,395 +1,324 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-<title>Loopify</title>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loopify v2</title>
 <style>
-  :root {
-    --bg: #0b0f14;
-    --accent: #00ffc3;
-    --muted: #1b2530;
-    --text: #d6e1ea;
-  }
+body {
+  margin:0;
+  font-family: system-ui;
+  background:#0b0f14;
+  color:white;
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+}
 
-  body {
-    margin: 0;
-    font-family: system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-  }
+header {
+  padding:10px;
+  display:flex;
+  justify-content:space-between;
+  background:#111;
+}
 
-  header {
-    display: flex;
-    justify-content: space-between;
-    padding: 10px 14px;
-    background: #111822;
-    font-size: 14px;
-    align-items: center;
-  }
+button {
+  padding:8px 12px;
+  border:none;
+  border-radius:6px;
+  background:#1e88e5;
+  color:white;
+}
 
-  button {
-    background: var(--accent);
-    border: none;
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-weight: bold;
-  }
+#grid {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+  padding:10px;
+}
 
-  #canvas {
-    flex: 1;
-    touch-action: none;
-  }
+.clip {
+  height:70px;
+  background:#222;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
 
-  .controls {
-    display: flex;
-    justify-content: space-around;
-    padding: 12px;
-    background: #111822;
-  }
+.clip.active { background:#00c853; }
+.clip.muted { opacity:0.3; }
 
-  .record-btn {
-    width: 70px;
-    height: 70px;
-    border-radius: 50%;
-    background: red;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: bold;
-  }
-
-  .recording {
-    animation: pulse 1s infinite;
-  }
-
-  @keyframes pulse {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.1); opacity: 0.6; }
-    100% { transform: scale(1); opacity: 1; }
-  }
+canvas {
+  flex:1;
+  background:#05070a;
+}
 </style>
 </head>
-
 <body>
 
 <header>
-  <div id="session">Session: --</div>
-  <div>
-    BPM: <input id="bpm" type="number" value="100" style="width:60px" />
-  </div>
-  <button id="share">Share</button>
+  <button id="start">Start Audio</button>
+  <div>BPM <input id="bpm" type="number" value="100" style="width:60px"></div>
+  <button id="record">Record</button>
+  <button id="ai">AI Beat</button>
 </header>
 
-<canvas id="canvas"></canvas>
+<canvas id="viz"></canvas>
+<div id="grid"></div>
 
-<div class="controls">
-  <div id="recordBtn" class="record-btn">REC</div>
-</div>
+<script>
+// ============================
+// STATE
+// ============================
 
-<script type="module">
-/* =========================
-   Utils
-========================= */
+const state = {
+  bpm: 100,
+  beatsPerBar: 4,
+  bars: 2,
+  loops: [],
+  audioCtx: null,
+  master: null,
+  mediaStream: null,
+  epoch: performance.now(),
+  offset: 0
+};
 
-const base58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-function randomId(len = 12) {
-  return Array.from(crypto.getRandomValues(new Uint8Array(len)))
-    .map(x => base58[x % base58.length])
-    .join('');
+function cycleDuration() {
+  return (60 / state.bpm) * state.beatsPerBar * state.bars;
 }
 
-/* =========================
-   IndexedDB Storage
-========================= */
-
-class Storage {
-  constructor() {
-    this.db = null;
-  }
-
-  async init() {
-    this.db = await new Promise((res, rej) => {
-      const req = indexedDB.open("loopify", 1);
-      req.onupgradeneeded = e => {
-        e.target.result.createObjectStore("loops", { keyPath: "id" });
-      };
-      req.onsuccess = () => res(req.result);
-      req.onerror = rej;
-    });
-  }
-
-  saveLoop(loop) {
-    const tx = this.db.transaction("loops", "readwrite");
-    tx.objectStore("loops").put(loop);
-  }
-
-  async getLoops() {
-    const tx = this.db.transaction("loops", "readonly");
-    const store = tx.objectStore("loops");
-    return new Promise(res => {
-      const req = store.getAll();
-      req.onsuccess = () => res(req.result);
-    });
-  }
+function phase() {
+  const now = performance.now();
+  const t = (now + state.offset - state.epoch) / 1000;
+  return (t % cycleDuration()) / cycleDuration();
 }
 
-/* =========================
-   Transport (Cycle Sync)
-========================= */
+// ============================
+// AUDIO ENGINE
+// ============================
 
-class Transport {
-  constructor(bpm = 100) {
-    this.bpm = bpm;
-    this.beatsPerBar = 4;
-    this.bars = 1;
-    this.startTime = performance.now();
-  }
-
-  get cycleDuration() {
-    return (60 / this.bpm) * this.beatsPerBar * this.bars * 1000;
-  }
-
-  get phase() {
-    return ((performance.now() - this.startTime) % this.cycleDuration) / this.cycleDuration;
-  }
-
-  nextCycleTime(ctx) {
-    const now = ctx.currentTime * 1000;
-    const offset = this.cycleDuration - ((performance.now() - this.startTime) % this.cycleDuration);
-    return ctx.currentTime + offset / 1000;
-  }
+function initAudio() {
+  state.audioCtx = new AudioContext();
+  state.master = state.audioCtx.createGain();
+  state.master.connect(state.audioCtx.destination);
 }
 
-/* =========================
-   Loop Model
-========================= */
+function playLoop(loop) {
+  const src = state.audioCtx.createBufferSource();
+  src.buffer = loop.buffer;
+  src.loop = true;
 
-class Loop {
-  constructor({ id, buffer, author }) {
-    this.id = id;
-    this.buffer = buffer;
-    this.author = author;
-    this.muted = false;
-    this.gain = 1;
-  }
+  const gain = state.audioCtx.createGain();
+  gain.gain.value = loop.muted ? 0 : loop.gain;
+
+  src.connect(gain).connect(state.master);
+
+  const startTime = state.audioCtx.currentTime + 0.1;
+  src.start(startTime);
+
+  loop.node = { src, gain };
 }
 
-/* =========================
-   Audio Engine
-========================= */
+// ============================
+// RECORDING
+// ============================
 
-class AudioEngine {
-  constructor(transport) {
-    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-    this.transport = transport;
-    this.master = this.ctx.createGain();
-    this.master.connect(this.ctx.destination);
-    this.loops = [];
-  }
+async function recordLoop() {
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  const rec = new MediaRecorder(stream);
+  let chunks = [];
 
-  addLoop(loop) {
-    this.loops.push(loop);
-    this.schedule(loop);
-  }
+  rec.ondataavailable = e => chunks.push(e.data);
 
-  schedule(loop) {
-    const src = this.ctx.createBufferSource();
-    const gain = this.ctx.createGain();
+  rec.start();
 
-    src.buffer = loop.buffer;
-    src.loop = true;
+  setTimeout(() => rec.stop(), cycleDuration()*1000);
 
-    gain.gain.value = loop.gain;
+  rec.onstop = async () => {
+    const blob = new Blob(chunks);
+    const array = await blob.arrayBuffer();
+    const buffer = await state.audioCtx.decodeAudioData(array);
 
-    src.connect(gain).connect(this.master);
+    const loop = {
+      id: crypto.randomUUID(),
+      buffer,
+      gain:1,
+      muted:false
+    };
 
-    const startTime = this.transport.nextCycleTime(this.ctx);
-
-    src.start(startTime);
-    loop._node = { src, gain };
-  }
+    state.loops.push(loop);
+    playLoop(loop);
+    renderGrid();
+    save();
+  };
 }
 
-/* =========================
-   Recorder
-========================= */
+// ============================
+// AI GENERATOR (demo)
+// ============================
 
-class Recorder {
-  constructor(engine, transport) {
-    this.engine = engine;
-    this.transport = transport;
-    this.chunks = [];
+function generateBeat() {
+  const ctx = state.audioCtx;
+  const buffer = ctx.createBuffer(1, ctx.sampleRate * cycleDuration(), ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let i=0;i<data.length;i++) {
+    if (i % (ctx.sampleRate/2) < 200) {
+      data[i] = Math.random()*0.5;
+    }
   }
 
-  async init() {
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    this.rec = new MediaRecorder(this.stream);
+  const loop = {
+    id: crypto.randomUUID(),
+    buffer,
+    gain:1,
+    muted:false
+  };
 
-    this.rec.ondataavailable = e => this.chunks.push(e.data);
-  }
-
-  start() {
-    this.chunks = [];
-    this.rec.start();
-  }
-
-  async stop() {
-    return new Promise(res => {
-      this.rec.onstop = async () => {
-        const blob = new Blob(this.chunks);
-        const array = await blob.arrayBuffer();
-        const buffer = await this.engine.ctx.decodeAudioData(array);
-        res(buffer);
-      };
-      this.rec.stop();
-    });
-  }
+  state.loops.push(loop);
+  playLoop(loop);
+  renderGrid();
 }
 
-/* =========================
-   Visualization
-========================= */
+// ============================
+// UI GRID
+// ============================
 
-class Visualizer {
-  constructor(canvas, engine, transport) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
-    this.engine = engine;
-    this.transport = transport;
+function renderGrid() {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
 
-    this.resize();
-    window.addEventListener("resize", () => this.resize());
+  state.loops.forEach(loop => {
+    const div = document.createElement("div");
+    div.className = "clip active";
 
-    requestAnimationFrame(() => this.draw());
-  }
+    if (loop.muted) div.classList.add("muted");
 
-  resize() {
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight - 140;
-  }
+    div.innerText = "Loop";
 
-  draw() {
-    const ctx = this.ctx;
-    const { width, height } = this.canvas;
+    div.onclick = () => {
+      loop.muted = !loop.muted;
+      loop.node.gain.gain.value = loop.muted ? 0 : loop.gain;
+      renderGrid();
+    };
 
-    ctx.clearRect(0, 0, width, height);
+    grid.appendChild(div);
+  });
+}
 
-    const cx = width / 2;
-    const cy = height / 2;
+// ============================
+// VISUALIZATION
+// ============================
 
-    this.engine.loops.forEach((loop, i) => {
-      const radius = 60 + i * 30;
+const canvas = document.getElementById("viz");
+const ctx = canvas.getContext("2d");
 
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = loop.muted ? "#444" : "#00ffc3";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-    });
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight * 0.5;
+}
+window.onresize = resize;
+resize();
 
-    // playhead
-    const angle = this.transport.phase * Math.PI * 2;
+function draw() {
+  requestAnimationFrame(draw);
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const cx = canvas.width/2;
+  const cy = canvas.height/2;
+
+  const p = phase();
+
+  state.loops.forEach((loop,i) => {
+    const radius = 50 + i*30;
+
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(angle) * 200, cy + Math.sin(angle) * 200);
-    ctx.strokeStyle = "#fff";
+    ctx.arc(cx,cy,radius,0,Math.PI*2);
+    ctx.strokeStyle = loop.muted ? "#555" : "#0f0";
     ctx.stroke();
 
-    requestAnimationFrame(() => this.draw());
-  }
+    // playhead
+    const angle = p * Math.PI*2;
+
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(angle)*radius,
+            cy + Math.sin(angle)*radius,
+            5,0,Math.PI*2);
+    ctx.fillStyle="#fff";
+    ctx.fill();
+  });
+}
+draw();
+
+// ============================
+// PERSISTENCE
+// ============================
+
+function save() {
+  const data = state.loops.map(l => ({
+    gain:l.gain,
+    muted:l.muted,
+    buffer: Array.from(l.buffer.getChannelData(0))
+  }));
+  localStorage.setItem("loops", JSON.stringify(data));
 }
 
-/* =========================
-   Session Controller (stub P2P)
-========================= */
+async function load() {
+  const data = JSON.parse(localStorage.getItem("loops") || "[]");
+  for (let d of data) {
+    const buffer = state.audioCtx.createBuffer(1, d.buffer.length, state.audioCtx.sampleRate);
+    buffer.copyToChannel(new Float32Array(d.buffer),0);
 
-class SessionController {
-  constructor() {
-    const url = new URL(location.href);
-    this.sessionId = url.searchParams.get("session") || randomId();
-
-    url.searchParams.set("session", this.sessionId);
-    history.replaceState({}, "", url);
+    const loop = { ...d, buffer };
+    state.loops.push(loop);
+    playLoop(loop);
   }
-
-  share() {
-    navigator.clipboard.writeText(location.href);
-    alert("Session link copied!");
-  }
+  renderGrid();
 }
 
-/* =========================
-   App Bootstrap
-========================= */
+// ============================
+// EVENTS
+// ============================
 
-const storage = new Storage();
-await storage.init();
+document.getElementById("start").onclick = async () => {
+  initAudio();
+  await load();
+};
 
-const transport = new Transport(100);
-const engine = new AudioEngine(transport);
-const recorder = new Recorder(engine, transport);
-const session = new SessionController();
+document.getElementById("record").onclick = () => {
+  recordLoop();
+};
 
-await recorder.init();
-
-const canvas = document.getElementById("canvas");
-const viz = new Visualizer(canvas, engine, transport);
-
-document.getElementById("session").textContent = "Session: " + session.sessionId;
-
-document.getElementById("share").onclick = () => session.share();
+document.getElementById("ai").onclick = () => {
+  generateBeat();
+};
 
 document.getElementById("bpm").onchange = e => {
-  transport.bpm = Number(e.target.value);
+  state.bpm = Number(e.target.value);
 };
 
-const recordBtn = document.getElementById("recordBtn");
+// ============================
+// P2P (SCAFFOLD)
+// ============================
 
-let recording = false;
-
-recordBtn.onclick = async () => {
-  if (!recording) {
-    recordBtn.classList.add("recording");
-    recorder.start();
-
-    const wait = transport.cycleDuration;
-
-    setTimeout(async () => {
-      const buffer = await recorder.stop();
-
-      const loop = new Loop({
-        id: randomId(),
-        buffer,
-        author: "local"
-      });
-
-      engine.addLoop(loop);
-      storage.saveLoop({ id: loop.id });
-
-      recordBtn.classList.remove("recording");
-      recording = false;
-
-    }, wait);
-
-    recording = true;
+class P2P {
+  constructor() {
+    this.peers = [];
   }
-};
 
-/* =========================
-   Restore saved loops (stub)
-========================= */
+  send(msg) {
+    console.log("send", msg);
+  }
 
-const saved = await storage.getLoops();
-console.log("Restored loops:", saved);
+  receive(msg) {
+    console.log("recv", msg);
+  }
+}
+
+state.p2p = new P2P();
 
 </script>
-
 </body>
 </html>

@@ -240,7 +240,8 @@ class Loop {
 
 Each loop is rendered as:
 - Circular waveform
-- Radius based on creation order
+- Radius based on length
+- Arranged in grid
 - Color per peer
 
 ### 10.2 Playhead

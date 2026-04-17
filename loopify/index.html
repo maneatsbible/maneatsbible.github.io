@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Loopify Prototype</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; }
+    button, input { margin: 5px; padding: 8px; }
+    #log { height: 150px; overflow: auto; background: #222; padding: 5px; }
+  </style>
+</head>
+<body>
+
+<h2>🎧 Loopify (Prototype)</h2>
+
+<button onclick="createSession()">Create Station</button>
+<button onclick="joinSession()">Join Station</button>
+
+<br/>
+<textarea id="signal" placeholder="Paste signal here"></textarea><br/>
+<button onclick="copySignal()">Copy Signal</button>
+
+<h3>🎤 Mic</h3>
+<button onclick="startMic()">Start Mic Loop</button>
+
+<h3>🎹 Synth</h3>
+<button onclick="playTone()">Play Tone Loop</button>
+
+<h3>📡 Stations</h3>
+<div id="stations"></div>
+
+<h3>📜 Log</h3>
+<div id="log"></div>
+
+<script>
+let pc;
+let dc;
+let isHost = false;
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let loops = [];
+
+function log(msg) {
+  document.getElementById("log").innerHTML += msg + "<br/>";
+}
+
+function createSession() {
+  isHost = true;
+  pc = new RTCPeerConnection();
+
+  dc = pc.createDataChannel("loops");
+  setupDataChannel();
+
+  pc.onicecandidate = e => {
+    if (!e.candidate) {
+      document.getElementById("signal").value =
+        JSON.stringify(pc.localDescription);
+    }
+  };
+
+  pc.createOffer().then(o => pc.setLocalDescription(o));
+  log("📡 Station created. Share signal.");
+}
+
+function joinSession() {
+  isHost = false;
+  pc = new RTCPeerConnection();
+
+  pc.ondatachannel = e => {
+    dc = e.channel;
+    setupDataChannel();
+  };
+
+  pc.onicecandidate = e => {
+    if (!e.candidate) {
+      document.getElementById("signal").value =
+        JSON.stringify(pc.localDescription);
+    }
+  };
+
+  const offer = JSON.parse(document.getElementById("signal").value);
+  pc.setRemoteDescription(offer)
+    .then(() => pc.createAnswer())
+    .then(a => pc.setLocalDescription(a));
+
+  log("🎧 Joined station.");
+}
+
+function copySignal() {
+  navigator.clipboard.writeText(document.getElementById("signal").value);
+}
+
+function setupDataChannel() {
+  dc.onmessage = e => {
+    const loop = JSON.parse(e.data);
+    scheduleLoop(loop);
+    log("🔁 Loop received");
+  };
+}
+
+function sendLoop(loop) {
+  if (dc && dc.readyState === "open") {
+    dc.send(JSON.stringify(loop));
+  }
+}
+
+function getQuantizedTime() {
+  const now = audioCtx.currentTime;
+  const bpm = 100;
+  const beat = 60 / bpm;
+  return Math.ceil(now / (beat * 4)) * (beat * 4);
+}
+
+function scheduleLoop(loop) {
+  const start = getQuantizedTime() + 0.1;
+
+  const source = audioCtx.createBufferSource();
+  source.buffer = loop.buffer;
+  source.loop = true;
+  source.connect(audioCtx.destination);
+  source.start(start);
+}
+
+async function startMic() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const input = audioCtx.createMediaStreamSource(stream);
+
+  const recorder = audioCtx.createScriptProcessor(4096, 1, 1);
+  input.connect(recorder);
+  recorder.connect(audioCtx.destination);
+
+  let chunks = [];
+
+  recorder.onaudioprocess = e => {
+    chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    if (chunks.length > 20) {
+      const buffer = audioCtx.createBuffer(1, 4096 * chunks.length, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      chunks.forEach((c, i) => data.set(c, i * 4096));
+
+      const loop = { buffer };
+      scheduleLoop(loop);
+      sendLoop(loop);
+
+      chunks = [];
+    }
+  };
+
+  log("🎤 Mic looping started");
+}
+
+function playTone() {
+  const length = audioCtx.sampleRate * 2;
+  const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let i = 0; i < length; i++) {
+    data[i] = Math.sin(i * 0.01);
+  }
+
+  const loop = { buffer };
+  scheduleLoop(loop);
+  sendLoop(loop);
+
+  log("🎹 Tone loop sent");
+}
+</script>
+
+</body>
+</html>

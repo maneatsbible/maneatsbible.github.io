@@ -1,416 +1,439 @@
-# Loopify — Design Specification (Vanilla JS P2P Audio Loop Collaboration)
+# Loopify — Full System Design (v2)
 
-## 1. Overview
+## 1. Vision
 
-**Loopify** is a mobile-first, browser-based peer-to-peer (P2P) application for recording, exchanging, and collaboratively arranging looping audio in real time. It is designed to be resilient to latency through a **Loop Exchange Protocol (LEP)**, allowing participants to stay musically synchronized without requiring tight real-time streaming.
+Loopify is a zero-install, browser-based, mobile-first collaborative music environment that enables real-time loop creation, synchronization, and arrangement over peer-to-peer networks.
 
-Core principles:
-- Latency-tolerant collaboration (loop-based sync, not stream-based)
-- Zero-install, URL-based session sharing
-- Creative immediacy (tap → record → loop → share)
-- Visual clarity (waveform rings + rotating playheads)
-- Robust offline-first P2P architecture
+This version expands the system into a **fully-featured distributed music studio**, combining:
+
+- Latency-resilient loop synchronization (LEP v2)
+- WebRTC mesh networking with signaling
+- Modular audio engine (loops, synth, sampler, effects)
+- Advanced UI (clip launcher + radial visualization hybrid)
+- Gesture-driven interaction
+- AI-assisted music generation
+- Persistent and shareable sessions
 
 ---
 
-## 2. Architecture
+## 2. System Architecture
 
-### 2.1 Stack
+### 2.1 Layers
 
-- Frontend: Vanilla JavaScript (ES Modules)
-- Audio Engine: Web Audio API
-- P2P Layer: WebRTC (DataChannels + optional MediaStreams)
-- Signaling: Lightweight WebSocket relay (stateless)
-- Storage: IndexedDB (local loop persistence)
-- Rendering: Canvas 2D (waveform rings) + minimal DOM
+Client (Browser)
+├── UI Layer (Canvas + DOM)
+├── Interaction Layer (Gestures, Touch, MIDI)
+├── Audio Engine (Web Audio API)
+├── Sync Engine (Transport + LEP)
+├── P2P Layer (WebRTC Mesh)
+├── Persistence (IndexedDB)
+└── AI Engine (Local + Remote inference optional)
+
+Optional Backend
+├── Signaling Server (WebSocket)
+└── TURN/STUN (ICE fallback)
 
 ---
 
 ## 3. Session Model
 
-### 3.1 Session Initialization
-
-A session is created locally and assigned a unique ID:
+### 3.1 Session Identity
 
 sessionId = base58(randomBytes(16))
+peerId = base58(randomBytes(12))
 
-URL format:
+### 3.2 URL Format
 
 https://loopify.app/?session=<SESSION_ID>
 
-On load:
-- If `session` param exists → join session
-- Else → create new session
+### 3.3 Join Flow
 
-### 3.2 Sharing
-
-- Copy/share button:
-  - Copies full URL
-  - Native mobile share API (if available)
+1. Parse session ID  
+2. Connect to signaling server  
+3. Discover peers  
+4. Establish WebRTC mesh  
+5. Sync SESSION_STATE  
+6. Align transport cycle  
 
 ---
 
-## 4. Loop Exchange Protocol (LEP)
+## 4. Loop Exchange Protocol (LEP v2)
 
-### 4.1 Core Idea
+### 4.1 Design Goals
 
-Instead of syncing real-time audio streams, peers exchange loop buffers + timing metadata, allowing playback to align on loop boundaries.
+- No real-time streaming dependency  
+- Deterministic loop alignment  
+- Bandwidth-efficient  
+- Fault-tolerant  
+
+---
 
 ### 4.2 Time Model
 
-Each session has a shared tempo (BPM) and loop length (bars)
-
 cycleDuration = (60 / BPM) * beatsPerBar * bars
 
-Each peer computes:
+cycleEpoch = shared timestamp  
+localOffset = drift correction  
 
-localCycleStart = performance.now() aligned to nearest cycle
+phase = ((now + offset - epoch) % cycleDuration) / cycleDuration  
 
-### 4.3 Latency Handling
+---
 
-- Loops are scheduled one cycle ahead
-- Incoming loops are:
-  - Buffered
-  - Phase-aligned
-  - Activated at next cycle boundary
+### 4.3 Scheduling Strategy
 
-### 4.4 Data Messages
+- All loops scheduled one cycle ahead  
+- Incoming loops queued into next boundary  
+- Drift corrected gradually (no jumps)  
+
+---
+
+### 4.4 Message Types
 
 LOOP_ADD
 
 {
-  "type": "LOOP_ADD",
-  "loopId": "...",
-  "audioBuffer": "...encoded...",
-  "length": 1,
-  "bpm": 120,
-  "createdAt": 123456789,
-  "author": "peerId"
+  type: "LOOP_ADD",
+  loopId,
+  encodedAudio,
+  format: "f32|opus",
+  bpm,
+  bars,
+  author,
+  createdAt
 }
 
 LOOP_UPDATE
 
 {
-  "type": "LOOP_UPDATE",
-  "loopId": "...",
-  "mute": false,
-  "speed": 1.0
+  type: "LOOP_UPDATE",
+  loopId,
+  mute,
+  gain,
+  speed
 }
+
+LOOP_REMOVE
+
+{ type: "LOOP_REMOVE", loopId }
 
 SESSION_STATE
 
 {
-  "type": "SESSION_STATE",
-  "bpm": 120,
-  "loops": [...]
+  type: "SESSION_STATE",
+  bpm,
+  loops: [...],
+  epoch
+}
+
+PEER_PING
+
+{
+  type: "PING",
+  t0
 }
 
 ---
 
-## 5. P2P Layer
+### 4.5 Audio Encoding
+
+Float32 (fast, large)  
+Opus (compressed, slower)  
+
+Pipeline:
+
+AudioBuffer → Float32 → (optional Opus) → Base64  
+
+---
+
+## 5. P2P Networking
 
 ### 5.1 Topology
 
-- Mesh network (small groups, <8 peers recommended)
-- Graceful degradation:
-  - Drop inactive peers
-  - Limit loop buffer size
+- Mesh (≤8 peers recommended)  
+- Adaptive pruning if overloaded  
+
+---
 
 ### 5.2 Connection Flow
 
-1. Peer joins via session ID
-2. Signaling server exchanges SDP offers
-3. WebRTC DataChannels established
-4. Full session state sync
+1. WebSocket signaling  
+2. SDP exchange  
+3. ICE candidates  
+4. DataChannel open  
+5. State sync  
 
-### 5.3 Limitations
+---
 
-- NAT/firewall issues may block connections
-- Mesh scaling constraints
-- Large audio buffers increase bandwidth
+### 5.3 Channels
 
-Mitigations:
-- Compress buffers (PCM → Float32 → optional Opus encoding)
-- Limit loop duration (1–8 bars)
-- Cap concurrent loops per peer
+- control (reliable)  
+- audio (chunked binary)  
+- ping (latency measurement)  
+
+---
+
+### 5.4 Reliability
+
+- Chunked buffer transfer  
+- Retransmission for missing chunks  
+- Hash verification  
+
+---
+
+### 5.5 NAT Handling
+
+- STUN default  
+- TURN fallback (optional relay)  
 
 ---
 
 ## 6. Audio Engine
 
-### 6.1 Core Components
+### 6.1 Graph
 
-- AudioContext
-- Master Gain Node
-- Loop Scheduler
-- Recorder Node
-- Synth Engine
-
-### 6.2 Loop Playback
-
-Each loop:
-- Stored as AudioBuffer
-- Played via:
-
-source.start(startTime, offset)
-source.loop = true
-
-### 6.3 Recording
-
-- Uses getUserMedia({ audio: true })
-- Records into buffer via ScriptProcessor / AudioWorklet
-- Quantized start:
-  - Recording begins at next cycle boundary
-- Auto-trim to loop length
+[Sources] → [Per-loop Gain] → [FX Bus] → [Master] → Output
 
 ---
 
-## 7. Loop Model
+### 6.2 Components
 
-class Loop {
-  constructor({
-    id,
-    buffer,
-    bpm,
-    length,
-    author
-  }) {
-    this.id = id;
-    this.buffer = buffer;
-    this.bpm = bpm;
-    this.length = length;
-
-    this.muted = false;
-    this.speed = 1.0;
-    this.gain = 1.0;
-
-    this.createdAt = performance.now();
-    this.author = author;
-  }
-}
+- AudioContext  
+- LoopScheduler  
+- Recorder  
+- SynthEngine  
+- DrumMachine  
+- Effects Rack  
 
 ---
 
-## 8. Controllers
+### 6.3 Loop Playback
 
-### 8.1 SessionController
-
-- Manages peers
-- Syncs session state
-- Handles join/leave events
-
-### 8.2 LoopController
-
-- Add/remove/update loops
-- Schedule playback
-- Apply quantization
-
-### 8.3 TransportController
-
-- Maintains global cycle timing
-- Emits:
-  - onCycleStart
-  - onBeat
+source.start(startTime, offset)  
+source.loop = true  
 
 ---
 
-## 9. UI Design (Mobile First)
+### 6.4 Effects
 
-[ Top Bar ]
-- Session ID
-- Share Button
-- BPM Control
-
-[ Loop Canvas ]
-- Radial waveform rings
-
-[ Controls ]
-- Record
-- Synth
-- Add Beat
-
-[ Bottom Panel ]
-- Loop controls (selected loop)
+- Reverb (Convolver)  
+- Delay  
+- Filter  
+- Compressor  
 
 ---
 
-## 10. Loop Visualization
+## 7. Synth Engine
 
-### 10.1 Waveform Rings
+### 7.1 Features
 
-Each loop is rendered as:
-- Circular waveform
-- Radius based on length
-- Arranged in grid
-- Color per peer
-
-### 10.2 Playhead
-
-- Rotating dial (like a clock hand)
-
-angle = (currentTime % cycleDuration) / cycleDuration * 2π
-
-### 10.3 States
-
-- Muted → dimmed
-- Active → bright
-- Recording → pulsing glow
+- Oscillators: sine, square, saw, triangle  
+- ADSR envelope  
+- Filter  
+- LFO  
 
 ---
 
-## 11. UI Components
+### 7.2 Sequencer
 
-### 11.1 LoopWidget
-
-Responsibilities:
-- Render waveform ring
-- Handle touch interactions
-
-Interactions:
-- Tap → select loop
-- Double tap → mute/unmute
-- Drag → adjust gain
-- Pinch → speed control
+- 8–32 steps  
+- Quantized to cycle  
+- Velocity + pitch  
 
 ---
 
-### 11.2 RecorderWidget
+## 8. Drum Machine
 
-- Big circular record button
+- Grid pads (4x4 / 4x8)  
+- Kick, Snare, Hi-hat, Percussion  
+- Swing, velocity, chaining  
+
+---
+
+## 9. AI Engine
+
+### Capabilities
+
+- Beat generation  
+- Bassline suggestions  
+- Chord progression loops  
+
+### Modes
+
+- Local  
+- Remote  
+
+### Inputs
+
+- BPM  
+- Active loops  
+- Genre  
+
+### Outputs
+
+- MIDI  
+- Audio loops  
+
+---
+
+## 10. Transport Controller
+
+- Cycle timing  
+- onCycleStart  
+- onBeat  
+
+Drift correction:
+
+offset += (remotePhase - localPhase) * smoothingFactor  
+
+---
+
+## 11. UI System
+
+Top Bar: Session / Share / BPM  
+Main: Radial + Clip grid  
+Bottom: Loop inspector  
+
+---
+
+## 12. Visualization
+
+- Waveform rings  
+- Radius = loop length  
+- Color = peer  
+
+Playhead:
+
+angle = phase * 2π  
 
 States:
-- Idle
-- Counting (pre-roll)
-- Recording
-- Finalizing
+
+- Recording (pulse)  
+- Muted (dim)  
+- Active (bright)  
 
 ---
 
-### 11.3 SynthWidget
+## 13. Clip Launcher
 
-Simple synth:
-- Oscillator types: sine, square, saw
-- Step sequencer (8–16 steps)
-- Quantized to loop cycle
+- Grid layout  
+- Quantized triggering  
 
 ---
 
-### 11.4 Beat Maker
+## 14. Interaction Model
 
-- Grid-based drum sequencer
-- Preloaded samples (kick, snare, hat)
-- Syncs to BPM
+Tap → select  
+Double tap → mute  
+Drag → gain  
+Pinch → speed  
+Long press → delete  
 
----
+Recording:
 
-## 12. Interaction Model
-
-### 12.1 Recording Flow
-
-1. Tap record
-2. Pre-roll countdown (1 bar)
-3. Record starts at cycle boundary
-4. Recording auto-stops at loop end
-5. Loop is created + broadcast
-
-### 12.2 Loop Editing
-
-- Mute toggle
-- Speed:
-  - 0.5x
-  - 1x
-  - 2x
-- Gain slider
+1. Tap  
+2. Pre-roll  
+3. Record  
+4. Stop  
+5. Broadcast  
 
 ---
 
-## 13. Network Activity Visualization
+## 15. Loop Inspector
 
-- Subtle pulses on loop rings when:
-  - Data received
-  - Loop updated
-
-- Peer indicators:
-  - Colored dots
-  - Connection strength
+- Mute  
+- Gain  
+- Speed  
+- FX  
 
 ---
 
-## 14. Studio Concerns
+## 16. Network Visualization
 
-### 14.1 Latency
-
-- Hidden via cycle scheduling
-- No attempt at real-time streaming sync
-
-### 14.2 Drift
-
-- Periodic re-alignment:
-
-adjust localCycleStart slightly
-
-### 14.3 Audio Quality
-
-Tradeoff:
-- Smaller buffers → faster sync
-- Larger buffers → better quality
+- Pulses on updates  
+- Peer indicators  
 
 ---
 
-## 15. Persistence
+## 17. Persistence
 
-- Save loops in IndexedDB
-- Restore session on reload
-- Option:
-  - Export session JSON
+IndexedDB:
 
----
+- Loops  
+- Metadata  
 
-## 16. Performance Considerations
+Restore:
 
-- Limit:
-  - Max loops: ~16
-  - Buffer length: <10s
+- Decode  
+- Reschedule  
 
-- Use:
-  - OffscreenCanvas (if available)
-  - AudioWorklets instead of ScriptProcessor
+Export:
+
+session.json  
 
 ---
 
-## 17. Future Enhancements
+## 18. Performance
 
-- AI-assisted beat generation
-- MIDI device support
-- Loop effects (reverb, delay)
-- Cloud relay fallback
+- Max ~16 loops  
+- Max 8 bars  
+- <10s buffers  
 
----
+Optimizations:
 
-## 18. Summary
-
-Loopify combines:
-- A latency-resilient loop protocol
-- A robust P2P mesh network
-- A playful, tactile UI
-
-The result is a system where:
-- Recording is immediate
-- Sharing is effortless (URL-based)
-- Collaboration feels musical, not technical
+- OffscreenCanvas  
+- AudioWorklets  
+- Lazy decode  
 
 ---
 
-## 19. Implementation Priorities
+## 19. Security
 
-1. Core audio loop engine
-2. Cycle synchronization
-3. WebRTC P2P layer
-4. Loop visualization
-5. Recording pipeline
-6. Sharing via URL
-7. UI polish and gestures
+- No raw mic streaming  
+- Isolation  
+- Optional encryption  
 
 ---
 
-End of specification.
+## 20. Failure Handling
+
+- Peer drop handling  
+- Retransmission  
+- Drift smoothing  
+
+---
+
+## 21. Future Extensions
+
+- MIDI  
+- Cloud sync  
+- Timeline  
+- Plugins  
+- Spatial audio  
+
+---
+
+## 22. Implementation Phases
+
+1. Audio engine  
+2. Recording + viz  
+3. WebRTC  
+4. LEP  
+5. UI gestures  
+6. Synth/drums  
+7. AI  
+
+---
+
+## 23. Summary
+
+Loopify v2 is a distributed music system using loop-based synchronization instead of fragile real-time streaming.
+
+It delivers:
+
+- P2P collaboration  
+- Deterministic timing  
+- Modular audio tools  
+- Gesture-first UX  
+- AI-assisted creativity  
+
+Result: fast, resilient, musical collaboration in the browser.

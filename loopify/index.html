@@ -1,169 +1,300 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Loopify Prototype</title>
-  <style>
-    body { font-family: sans-serif; background: #111; color: #eee; }
-    button, input { margin: 5px; padding: 8px; }
-    #log { height: 150px; overflow: auto; background: #222; padding: 5px; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Loopify</title>
+<style>
+  body {
+    margin: 0;
+    font-family: system-ui;
+    background: #0f0f14;
+    color: #fff;
+  }
+
+  header {
+    padding: 10px;
+    text-align: center;
+    font-weight: bold;
+    background: #1b1b24;
+  }
+
+  #studio {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    padding: 10px;
+  }
+
+  .loop {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: #181822;
+    border: 2px solid #333;
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  .controls {
+    position: absolute;
+    bottom: -40px;
+    width: 100%;
+    text-align: center;
+  }
+
+  button {
+    background: #2c2c3a;
+    color: white;
+    border: none;
+    padding: 6px 8px;
+    margin: 2px;
+    border-radius: 6px;
+  }
+
+  #network {
+    padding: 10px;
+    font-size: 12px;
+    background: #111;
+  }
+
+  #actions {
+    display: flex;
+    justify-content: space-around;
+    padding: 10px;
+  }
+</style>
 </head>
+
 <body>
 
-<h2>🎧 Loopify (Prototype)</h2>
+<header>Loopify</header>
 
-<button onclick="createSession()">Create Station</button>
-<button onclick="joinSession()">Join Station</button>
+<div id="actions">
+  <button onclick="startMic()">🎤 Record</button>
+  <button onclick="addSynth()">🎹 Synth Loop</button>
+</div>
 
-<br/>
-<textarea id="signal" placeholder="Paste signal here"></textarea><br/>
-<button onclick="copySignal()">Copy Signal</button>
+<div id="studio"></div>
 
-<h3>🎤 Mic</h3>
-<button onclick="startMic()">Start Mic Loop</button>
-
-<h3>🎹 Synth</h3>
-<button onclick="playTone()">Play Tone Loop</button>
-
-<h3>📡 Stations</h3>
-<div id="stations"></div>
-
-<h3>📜 Log</h3>
-<div id="log"></div>
+<div id="network">
+  <b>Network:</b>
+  <div id="log"></div>
+</div>
 
 <script>
-let pc;
-let dc;
-let isHost = false;
+// ---------------- AUDIO ENGINE ----------------
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-let loops = [];
+let globalStart = audioCtx.currentTime;
+let loopLength = 2; // seconds
 
-function log(msg) {
-  document.getElementById("log").innerHTML += msg + "<br/>";
+function nowLoopTime() {
+  let t = audioCtx.currentTime - globalStart;
+  return t % loopLength;
 }
 
-function createSession() {
-  isHost = true;
-  pc = new RTCPeerConnection();
+// ---------------- LOOP CLASS ----------------
 
-  dc = pc.createDataChannel("loops");
-  setupDataChannel();
+class Loop {
+  constructor(buffer) {
+    this.buffer = buffer;
+    this.speed = 1;
+    this.muted = false;
+    this.id = Math.random().toString(36).slice(2);
 
-  pc.onicecandidate = e => {
-    if (!e.candidate) {
-      document.getElementById("signal").value =
-        JSON.stringify(pc.localDescription);
+    this.canvas = document.createElement("canvas");
+    this.ctx = this.canvas.getContext("2d");
+
+    this.el = document.createElement("div");
+    this.el.className = "loop";
+    this.el.appendChild(this.canvas);
+
+    this.controls = document.createElement("div");
+    this.controls.className = "controls";
+    this.controls.innerHTML = `
+      <button onclick="loops['${this.id}'].toggleMute()">M</button>
+      <button onclick="loops['${this.id}'].double()">2x</button>
+      <button onclick="loops['${this.id}'].half()">½</button>
+    `;
+    this.el.appendChild(this.controls);
+
+    document.getElementById("studio").appendChild(this.el);
+
+    this.draw();
+    this.schedule();
+  }
+
+  schedule() {
+    if (this.source) this.source.stop();
+
+    this.source = audioCtx.createBufferSource();
+    this.source.buffer = this.buffer;
+    this.source.loop = true;
+    this.source.playbackRate.value = this.speed;
+
+    this.gain = audioCtx.createGain();
+    this.source.connect(this.gain).connect(audioCtx.destination);
+
+    this.gain.gain.value = this.muted ? 0 : 1;
+
+    this.source.start();
+  }
+
+  toggleMute() {
+    this.muted = !this.muted;
+    this.gain.gain.value = this.muted ? 0 : 1;
+  }
+
+  double() {
+    this.speed *= 2;
+    this.schedule();
+  }
+
+  half() {
+    this.speed *= 0.5;
+    this.schedule();
+  }
+
+  draw() {
+    const ctx = this.ctx;
+    const w = this.canvas.width = this.canvas.clientWidth;
+    const h = this.canvas.height = this.canvas.clientHeight;
+
+    ctx.clearRect(0,0,w,h);
+
+    // waveform ring
+    const data = this.buffer.getChannelData(0);
+    const step = Math.floor(data.length / 100);
+
+    ctx.strokeStyle = "#4af";
+    ctx.beginPath();
+
+    for (let i = 0; i < 100; i++) {
+      let v = data[i * step];
+      let angle = (i / 100) * Math.PI * 2;
+      let r = (w/2) * (0.7 + v * 0.2);
+
+      let x = w/2 + Math.cos(angle) * r;
+      let y = h/2 + Math.sin(angle) * r;
+
+      if (i === 0) ctx.moveTo(x,y);
+      else ctx.lineTo(x,y);
     }
-  };
 
-  pc.createOffer().then(o => pc.setLocalDescription(o));
-  log("📡 Station created. Share signal.");
-}
+    ctx.closePath();
+    ctx.stroke();
 
-function joinSession() {
-  isHost = false;
-  pc = new RTCPeerConnection();
+    // playhead
+    let t = nowLoopTime() / loopLength;
+    let angle = t * Math.PI * 2;
 
-  pc.ondatachannel = e => {
-    dc = e.channel;
-    setupDataChannel();
-  };
+    ctx.strokeStyle = "#fff";
+    ctx.beginPath();
+    ctx.moveTo(w/2, h/2);
+    ctx.lineTo(
+      w/2 + Math.cos(angle) * w/2,
+      h/2 + Math.sin(angle) * h/2
+    );
+    ctx.stroke();
 
-  pc.onicecandidate = e => {
-    if (!e.candidate) {
-      document.getElementById("signal").value =
-        JSON.stringify(pc.localDescription);
-    }
-  };
-
-  const offer = JSON.parse(document.getElementById("signal").value);
-  pc.setRemoteDescription(offer)
-    .then(() => pc.createAnswer())
-    .then(a => pc.setLocalDescription(a));
-
-  log("🎧 Joined station.");
-}
-
-function copySignal() {
-  navigator.clipboard.writeText(document.getElementById("signal").value);
-}
-
-function setupDataChannel() {
-  dc.onmessage = e => {
-    const loop = JSON.parse(e.data);
-    scheduleLoop(loop);
-    log("🔁 Loop received");
-  };
-}
-
-function sendLoop(loop) {
-  if (dc && dc.readyState === "open") {
-    dc.send(JSON.stringify(loop));
+    requestAnimationFrame(() => this.draw());
   }
 }
 
-function getQuantizedTime() {
-  const now = audioCtx.currentTime;
-  const bpm = 100;
-  const beat = 60 / bpm;
-  return Math.ceil(now / (beat * 4)) * (beat * 4);
-}
+const loops = {};
 
-function scheduleLoop(loop) {
-  const start = getQuantizedTime() + 0.1;
-
-  const source = audioCtx.createBufferSource();
-  source.buffer = loop.buffer;
-  source.loop = true;
-  source.connect(audioCtx.destination);
-  source.start(start);
-}
+// ---------------- MIC RECORDING ----------------
 
 async function startMic() {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const input = audioCtx.createMediaStreamSource(stream);
-
-  const recorder = audioCtx.createScriptProcessor(4096, 1, 1);
-  input.connect(recorder);
-  recorder.connect(audioCtx.destination);
-
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  const recorder = new MediaRecorder(stream);
   let chunks = [];
 
-  recorder.onaudioprocess = e => {
-    chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
-    if (chunks.length > 20) {
-      const buffer = audioCtx.createBuffer(1, 4096 * chunks.length, audioCtx.sampleRate);
-      const data = buffer.getChannelData(0);
+  recorder.ondataavailable = e => chunks.push(e.data);
 
-      chunks.forEach((c, i) => data.set(c, i * 4096));
+  recorder.onstop = async () => {
+    const blob = new Blob(chunks);
+    const arrayBuffer = await blob.arrayBuffer();
+    const buffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-      const loop = { buffer };
-      scheduleLoop(loop);
-      sendLoop(loop);
+    let loop = new Loop(buffer);
+    loops[loop.id] = loop;
 
-      chunks = [];
-    }
+    broadcastLoop(buffer);
   };
 
-  log("🎤 Mic looping started");
+  recorder.start();
+  setTimeout(()=>recorder.stop(), loopLength * 1000);
 }
 
-function playTone() {
-  const length = audioCtx.sampleRate * 2;
-  const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+// ---------------- SYNTH ----------------
+
+function addSynth() {
+  const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * loopLength, audioCtx.sampleRate);
   const data = buffer.getChannelData(0);
 
-  for (let i = 0; i < length; i++) {
-    data[i] = Math.sin(i * 0.01);
+  for (let i = 0; i < data.length; i++) {
+    let t = i / audioCtx.sampleRate;
+    let beat = Math.floor(t * 4);
+
+    if (beat % 2 === 0) {
+      data[i] = Math.sin(t * 440 * Math.PI * 2) * 0.3;
+    }
   }
 
-  const loop = { buffer };
-  scheduleLoop(loop);
-  sendLoop(loop);
+  let loop = new Loop(buffer);
+  loops[loop.id] = loop;
 
-  log("🎹 Tone loop sent");
+  broadcastLoop(buffer);
 }
+
+// ---------------- P2P LAYER ----------------
+
+// NOTE: Simplified signaling via broadcast channel (same tab origin)
+// Replace with WebSocket signaling server for real-world use
+
+const channel = new BroadcastChannel("loopify");
+
+channel.onmessage = async (msg) => {
+  log("Received loop from peer");
+
+  const arrayBuffer = msg.data;
+  const buffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+  let loop = new Loop(buffer);
+  loops[loop.id] = loop;
+};
+
+function broadcastLoop(buffer) {
+  buffer.copyFromChannel(buffer.getChannelData(0), 0);
+
+  audioCtx.decodeAudioData(
+    buffer.getChannelData(0).buffer.slice(0),
+    (decoded) => {}
+  );
+
+  channel.postMessage(buffer.getChannelData(0).buffer);
+  log("Sent loop to peers");
+}
+
+// ---------------- NETWORK UI ----------------
+
+function log(msg) {
+  const el = document.getElementById("log");
+  const div = document.createElement("div");
+  div.textContent = msg;
+  el.prepend(div);
+}
+
+// ---------------- START ----------------
+
+log("Loopify ready");
 </script>
 
 </body>

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>BetterDispute</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      background: #0f0f12;
+      color: #eaeaea;
+    }
+
+    header {
+      padding: 12px 16px;
+      background: #1a1a22;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #app {
+      padding: 16px;
+    }
+
+    .card {
+      background: #1b1b25;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .muted {
+      color: #999;
+      font-size: 12px;
+    }
+
+    button {
+      background: #2d6cdf;
+      color: white;
+      border: none;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    textarea {
+      width: 100%;
+      height: 80px;
+      margin-top: 8px;
+      background: #111;
+      color: white;
+      border: 1px solid #333;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <div><strong>BetterDispute</strong></div>
+  <div class="muted" id="versionTag">loading...</div>
+</header>
+
+<div id="app"></div>
+
+<script>
+/* =========================
+   VERSION LOADER
+========================= */
+
+const VERSION_FILE = "/versions/bd-v1.html";
+
+async function loadLatestVersion() {
+  // In future: this can scan /versions/ or a manifest
+  try {
+    const res = await fetch(VERSION_FILE);
+    if (!res.ok) throw new Error("Version load failed");
+    const html = await res.text();
+    document.getElementById("app").innerHTML = html;
+  } catch (e) {
+    console.warn("Falling back to runtime app:", e);
+    App.init();
+  }
+}
+
+/* =========================
+   GITHUB API LAYER (stubbed)
+========================= */
+
+const GitHub = {
+  token: null,
+  repo: "maneatsbible/BetterDispute",
+
+  async request(path, method = "GET", body = null) {
+    if (!this.token) {
+      console.warn("No GitHub token set");
+    }
+
+    const res = await fetch(`https://api.github.com/repos/${this.repo}${path}`, {
+      method,
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Authorization": this.token ? `Bearer ${this.token}` : ""
+      },
+      body: body ? JSON.stringify(body) : null
+    });
+
+    return res.json();
+  },
+
+  async createIssue(data) {
+    return this.request("/issues", "POST", data);
+  },
+
+  async listIssues(label) {
+    return this.request(`/issues?labels=${label}`);
+  }
+};
+
+/* =========================
+   MODEL (Graph)
+========================= */
+
+const Model = {
+  nodes: [],
+
+  load(rawIssues) {
+    this.nodes = rawIssues
+      .map(parseIssue)
+      .filter(Boolean);
+  }
+};
+
+function parseIssue(issue) {
+  try {
+    const jsonStart = issue.body.indexOf("{");
+    const jsonEnd = issue.body.indexOf("}") + 1;
+    const meta = JSON.parse(issue.body.slice(jsonStart, jsonEnd));
+
+    // VALIDATION (light enforcement here, heavy in controller)
+    return {
+      id: issue.number,
+      title: issue.title,
+      body: issue.body,
+      type: meta.bd.type,
+      rootId: meta.bd.rootId,
+      parentId: meta.bd.parentId,
+      author: meta.bd.author,
+      opponent: meta.bd.opponent,
+      raw: issue
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+/* =========================
+   CONTROLLER (AUTHORITY LAYER)
+========================= */
+
+const Controller = {
+
+  canChallenge(user, node) {
+    if (node.author === user) return false;
+    return node.type !== "answer";
+  },
+
+  canAnswer(user, node) {
+    return node.type === "challenge" && node.opponent === user;
+  },
+
+  createChallenge(parent, user, text) {
+    if (!this.canChallenge(user, parent)) {
+      throw new Error("Invalid challenge");
+    }
+
+    return this.buildIssue("challenge", parent, user, text);
+  },
+
+  createAnswer(parent, user, text) {
+    if (!this.canAnswer(user, parent)) {
+      throw new Error("Invalid answer");
+    }
+
+    return this.buildIssue("answer", parent, user, text);
+  },
+
+  buildIssue(type, parent, user, text) {
+    const rootId = parent.rootId || parent.id;
+
+    const users = [parent.author, parent.opponent || user]
+      .filter(Boolean)
+      .sort();
+
+    return {
+      title: `[BD][${type.toUpperCase()}][R:${rootId}][P:${parent.id}] ${text.slice(0, 40)}`,
+      body: JSON.stringify({
+        bd: {
+          type,
+          rootId,
+          parentId: parent.id,
+          author: user,
+          opponent: parent.author,
+          createdAt: new Date().toISOString(),
+          version: 1
+        }
+      }, null, 2) + "\n\n---\n" + text,
+
+      labels: [
+        "bd-post",
+        `bd-type:${type}`,
+        `bd-root:${rootId}`,
+        `bd-parent:${parent.id}`,
+        `bd-users:${users.join("|")}`
+      ]
+    };
+  }
+};
+
+/* =========================
+   VIEW
+========================= */
+
+const View = {
+  render(nodes) {
+    const app = document.getElementById("app");
+    app.innerHTML = "";
+
+    nodes.forEach(n => {
+      const el = document.createElement("div");
+      el.className = "card";
+
+      el.innerHTML = `
+        <div><strong>${n.type.toUpperCase()}</strong> #${n.id}</div>
+        <div class="muted">root: ${n.rootId} | parent: ${n.parentId}</div>
+        <div>${n.title}</div>
+      `;
+
+      el.onclick = () => {
+        App.openNode(n);
+      };
+
+      app.appendChild(el);
+    });
+  },
+
+  composer(parent, user) {
+    const app = document.getElementById("app");
+
+    const wrap = document.createElement("div");
+    wrap.className = "card";
+
+    wrap.innerHTML = `
+      <div><strong>Responding</strong> to #${parent.id}</div>
+      <textarea id="txt"></textarea>
+      <button id="submit">Submit</button>
+    `;
+
+    wrap.querySelector("#submit").onclick = async () => {
+      const text = wrap.querySelector("#txt").value;
+
+      let issue;
+      if (parent.type === "challenge") {
+        issue = Controller.createAnswer(parent, user, text);
+      } else {
+        issue = Controller.createChallenge(parent, user, text);
+      }
+
+      console.log("Would submit:", issue);
+
+      alert("Action created (stub). Check console.");
+    };
+
+    app.innerHTML = "";
+    app.appendChild(wrap);
+  }
+};
+
+/* =========================
+   APP
+========================= */
+
+const App = {
+
+  currentUser: "alice",
+
+  init() {
+    document.getElementById("versionTag").innerText = "v1-runtime";
+
+    // demo seed (replace with GitHub fetch)
+    Model.load([]);
+
+    View.render(Model.nodes);
+  },
+
+  openNode(node) {
+    View.composer(node, this.currentUser);
+  }
+};
+
+/* =========================
+   BOOT
+========================= */
+
+loadLatestVersion();
+</script>
+
+</body>
+</html>

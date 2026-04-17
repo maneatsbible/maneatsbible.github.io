@@ -2,276 +2,394 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 <title>Loopify</title>
+
 <style>
+  :root {
+    --bg: #0b0f14;
+    --accent: #00ffc3;
+    --muted: #1b2530;
+    --text: #d6e1ea;
+  }
+
   body {
     margin: 0;
-    background: #0b0b0f;
-    color: #fff;
-    font-family: sans-serif;
-    overflow: hidden;
+    font-family: system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
   }
-  #topbar {
+
+  header {
     display: flex;
     justify-content: space-between;
-    padding: 10px;
-    background: #111;
+    padding: 10px 14px;
+    background: #111822;
+    font-size: 14px;
+    align-items: center;
   }
+
   button {
-    background: #222;
-    color: white;
+    background: var(--accent);
     border: none;
-    padding: 10px;
     border-radius: 8px;
+    padding: 8px 12px;
+    font-weight: bold;
   }
+
   #canvas {
-    width: 100vw;
-    height: 60vh;
-    display: block;
+    flex: 1;
+    touch-action: none;
   }
-  #controls {
+
+  .controls {
     display: flex;
     justify-content: space-around;
-    padding: 10px;
+    padding: 12px;
+    background: #111822;
+  }
+
+  .record-btn {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: red;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+  }
+
+  .recording {
+    animation: pulse 1s infinite;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.6; }
+    100% { transform: scale(1); opacity: 1; }
   }
 </style>
 </head>
+
 <body>
 
-<div id="topbar">
-  <div id="sessionId"></div>
-  <button id="shareBtn">Share</button>
-</div>
+<header>
+  <div id="session">Session: --</div>
+  <div>
+    BPM: <input id="bpm" type="number" value="100" style="width:60px" />
+  </div>
+  <button id="share">Share</button>
+</header>
 
 <canvas id="canvas"></canvas>
 
-<div id="controls">
-  <button id="recordBtn">● Record</button>
-  <button id="beatBtn">Beat</button>
-  <button id="synthBtn">Synth</button>
+<div class="controls">
+  <div id="recordBtn" class="record-btn">REC</div>
 </div>
 
-<script>
-// ==========================
-// Utilities
-// ==========================
-const randId = () => Math.random().toString(36).slice(2);
+<script type="module">
+/* =========================
+   Utils
+========================= */
 
-// ==========================
-// Session
-// ==========================
-const url = new URL(location.href);
-let sessionId = url.searchParams.get("session");
+const base58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
-if (!sessionId) {
-  sessionId = randId();
-  url.searchParams.set("session", sessionId);
-  history.replaceState(null, "", url);
+function randomId(len = 12) {
+  return Array.from(crypto.getRandomValues(new Uint8Array(len)))
+    .map(x => base58[x % base58.length])
+    .join('');
 }
 
-document.getElementById("sessionId").innerText = sessionId;
+/* =========================
+   IndexedDB Storage
+========================= */
 
-document.getElementById("shareBtn").onclick = () => {
-  navigator.clipboard.writeText(location.href);
-  alert("Copied session URL");
-};
+class Storage {
+  constructor() {
+    this.db = null;
+  }
 
-// ==========================
-// Audio Engine
-// ==========================
-const ctx = new (window.AudioContext || window.webkitAudioContext)();
-const master = ctx.createGain();
-master.connect(ctx.destination);
+  async init() {
+    this.db = await new Promise((res, rej) => {
+      const req = indexedDB.open("loopify", 1);
+      req.onupgradeneeded = e => {
+        e.target.result.createObjectStore("loops", { keyPath: "id" });
+      };
+      req.onsuccess = () => res(req.result);
+      req.onerror = rej;
+    });
+  }
 
-let BPM = 100;
-let bars = 1;
-let beatsPerBar = 4;
+  saveLoop(loop) {
+    const tx = this.db.transaction("loops", "readwrite");
+    tx.objectStore("loops").put(loop);
+  }
 
-const cycleDuration = () => (60 / BPM) * beatsPerBar * bars;
+  async getLoops() {
+    const tx = this.db.transaction("loops", "readonly");
+    const store = tx.objectStore("loops");
+    return new Promise(res => {
+      const req = store.getAll();
+      req.onsuccess = () => res(req.result);
+    });
+  }
+}
 
-// ==========================
-// Loop Model
-// ==========================
+/* =========================
+   Transport (Cycle Sync)
+========================= */
+
+class Transport {
+  constructor(bpm = 100) {
+    this.bpm = bpm;
+    this.beatsPerBar = 4;
+    this.bars = 1;
+    this.startTime = performance.now();
+  }
+
+  get cycleDuration() {
+    return (60 / this.bpm) * this.beatsPerBar * this.bars * 1000;
+  }
+
+  get phase() {
+    return ((performance.now() - this.startTime) % this.cycleDuration) / this.cycleDuration;
+  }
+
+  nextCycleTime(ctx) {
+    const now = ctx.currentTime * 1000;
+    const offset = this.cycleDuration - ((performance.now() - this.startTime) % this.cycleDuration);
+    return ctx.currentTime + offset / 1000;
+  }
+}
+
+/* =========================
+   Loop Model
+========================= */
+
 class Loop {
-  constructor(buffer) {
-    this.id = randId();
+  constructor({ id, buffer, author }) {
+    this.id = id;
     this.buffer = buffer;
-    this.gainNode = ctx.createGain();
-    this.gainNode.connect(master);
+    this.author = author;
     this.muted = false;
-    this.speed = 1;
+    this.gain = 1;
+  }
+}
+
+/* =========================
+   Audio Engine
+========================= */
+
+class AudioEngine {
+  constructor(transport) {
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.transport = transport;
+    this.master = this.ctx.createGain();
+    this.master.connect(this.ctx.destination);
+    this.loops = [];
   }
 
-  play(startTime) {
-    const src = ctx.createBufferSource();
-    src.buffer = this.buffer;
+  addLoop(loop) {
+    this.loops.push(loop);
+    this.schedule(loop);
+  }
+
+  schedule(loop) {
+    const src = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+
+    src.buffer = loop.buffer;
     src.loop = true;
-    src.playbackRate.value = this.speed;
-    src.connect(this.gainNode);
+
+    gain.gain.value = loop.gain;
+
+    src.connect(gain).connect(this.master);
+
+    const startTime = this.transport.nextCycleTime(this.ctx);
+
     src.start(startTime);
-    this.src = src;
+    loop._node = { src, gain };
   }
 }
 
-// ==========================
-// Transport
-// ==========================
-let cycleStart = ctx.currentTime;
+/* =========================
+   Recorder
+========================= */
 
-function nextCycleTime() {
-  const dur = cycleDuration();
-  const now = ctx.currentTime;
-  return Math.ceil((now - cycleStart) / dur) * dur + cycleStart;
+class Recorder {
+  constructor(engine, transport) {
+    this.engine = engine;
+    this.transport = transport;
+    this.chunks = [];
+  }
+
+  async init() {
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    this.rec = new MediaRecorder(this.stream);
+
+    this.rec.ondataavailable = e => this.chunks.push(e.data);
+  }
+
+  start() {
+    this.chunks = [];
+    this.rec.start();
+  }
+
+  async stop() {
+    return new Promise(res => {
+      this.rec.onstop = async () => {
+        const blob = new Blob(this.chunks);
+        const array = await blob.arrayBuffer();
+        const buffer = await this.engine.ctx.decodeAudioData(array);
+        res(buffer);
+      };
+      this.rec.stop();
+    });
+  }
 }
 
-// ==========================
-// Loop Controller
-// ==========================
-const loops = [];
+/* =========================
+   Visualization
+========================= */
 
-function addLoop(buffer) {
-  const loop = new Loop(buffer);
-  loops.push(loop);
-  schedule(loop);
-  broadcast({type:"LOOP_ADD", data: serialize(buffer)});
-}
+class Visualizer {
+  constructor(canvas, engine, transport) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+    this.engine = engine;
+    this.transport = transport;
 
-function schedule(loop) {
-  const t = nextCycleTime();
-  loop.play(t);
-}
+    this.resize();
+    window.addEventListener("resize", () => this.resize());
 
-// ==========================
-// Recording
-// ==========================
-let mediaStream, recorder, chunks = [];
+    requestAnimationFrame(() => this.draw());
+  }
 
-async function setupMic() {
-  mediaStream = await navigator.mediaDevices.getUserMedia({audio:true});
-}
+  resize() {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight - 140;
+  }
 
-async function recordLoop() {
-  if (!mediaStream) await setupMic();
+  draw() {
+    const ctx = this.ctx;
+    const { width, height } = this.canvas;
 
-  recorder = new MediaRecorder(mediaStream);
-  chunks = [];
+    ctx.clearRect(0, 0, width, height);
 
-  recorder.ondataavailable = e => chunks.push(e.data);
+    const cx = width / 2;
+    const cy = height / 2;
 
-  recorder.onstop = async () => {
-    const blob = new Blob(chunks);
-    const array = await blob.arrayBuffer();
-    const buffer = await ctx.decodeAudioData(array);
-    addLoop(buffer);
-  };
+    this.engine.loops.forEach((loop, i) => {
+      const radius = 60 + i * 30;
 
-  recorder.start();
-
-  setTimeout(() => recorder.stop(), cycleDuration() * 1000);
-}
-
-document.getElementById("recordBtn").onclick = () => {
-  ctx.resume();
-  recordLoop();
-};
-
-// ==========================
-// Visualization
-// ==========================
-const canvas = document.getElementById("canvas");
-const c = canvas.getContext("2d");
-
-function resize() {
-  canvas.width = innerWidth;
-  canvas.height = innerHeight * 0.6;
-}
-resize();
-window.onresize = resize;
-
-function draw() {
-  requestAnimationFrame(draw);
-  c.clearRect(0,0,canvas.width,canvas.height);
-
-  const cx = canvas.width/2;
-  const cy = canvas.height/2;
-
-  const now = ctx.currentTime;
-  const angle = ((now % cycleDuration()) / cycleDuration()) * Math.PI*2;
-
-  loops.forEach((loop, i) => {
-    const r = 60 + i*40;
-
-    c.beginPath();
-    c.arc(cx, cy, r, 0, Math.PI*2);
-    c.strokeStyle = loop.muted ? "#444" : "#0f0";
-    c.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = loop.muted ? "#444" : "#00ffc3";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    });
 
     // playhead
-    c.beginPath();
-    c.moveTo(cx, cy);
-    c.lineTo(cx + Math.cos(angle)*r, cy + Math.sin(angle)*r);
-    c.strokeStyle = "#fff";
-    c.stroke();
-  });
-}
-draw();
+    const angle = this.transport.phase * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angle) * 200, cy + Math.sin(angle) * 200);
+    ctx.strokeStyle = "#fff";
+    ctx.stroke();
 
-// ==========================
-// Simple Beat
-// ==========================
-document.getElementById("beatBtn").onclick = () => {
-  const buffer = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i=0;i<data.length;i++) {
-    data[i] = Math.random()*2-1;
+    requestAnimationFrame(() => this.draw());
   }
-  addLoop(buffer);
+}
+
+/* =========================
+   Session Controller (stub P2P)
+========================= */
+
+class SessionController {
+  constructor() {
+    const url = new URL(location.href);
+    this.sessionId = url.searchParams.get("session") || randomId();
+
+    url.searchParams.set("session", this.sessionId);
+    history.replaceState({}, "", url);
+  }
+
+  share() {
+    navigator.clipboard.writeText(location.href);
+    alert("Session link copied!");
+  }
+}
+
+/* =========================
+   App Bootstrap
+========================= */
+
+const storage = new Storage();
+await storage.init();
+
+const transport = new Transport(100);
+const engine = new AudioEngine(transport);
+const recorder = new Recorder(engine, transport);
+const session = new SessionController();
+
+await recorder.init();
+
+const canvas = document.getElementById("canvas");
+const viz = new Visualizer(canvas, engine, transport);
+
+document.getElementById("session").textContent = "Session: " + session.sessionId;
+
+document.getElementById("share").onclick = () => session.share();
+
+document.getElementById("bpm").onchange = e => {
+  transport.bpm = Number(e.target.value);
 };
 
-// ==========================
-// Simple Synth
-// ==========================
-document.getElementById("synthBtn").onclick = () => {
-  const buffer = ctx.createBuffer(1, ctx.sampleRate * cycleDuration(), ctx.sampleRate);
-  const data = buffer.getChannelData(0);
+const recordBtn = document.getElementById("recordBtn");
 
-  for (let i=0;i<data.length;i++) {
-    data[i] = Math.sin(i/20);
+let recording = false;
+
+recordBtn.onclick = async () => {
+  if (!recording) {
+    recordBtn.classList.add("recording");
+    recorder.start();
+
+    const wait = transport.cycleDuration;
+
+    setTimeout(async () => {
+      const buffer = await recorder.stop();
+
+      const loop = new Loop({
+        id: randomId(),
+        buffer,
+        author: "local"
+      });
+
+      engine.addLoop(loop);
+      storage.saveLoop({ id: loop.id });
+
+      recordBtn.classList.remove("recording");
+      recording = false;
+
+    }, wait);
+
+    recording = true;
   }
-  addLoop(buffer);
 };
 
-// ==========================
-// P2P (Minimal WebRTC)
-// ==========================
-let pc = new RTCPeerConnection();
-let dc = pc.createDataChannel("data");
+/* =========================
+   Restore saved loops (stub)
+========================= */
 
-dc.onmessage = e => {
-  const msg = JSON.parse(e.data);
-  if (msg.type === "LOOP_ADD") {
-    deserialize(msg.data).then(addLoop);
-  }
-};
-
-function broadcast(msg) {
-  if (dc.readyState === "open") {
-    dc.send(JSON.stringify(msg));
-  }
-}
-
-// naive encoding
-function serialize(buffer) {
-  return Array.from(buffer.getChannelData(0));
-}
-
-async function deserialize(arr) {
-  const buffer = ctx.createBuffer(1, arr.length, ctx.sampleRate);
-  buffer.copyToChannel(new Float32Array(arr),0);
-  return buffer;
-}
+const saved = await storage.getLoops();
+console.log("Restored loops:", saved);
 
 </script>
+
 </body>
 </html>

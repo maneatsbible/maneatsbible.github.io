@@ -109,7 +109,7 @@ Unstructured disagreement in comments/threads often produces confusion and escal
 1. **Framework-free:** no external JS/CSS libraries.
 2. **Single-file deliverable:** one HTML containing CSS+JS for MVP.
 3. **Deterministic state reconstruction:** same inputs produce same state.
-4. **Performance:** initial render target <2s on typical broadband for small disputes.
+4. **Performance:** initial render target <2s on 25 Mbps down / 5 Mbps up connection for disputes up to 200 posts and 20 summary cards.
 5. **Resilience:** tolerate eventual consistency and partial GitHub fetch failures.
 6. **Accessibility:** keyboard focus states, semantic controls, readable contrast.
 7. **Auditability:** append-only writes; immutable history display.
@@ -193,7 +193,7 @@ To unblock implementation, this spec adopts the following defaults until product
 2. **Auth:** authenticated writes require user-supplied GitHub token in-session (temporary MVP compromise).
 3. **Read mode:** public read-only access without login.
 4. **Challenge uniqueness:** one challenge per person per target post for all time.
-5. **Crickets default:** 24h timeout if no agreed custom condition exists.
+5. **Crickets default:** 24h timeout if no agreed custom condition exists (placeholder baseline chosen to avoid immediate expiry across time zones; subject to product confirmation).
 6. **Terminal card:** non-clickable when root assertion has no challenges.
 7. **Join rule:** third party must explicitly agree with root assertion before answering linked challenges.
 8. **URL schema:** `?view=home|dispute&root=<id>&dispute=<id>&post=<id>`.

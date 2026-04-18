@@ -2,263 +2,246 @@
 
 ## 1) Document Control
 - **Product:** Better Dispute
-- **Version:** v0.1 (draft)
-- **Status:** Proposed
-- **Scope:** Browser-only vanilla JavaScript app in a single HTML file for initial production release
-- **Primary runtime:** Modern desktop/mobile browsers
+- **Version:** v0.2 (draft)
+- **Status:** Proposed for MVP
+- **Scope:** Single-file browser app (`HTML + CSS + JS`) with production-grade behavior
+- **Architecture:** Strict MVC (controller-authoritative)
+- **Storage:** GitHub users for identity, GitHub Issues as append-only event store
 
 ## 2) Problem Statement
-Unstructured disagreement in comments/threads often produces confusion and escalation instead of clarity. Better Dispute structures disagreement as a governed duel between two people, centered on clear challenges and explicit yes/no answers, with append-only records and shareable canonical URLs.
+Most online disagreement is unstructured and spirals into noise. Better Dispute structures disagreement into explicit, auditable, turn-based exchanges between people so claims, questions, and answers can be tracked and resolved.
 
-## 3) Goals
-1. Deliver a production-grade MVP in one HTML file (no external frameworks).
-2. Use GitHub identity + GitHub Issues as append-only storage.
-3. Enforce rules in controller only (strict MVC).
-4. Provide Home and Dispute views with turn-based duel UX.
-5. Make every post shareable via canonical URL.
-6. Support assertion/challenge/answer flow, objections, and dispute resolution offers.
+## 3) Objectives
+1. Deliver a production-quality MVP in one HTML file, no frameworks.
+2. Preserve immutable history through append-only issue events.
+3. Enforce all business rules in controller methods.
+4. Drive all UI state and controls from controller capability checks.
+5. Make every post shareable by canonical URL.
+6. Support duel-style dispute flow, including objections and crickets.
 
 ## 4) Non-Goals (MVP)
-1. Real-time websockets/push infrastructure.
-2. Multi-file frontend architecture (deferred until post-MVP).
+1. Multi-file frontend architecture.
+2. Real-time sockets/push infrastructure.
 3. Rich media beyond one optional image per post.
-4. Formal moderation/appeals system beyond basic abuse controls.
-5. Cryptographic proof beyond deterministic validation and GitHub timestamps.
+4. Full moderation platform (keep minimal guardrails only).
+5. Private/distributed tenancy beyond one public data repo.
 
 ## 5) Product Principles
-1. **Controller authority:** all eligibility and business rules are enforced before writes.
-2. **Dumb view:** view renders state and control availability only.
-3. **Append-only records:** immutable posts; corrections occur via new posts.
-4. **Explicit turn state:** users should always see whose move it is.
-5. **URL-first navigation:** app state is reproducible from URL params.
+1. **Controller is source of truth.**
+2. **View is dumb renderer.**
+3. **All writes are append-only events.**
+4. **Turn-state must always be obvious.**
+5. **URL must reconstruct app context.**
 
-## 6) Personas
-- **Disputer:** participates directly in a duel, challenges and answers.
-- **Observer:** reads disputes and may join by agreeing with an assertion.
-- **Strawman initiator:** starts top-level assertions as `@strawman`.
+## 6) Core Domain
 
-## 7) Core User Stories
-1. As a user, I can start a top-level assertion (text OR image).
-2. As a user, I can challenge another person’s post once per target post.
-3. As challenged user, I can answer with required Yes/No plus optional text.
-4. As answerer, I can counter-challenge in the same turn.
-5. As user, I can object to challenge form/validity.
-6. As user, I can open any post/dispute from canonical URL.
-7. As user, I can see “Your turn” and actionable controls.
-8. As user, I can copy canonical post URL from any post.
-9. As user, I can propose and negotiate crickets timeout conditions.
-10. As user, I can propose resolution offers as assertions.
+### 6.1 Person
+- GitHub-backed user identity.
+- Fields: `id`, `githubId`, `handle` (e.g., `@name`), `isSystem`.
+- `@strawman` is a reserved system person.
 
-## 8) Functional Requirements
+### 6.2 Post
+- Types: `Assertion`, `Challenge`, `Answer`.
+- Every post belongs to a rooted tree where root is an `Assertion`.
+- Top-level assertion content constraint: **text XOR image** (exactly one).
+- Non-root posts may include text and optional one image.
+- `Challenge` subtypes:
+  - `Interrogatory` (Yes/No)
+  - `Objection` (form/validity/relevance/leading/etc.)
+- `Answer` for `Interrogatory` requires `yesNo` plus optional text.
 
-### 8.1 Identity and Access
-- Users are GitHub users represented as `Person` with stable `id`, `@name`, `githubId`.
-- App supports authenticated actor context and unauthenticated read-only mode.
-- `@strawman` is system-defined and cannot authenticate.
+### 6.3 Dispute
+- First-class object created by a challenge between two people.
+- Unique `id`, participants, root assertion link, turn state, status.
+- Counter-challenge supports turn-based duel continuation.
+- Challenges inside disputes may spawn nested disputes.
 
-### 8.2 Post Types
-- `Assertion`, `Challenge`, `Answer`.
-- `Challenge` has subtype: `Interrogatory` (Y/N) or `Objection`.
-- `Answer` to interrogatory requires `yesNo` value; optional text.
+### 6.4 CricketsCondition
+- Negotiated timeout model for failure-to-answer outcomes.
+- States: `proposed`, `agreed`, `disputed`, `rejected`, `expired`.
 
-### 8.3 Tree and Dispute Model
-- Every post is a node in a tree rooted at an assertion.
-- A challenge creates or links to a first-class `Dispute` with two participants.
-- Dispute may spawn nested disputes when eligible third-party or branch challenges occur.
+## 7) Controller Contract (Authoritative)
+Controller methods (minimum):
+- `canChallenge(person, post)`
+- `canAnswer(person, challenge)`
+- `canDispute(person, post)`
+- `canAgree(person, assertion)`
+- `canProposeCrickets(person, dispute)`
+- `canResolve(person, dispute)`
 
-### 8.4 Controller Rules (authoritative)
-- No self-challenge.
-- A person may challenge a specific post at most once.
-- Only eligible target may answer a challenge.
-- Controls rendered disabled when disallowed (never hidden by permission).
-- Latest actionable post is highlighted.
-- View refreshes after successful write.
+Controller-enforced rules:
+1. No person may challenge their own post.
+2. A person may challenge a given post at most once (lifetime in MVP).
+3. Only the targeted person may answer a challenge.
+4. Controls are disabled if disallowed (not hidden).
+5. Latest actionable post is highlighted.
+6. Successful submit always refreshes state from source of truth.
 
-### 8.5 Home View
-- Header: home icon (balances), title, version.
-- New assertion composer: text, optional image, optional post-as-`@strawman`.
-- Summary cards for top-level assertions/disputes.
-- “Your turn” badges on cards with pending actor move.
-- Non-clickable terminal cards are visually subdued.
+## 8) View Contract (Dumb Rendering)
+1. View reads controller state only.
+2. View renders enabled/disabled controls from controller booleans.
+3. View never decides permissions.
+4. View never mutates model directly.
 
-### 8.6 Dispute View
-- Back navigation pops level to Home.
-- Parent chain shown with arrows.
-- Flattened duel projection of subtree.
-- Icons: Assertion `!`, Challenge `?`, Answer `✓`.
-- Single lane initially; switches to dual lane after first counter-challenge.
-- Inline slide-up composer for challenge/answer; per-post draft text preserved on cancel.
+## 9) UX Specification
 
-### 8.7 URL and Navigation
-- Canonical URL params must fully address a root assertion and optional dispute/post focus.
-- Deep links restore correct view and highlighted context.
-- Copy button returns canonical URL for the specific post.
+### 9.1 Global Shell
+- Dark theme with selective colorful accents.
+- Header: balances icon (home), “Better Dispute”, version (right).
 
-### 8.8 Notifications (MVP)
-- In-app notification center with unread indicators for:
+### 9.2 Home View
+- New top-level assertion composer:
+  - text input
+  - image input (URL for MVP)
+  - post-as-`@strawman` option
+- Summary cards of top-level assertions/disputes.
+- Cards are clickable like X-style thread cards.
+- “Your turn” badge where actor has pending move.
+- Terminal cards (no challenges) shown subtly as non-actionable.
+
+### 9.3 Dispute View
+- Back button pops one level at a time to Home.
+- Parent chain shown as arrows (no “lineage” label).
+- Flattened duel projection of relevant subtree.
+- Post icons: `!` assertion, `?` challenge, `✓` answer.
+- Visual depth via slight card stacking.
+- Challenge action opens inline slide-up composer.
+- Answer composer:
+  - required yes/no for interrogatory
+  - optional text
+  - optional counter-challenge field
+- First counter-challenge switches layout to two lanes:
+  - original lane left
+  - counter lane right
+  - chronologically interleaved entries
+- Show “Your turn” indicator.
+- Disable unavailable actions and highlight latest actionable post.
+
+### 9.4 Notifications
+- MVP in-app notifications:
   - “You were challenged”
   - “Your answer was challenged”
-- Home card badges indicate awaiting user move.
+- Home-level awaiting-move badges.
 
-### 8.9 Crickets
-- Disputers can propose countdown timeout conditions.
-- Conditions are challengeable/disputable.
-- Crickets event is surfaced prominently when timeout elapses without valid answer.
+## 10) URL & Routing Requirements
+Canonical query params (MVP):
+- `view=home|dispute`
+- `root=<rootAssertionId>`
+- `dispute=<disputeId>`
+- `post=<postId>`
 
-## 9) Non-Functional Requirements
-1. **Framework-free:** no external JS/CSS libraries.
-2. **Single-file deliverable:** one HTML containing CSS+JS for MVP.
-3. **Deterministic state reconstruction:** same inputs produce same state.
-4. **Performance:** initial render target <2s on 25 Mbps down / 5 Mbps up connection for disputes up to 200 posts and 20 summary cards.
-5. **Resilience:** tolerate eventual consistency and partial GitHub fetch failures.
-6. **Accessibility:** keyboard focus states, semantic controls, readable contrast.
-7. **Auditability:** append-only writes; immutable history display.
+Requirements:
+1. URL fully reconstructs current context.
+2. Every post has copy-canonical-URL action.
+3. Deep links work for internal/external sharing.
 
-## 10) Domain Model
+## 11) GitHub Storage Model (Append-Only)
+1. One dedicated public GitHub repository stores app data.
+2. Every event is a new GitHub issue (never mutate historical events for state transitions).
+3. Issue body contains canonical JSON payload + readable content.
+4. Labels index entity type and relational keys (root/dispute/parent/participants).
+5. Canonical ordering: issue number ascending, tie-break by event id.
+6. Invalid events are flagged by derived state, not deleted.
 
-### 10.1 Person
-- `id` (UUID)
-- `name` (`@handle`)
-- `githubId`
-- `isSystem` (for `@strawman`)
+## 12) Security, Safety, and Reliability
+1. Strict payload schema validation before writes.
+2. Escape/sanitize rendered content to prevent XSS.
+3. Constrain image sources and file characteristics.
+4. Keep auth token in memory only for MVP.
+5. Handle GitHub API errors, retries, and eventual consistency.
+6. Throttle write actions client-side to reduce abuse/rate-limit pressure.
 
-### 10.2 Post
-- `id` (UUID)
-- `type` (`assertion|challenge|answer`)
-- `challengeType` (`interrogatory|objection|null`)
-- `authorPersonId`
-- `targetPersonId` (required for challenge)
-- `rootAssertionId`
-- `parentPostId` (null only for top-level assertion)
-- `disputeId`
-- `text`
-- `imageUrl` (optional)
-- `yesNo` (`yes|no|null`)
-- `createdAt`
-- `status` (`active|superseded|resolved|invalid`)
+## 13) Clarifying Questions (to improve final product spec)
+1. Should there be one global dispute repo forever, or future multi-tenant repos?
+2. Is PAT-based in-browser auth acceptable for MVP, or do you want OAuth broker now?
+3. Should observers be allowed to challenge directly, or must they “agree” first?
+4. Do objections require categories, or free-form objection text only?
+5. What exact visual rule should define a “terminal” non-clickable summary card?
+6. Should challenge uniqueness reset after dispute resolution, or stay lifetime-unique?
+7. What is the default crickets duration if no agreement is reached?
+8. Should crickets countdown pause when GitHub API is unavailable?
+9. Are “resolution offers” a dedicated post subtype or assertions with a resolution flag?
+10. What minimum abuse controls are required at launch (report, mute, blocklist)?
 
-### 10.3 Dispute
-- `id` (UUID)
-- `rootAssertionId`
-- `participantA`, `participantB`
-- `state` (`open|resolved|crickets|closed`)
-- `activeChallengePostId`
-- `turnPersonId`
-- `createdAt`
+## 14) Integrated MVP Decisions (assumptions applied now)
+To unblock implementation, this draft integrates the following:
+1. **Data tenancy:** single dedicated public repo.
+2. **Auth:** in-session token for authenticated writes.
+3. **Read mode:** anonymous read-only allowed.
+4. **Challenge uniqueness:** lifetime one-per-person-per-target-post.
+5. **Join rule:** must agree with root assertion before answering linked challenges.
+6. **Terminal card rule:** root has no challenges.
+7. **Crickets default:** 24 hours when no agreed condition exists.
+8. **Objection model:** free-form text for MVP.
+9. **Image input:** URL-based only in MVP (upload flow deferred).
+10. **Notifications:** in-app only (no push/email).
 
-### 10.4 CricketsCondition
-- `id`
-- `disputeId`
-- `proposedBy`
-- `durationSeconds`
-- `status` (`proposed|agreed|disputed|rejected`)
+## 15) Acceptance Criteria (MVP)
+1. User can create root assertion with text XOR image.
+2. User cannot challenge own posts.
+3. Duplicate challenge by same person against same post is blocked.
+4. Interrogatory answer requires Yes/No.
+5. Counter-challenge can be submitted during answer flow.
+6. First counter-challenge flips dispute view to two-lane layout.
+7. “Your turn” indicators are correct on Home and Dispute views.
+8. Disallowed actions are rendered disabled, never silently hidden.
+9. Every post has working canonical URL copy action.
+10. Deep links reconstruct view/dispute/post focus after refresh.
+11. App runs from one HTML file with no external JS/CSS frameworks.
+12. Derived state remains deterministic after reload.
 
-## 11) GitHub Storage Specification (Append-Only)
-- Backend store: GitHub Issues in a dedicated repository.
-- Each post/dispute event persisted as a new issue.
-- Issue body stores canonical JSON payload + human-readable text block.
-- Labels index entity type and keys (e.g., root, dispute, parent, participants).
-- Canonical ordering uses GitHub issue number then entity id.
-- Never mutate prior issues for state changes; emit new event issue.
+## 16) Implementation Plan (Draft)
 
-## 12) Security & Abuse Constraints
-1. Reject malformed payloads in controller.
-2. Escape all rendered user content to prevent XSS.
-3. Validate and constrain image URLs.
-4. Minimize token exposure (memory-only session token, no localStorage for auth token).
-5. Rate-limit write attempts client-side.
-6. Mark invalid events without deleting them.
+### Phase 0 — Foundation & Contracts
+1. Define JSON schemas for `Person`, `Post`, `Dispute`, `CricketsCondition`, and event envelope.
+2. Define deterministic serializer/parser and validator utilities.
+3. Define controller action surface and state shape contract.
 
-## 13) UX Design Constraints
-- Dark theme baseline with selective accent colors.
-- Minimalist controls and icon-first actions.
-- Disabled state is visible and explainable (tooltip/hint).
-- Chronology is explicit and scannable in duel timeline.
+### Phase 1 — GitHub Data Integration
+1. Implement API wrapper for GitHub Issues list/search/create with pagination and retry.
+2. Implement in-memory auth session handling and token input UX.
+3. Implement event query layer for root assertions, disputes, and post chains.
 
-## 14) Clarifying Questions (Consultant Review)
-1. Should storage be in one global repo, one repo per community, or one repo per dispute domain?
-2. Must all dispute data be public, or do we require private repositories?
-3. What is the required identity flow for browser-only auth (PAT, OAuth app + backend broker, or GitHub App via companion service)?
-4. Are anonymous read-only users allowed for all public disputes?
-5. What are final canonical URL parameters and permanence guarantees?
-6. Is one challenge per person per post lifetime-only, or reset after resolution?
-7. How should third-party participants join a dispute after “agree with assertion”?
-8. What exact rules determine terminal non-clickable summary cards?
-9. What default crickets duration should apply before negotiated agreement?
-10. What abuse controls are mandatory at launch (blocklist, report, profanity filters)?
+### Phase 2 — Model Reconstruction & Rule Engine
+1. Reconstruct canonical model from append-only issue events.
+2. Implement authoritative controller checks (`canChallenge`, `canAnswer`, etc.).
+3. Enforce all action validations before any write.
 
-## 15) Integrated Improvements / Assumptions for MVP
-To unblock implementation, this spec adopts the following defaults until product decisions change:
-1. **Repository scope:** one dedicated public GitHub repo for all Better Dispute data.
-2. **Auth:** authenticated writes require user-supplied GitHub token in-session (temporary MVP compromise).
-3. **Read mode:** public read-only access without login.
-4. **Challenge uniqueness:** one challenge per person per target post for all time.
-5. **Crickets default:** 24h timeout if no agreed custom condition exists (placeholder baseline chosen to avoid immediate expiry across time zones; subject to product confirmation).
-6. **Terminal card:** non-clickable when root assertion has no challenges.
-7. **Join rule:** third party must explicitly agree with root assertion before answering linked challenges.
-8. **URL schema:** `?view=home|dispute&root=<id>&dispute=<id>&post=<id>`.
-9. **Notifications:** in-app only for MVP, no email/push.
-10. **Image upload MVP:** accept URL input first; direct upload deferred.
+### Phase 3 — Home View
+1. Build app shell/header/version display.
+2. Build new assertion composer with strawman option and image URL.
+3. Render summary cards with turn badges and terminal-state visuals.
 
-## 16) Acceptance Criteria (MVP)
-1. User can create assertion (text OR image) and see it on Home.
-2. Challenge button availability always matches controller rules.
-3. Answer form enforces yes/no where required.
-4. Counter-challenge transitions dispute view from one lane to two lanes.
-5. Every post has working copy-canonical-URL action.
-6. Deep link opens correct view and context.
-7. “Your turn” indicators appear correctly on Home and Dispute views.
-8. Disabled controls are visible where action is disallowed.
-9. App reconstructs identical state after browser refresh.
-10. No external framework/library is loaded.
+### Phase 4 — Dispute View
+1. Render parent chain, timeline cards, and post-type icons.
+2. Implement challenge and answer inline slide-up composers with draft persistence.
+3. Implement turn indicators, disabled actions, and latest-actionable highlighting.
+4. Implement automatic single-lane to two-lane transition on first counter-challenge.
 
-## 17) Implementation Plan (Draft)
+### Phase 5 — Routing & Shareability
+1. Implement query-param router and deep-link hydration.
+2. Implement canonical URL builder for root/dispute/post scope.
+3. Implement copy-link UX on every post.
 
-### Phase 0 — Foundations
-1. Define canonical schemas and validation helpers in single HTML module sections.
-2. Implement deterministic parser/serializer for issue payloads.
-3. Add centralized error/event bus and UI state store.
+### Phase 6 — Crickets & Resolution Flow
+1. Implement proposing/disputing/agreeing crickets conditions.
+2. Implement countdown expiration and prominent crickets event rendering.
+3. Implement resolution-offer assertions and resolution transitions.
 
-### Phase 1 — GitHub Integration
-1. Build API client for list/search/create issues with pagination and retry.
-2. Implement auth session handling (token input + memory-only storage).
-3. Implement query layer for roots, disputes, and post timelines.
+### Phase 7 — Hardening
+1. Security pass: sanitization, strict validation, token handling.
+2. Reliability pass: retries, stale-state refresh, conflict handling.
+3. UX/accessibility pass: keyboard, focus, contrast, concise status cues.
+4. Performance pass for large trees and summary-card lists.
 
-### Phase 2 — Controller + Rules Engine
-1. Implement model reconstruction from issue events.
-2. Implement `canChallenge`, `canAnswer`, `canDispute`, `canAgree`, `canProposeCrickets`.
-3. Enforce business rules at action dispatch.
+## 17) Risks & Mitigations
+1. **GitHub API rate limits** → caching, debouncing, manual refresh controls.
+2. **Eventual consistency** → optimistic UI plus confirm-and-refresh cycle.
+3. **Client-only auth risk** → memory-only token and clear MVP warning.
+4. **Spam/abuse** → validation, local throttling, minimal moderation hooks.
 
-### Phase 3 — View Layer
-1. Build app shell/header/version.
-2. Build Home view: assertion composer, strawman option, summary cards, badges.
-3. Build Dispute view: lineage, lane projection, inline composers, action buttons.
-4. Implement disabled state UX and latest-actionable highlighting.
-
-### Phase 4 — URL Routing + Shareability
-1. Implement router parsing and state hydration from query params.
-2. Implement canonical URL builder per post/dispute/root.
-3. Implement copy link action and deep-link restore.
-
-### Phase 5 — Crickets + Resolution
-1. Implement crickets condition offers and disputes.
-2. Implement resolution offer assertions and agreement transitions.
-3. Render crickets state prominently in timeline and cards.
-
-### Phase 6 — Hardening
-1. Input sanitization and XSS-safe rendering.
-2. Performance passes (memoization/cache, selective re-render).
-3. Accessibility pass (keyboard, labels, focus, contrast).
-4. Manual QA matrix across desktop/mobile browsers.
-
-## 18) Risks and Mitigations
-1. **GitHub API rate limits** → cache, debounce, backoff, manual refresh affordance.
-2. **Browser-only auth limitations** → clearly mark MVP auth compromise, plan broker service.
-3. **Eventual consistency** → refresh controls + optimistic-but-verified UI state.
-4. **Data abuse/spam** → validation, visibility filtering, and report hooks.
-
-## 19) Post-MVP Evolution
-1. Split single HTML into modular files while preserving behavior.
-2. Introduce secure auth broker service.
-3. Add richer moderation and reputation controls.
-4. Add richer media and attachment handling.
+## 18) Post-MVP Evolution
+1. Move from single HTML file to modular architecture.
+2. Add OAuth/GitHub App broker for secure auth.
+3. Add stronger moderation, reputation, and policy controls.
+4. Support richer media and upload workflows.
